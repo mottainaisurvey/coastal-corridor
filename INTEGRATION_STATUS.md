@@ -104,7 +104,7 @@ All 14 subdomains are registered on the Vercel project. CNAME DNS records point 
 | Secret Key | ✅ Set in Vercel | `sk_live_*` production key |
 | Sign-In UI | ⏳ Pending SSL | Will activate once SSL completes |
 | Email/Password | ✅ Enabled | Ready |
-| OAuth2 | ✅ Ready | Google/Apple can be added in Clerk dashboard |
+| OAuth2 | ✅ Active | Google OAuth configured and active |
 | User Management | ✅ Ready | Full user management at dashboard.clerk.com |
 
 **Environment Variables**:
@@ -128,8 +128,8 @@ CLERK_SECRET_KEY=sk_live_[SET_IN_VERCEL]
 |------|--------|
 | DATABASE_URL | ✅ Set in Vercel |
 | Schema (Prisma) | ✅ Defined |
-| Migrations | ⚠️ Pending — run `npx prisma migrate deploy` |
-| Seed Data | ⚠️ Pending — run `npx prisma db seed` |
+| Migrations | ✅ Complete |
+| Seed Data | ✅ Complete |
 | PostGIS Extension | ⚠️ Optional — enable for geospatial queries |
 
 **Environment Variable**:
@@ -315,8 +315,8 @@ POSTMARK_API_TOKEN=859fd39d-d3bf-43f1-8655-bac08dbf59a9
 
 ### Immediate (This Week)
 - [ ] Wait for Clerk SSL certificates to complete (auto-activates sign-in)
-- [ ] Run Prisma migrations on Supabase: `npx prisma migrate deploy`
-- [ ] Seed database: `npx prisma db seed`
+- [x] Run Prisma migrations on Supabase: `npx prisma migrate deploy`
+- [x] Seed database: `npx prisma db seed`
 - [ ] Verify Postmark sender domain (`mail.coastalcorridor.africa`)
 - [ ] Add Stripe live keys to Vercel
 - [ ] Connect GitHub repo to Vercel for auto-deploy
@@ -329,7 +329,7 @@ POSTMARK_API_TOKEN=859fd39d-d3bf-43f1-8655-bac08dbf59a9
 - [ ] Configure Cloudflare CDN at `cdn.coastalcorridor.africa`
 
 ### Medium-Term (1 Month)
-- [ ] Add Google/Apple OAuth via Clerk
+- [x] Add Google/Apple OAuth via Clerk
 - [ ] Build developer dashboard
 - [ ] Property listing submission workflow
 - [ ] Advanced analytics
