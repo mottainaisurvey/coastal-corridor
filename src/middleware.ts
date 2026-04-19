@@ -16,6 +16,7 @@ export default authMiddleware({
     '/api/search(.*)',
     '/api/health(.*)',
     '/api/inquiries(.*)',
+    '/api/admin/migrate(.*)',
   ],
 });
 
