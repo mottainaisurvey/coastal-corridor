@@ -1,37 +1,49 @@
 'use client';
 
-import { useAuth, useUser } from '@clerk/nextjs';
-import { redirect } from 'next/navigation';
+import { useAuth, useUser, UserButton } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Eye, MessageSquare, Home, TrendingUp, Calendar } from 'lucide-react';
+import { Eye, MessageSquare, Home, TrendingUp, Calendar, BadgeCheck } from 'lucide-react';
+
+const AGENT_ROLES = ['agent', 'AGENT', 'admin', 'superadmin', 'ADMIN'];
 
 export default function AgentDashboard() {
   const { isLoaded, userId } = useAuth();
   const { user } = useUser();
+  const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [recentInquiries, setRecentInquiries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const role = (user?.publicMetadata?.role as string) || '';
+  const isAgent = AGENT_ROLES.includes(role);
+
+  // Redirect unauthenticated users
   useEffect(() => {
     if (isLoaded && !userId) {
-      redirect('/');
+      router.replace('/');
     }
-  }, [isLoaded, userId]);
+  }, [isLoaded, userId, router]);
+
+  // Redirect users without agent role
+  useEffect(() => {
+    if (isLoaded && user && !isAgent) {
+      router.replace('/unauthorized?required=agent');
+    }
+  }, [isLoaded, user, isAgent, router]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !isAgent) return;
 
     const fetchDashboardData = async () => {
       try {
-        // Fetch agent stats
         const statsRes = await fetch(`/api/agent/stats?userId=${userId}`);
         if (statsRes.ok) {
           const statsData = await statsRes.json();
           setStats(statsData.data);
         }
 
-        // Fetch recent inquiries
         const inquiriesRes = await fetch(`/api/agent/inquiries?userId=${userId}&limit=10`);
         if (inquiriesRes.ok) {
           const inquiriesData = await inquiriesRes.json();
@@ -45,30 +57,44 @@ export default function AgentDashboard() {
     };
 
     fetchDashboardData();
-  }, [userId]);
+  }, [userId, isAgent]);
 
   if (!isLoaded || !user) {
     return (
       <div className="container-x py-24">
-        <div className="animate-pulse">
-          <div className="h-8 bg-ink/10 rounded w-1/3 mb-4"></div>
-          <div className="h-4 bg-ink/10 rounded w-1/2"></div>
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-ink/10 rounded w-24" />
+          <div className="h-10 bg-ink/10 rounded w-1/3" />
+          <div className="h-4 bg-ink/10 rounded w-1/2" />
         </div>
       </div>
     );
   }
 
+  if (!isAgent) return null;
+
   return (
     <div className="bg-paper min-h-screen">
       <div className="container-x py-24">
         <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="mb-12">
-            <div className="eyebrow mb-4">Agent Dashboard</div>
-            <h1 className="font-serif text-[40px] md:text-[52px] leading-[1.05] tracking-tightest mb-2 font-light">
-              Welcome, {user.firstName}
-            </h1>
-            <p className="text-[18px] text-ink/75">Manage your listings, inquiries, and performance</p>
+
+          {/* Header row */}
+          <div className="flex items-start justify-between mb-12">
+            <div>
+              <div className="eyebrow mb-4">Agent Dashboard</div>
+              <h1 className="font-serif text-[40px] md:text-[52px] leading-[1.05] tracking-tightest mb-2 font-light">
+                Welcome, {user.firstName || 'Agent'}
+              </h1>
+              <p className="text-[18px] text-ink/75">Manage your listings, inquiries, and performance</p>
+            </div>
+            {/* Role badge + sign-out */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm text-[11px] font-mono uppercase tracking-wider bg-ocean/10 text-ocean border border-ocean/20">
+                <BadgeCheck className="h-3.5 w-3.5" />
+                Agent
+              </div>
+              <UserButton afterSignOutUrl="/" />
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -118,28 +144,19 @@ export default function AgentDashboard() {
 
           {/* Quick Actions */}
           <div className="grid md:grid-cols-3 gap-6 mb-12">
-            <Link
-              href="/agent/listings"
-              className="bg-white border border-ink/10 rounded-lg p-6 hover:shadow-card-hover transition-shadow group"
-            >
+            <Link href="/agent/listings" className="bg-white border border-ink/10 rounded-lg p-6 hover:shadow-card-hover transition-shadow group">
               <h3 className="font-serif text-[20px] font-light mb-2">Manage Listings</h3>
               <p className="text-ink/60 text-sm mb-4">Create, edit, and manage your property listings</p>
               <div className="text-ink/20 group-hover:text-ink/40 transition-colors">→</div>
             </Link>
 
-            <Link
-              href="/agent/inquiries"
-              className="bg-white border border-ink/10 rounded-lg p-6 hover:shadow-card-hover transition-shadow group"
-            >
+            <Link href="/agent/inquiries" className="bg-white border border-ink/10 rounded-lg p-6 hover:shadow-card-hover transition-shadow group">
               <h3 className="font-serif text-[20px] font-light mb-2">Inquiries</h3>
               <p className="text-ink/60 text-sm mb-4">Respond to buyer inquiries and schedule viewings</p>
               <div className="text-ink/20 group-hover:text-ink/40 transition-colors">→</div>
             </Link>
 
-            <Link
-              href="/agent/profile"
-              className="bg-white border border-ink/10 rounded-lg p-6 hover:shadow-card-hover transition-shadow group"
-            >
+            <Link href="/agent/profile" className="bg-white border border-ink/10 rounded-lg p-6 hover:shadow-card-hover transition-shadow group">
               <h3 className="font-serif text-[20px] font-light mb-2">Profile Settings</h3>
               <p className="text-ink/60 text-sm mb-4">Update your agent profile and credentials</p>
               <div className="text-ink/20 group-hover:text-ink/40 transition-colors">→</div>
@@ -178,6 +195,7 @@ export default function AgentDashboard() {
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>
