@@ -1,6 +1,8 @@
 import { Client } from 'postmark';
 
-const postmarkClient = new Client(process.env.POSTMARK_API_TOKEN || '');
+const postmarkClient = process.env.POSTMARK_API_TOKEN
+  ? new Client(process.env.POSTMARK_API_TOKEN)
+  : null;
 
 export interface EmailOptions {
   to: string;
@@ -20,6 +22,10 @@ export async function sendEmail({
   replyTo = 'support@coastalcorridor.ng',
 }: EmailOptions) {
   try {
+    if (!postmarkClient) {
+      console.warn(`⚠️ Postmark not configured. Email would be sent to ${to}`);
+      return { MessageID: 'mock-' + Date.now() };
+    }
     const result = await postmarkClient.sendEmail({
       From: from,
       To: to,
