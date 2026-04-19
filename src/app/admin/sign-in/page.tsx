@@ -1,10 +1,20 @@
 'use client';
 
-import { SignIn } from '@clerk/nextjs';
+import { SignIn, useSignIn } from '@clerk/nextjs';
 import Link from 'next/link';
-import { ShieldCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Lock, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+
+type Role = 'superadmin' | 'admin' | null;
+
+const ROLE_EMAILS: Record<'superadmin' | 'admin', string> = {
+  superadmin: 'superadmin@coastalcorridor.africa',
+  admin: 'admin@coastalcorridor.africa',
+};
 
 export default function AdminSignInPage() {
+  const [selectedRole, setSelectedRole] = useState<Role>(null);
+
   return (
     <div className="min-h-screen flex">
 
@@ -43,8 +53,26 @@ export default function AdminSignInPage() {
               Admin &amp; Superadmin Portal
             </h1>
             <p className="text-[15px] text-paper/55 leading-relaxed max-w-sm">
-              This area is restricted to authorised platform administrators. Sign in with your assigned credentials to access the management dashboard.
+              This area is restricted to authorised platform administrators. Select your role below, then sign in with your assigned credentials.
             </p>
+
+            {/* Role descriptions */}
+            <div className="mt-8 space-y-3">
+              <div className="flex items-start gap-3 p-3 rounded-sm bg-paper/4 border border-paper/8">
+                <div className="w-2 h-2 rounded-full bg-ochre mt-1.5 flex-shrink-0" />
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-micro text-ochre mb-0.5">Superadmin</div>
+                  <div className="text-[12px] text-paper/45 leading-relaxed">Full platform access — user management, financials, system configuration, all data.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-sm bg-paper/4 border border-paper/8">
+                <div className="w-2 h-2 rounded-full bg-ocean mt-1.5 flex-shrink-0" />
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-micro text-ocean mb-0.5">Admin</div>
+                  <div className="text-[12px] text-paper/45 leading-relaxed">Operational access — listings, agents, inquiries, reports. No system configuration.</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Security notice */}
@@ -62,8 +90,9 @@ export default function AdminSignInPage() {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL — Clerk Sign-In ── */}
+      {/* ── RIGHT PANEL ── */}
       <div className="flex-1 flex flex-col items-center justify-center bg-paper px-6 py-12">
+
         {/* Mobile header */}
         <div className="lg:hidden mb-8 text-center">
           <div className="w-12 h-12 rounded-sm bg-ink flex items-center justify-center mx-auto mb-4">
@@ -74,51 +103,132 @@ export default function AdminSignInPage() {
         </div>
 
         <div className="w-full max-w-[400px]">
-          {/* Role badges */}
-          <div className="flex gap-2 mb-6 justify-center lg:justify-start">
-            <span className="font-mono text-[10px] uppercase tracking-micro bg-ochre/15 text-ochre border border-ochre/20 px-3 py-1.5 rounded-sm">
-              Superadmin
-            </span>
-            <span className="font-mono text-[10px] uppercase tracking-micro bg-ocean/10 text-ocean border border-ocean/20 px-3 py-1.5 rounded-sm">
-              Admin
-            </span>
-          </div>
 
-          <SignIn
-            routing="path"
-            path="/admin/sign-in"
-            afterSignInUrl="/admin/dashboard"
-            appearance={{
-              elements: {
-                rootBox: 'w-full',
-                card: 'shadow-none bg-transparent p-0 w-full',
-                headerTitle: 'font-serif text-[24px] font-light text-ink tracking-display',
-                headerSubtitle: 'text-[13px] text-ink/55',
-                socialButtonsBlockButton: 'border border-ink/20 bg-white hover:bg-ink/4 text-ink font-sans text-[13px] rounded-sm',
-                dividerLine: 'bg-ink/10',
-                dividerText: 'font-mono text-[10px] uppercase tracking-micro text-ink/40',
-                formFieldLabel: 'font-mono text-[10px] uppercase tracking-micro text-ink/60',
-                formFieldInput: 'border border-ink/20 rounded-sm bg-white focus:border-ink focus:ring-2 focus:ring-ink/8 text-[14px] text-ink',
-                formButtonPrimary: 'bg-ink hover:bg-ink-2 text-paper font-sans text-[13px] uppercase tracking-[0.08em] rounded-sm',
-                footerActionLink: 'text-ocean hover:text-ocean-2 font-sans text-[13px]',
-                formFieldSuccessText: 'text-success text-[12px]',
-                formFieldErrorText: 'text-alert text-[12px]',
-                footer: 'hidden',
-              },
-              layout: {
-                socialButtonsPlacement: 'top',
-              },
-            }}
-          />
+          {!selectedRole ? (
+            /* ── ROLE SELECTION ── */
+            <div>
+              <div className="mb-8">
+                <div className="font-mono text-[11px] uppercase tracking-micro text-ink/40 mb-2">Step 1 of 2</div>
+                <h2 className="font-serif text-[28px] font-light text-ink leading-tight">Select your role</h2>
+                <p className="text-[14px] text-ink/55 mt-2">Choose the access level that matches your assigned credentials.</p>
+              </div>
 
-          <div className="mt-8 pt-6 border-t border-ink/8 text-center">
-            <p className="text-[12px] text-ink/40 font-mono uppercase tracking-micro">
-              Not an administrator?{' '}
-              <Link href="/" className="text-ink/60 hover:text-ink transition-colors">
-                Return to main platform
-              </Link>
-            </p>
-          </div>
+              <div className="space-y-3">
+                {/* Superadmin button */}
+                <button
+                  onClick={() => setSelectedRole('superadmin')}
+                  className="w-full group flex items-center justify-between p-5 rounded-sm border-2 border-ochre/30 bg-ochre/5 hover:bg-ochre/10 hover:border-ochre/60 transition-all duration-150 cursor-pointer text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-sm bg-ochre/15 border border-ochre/25 flex items-center justify-center flex-shrink-0">
+                      <ShieldCheck className="h-5 w-5 text-ochre" />
+                    </div>
+                    <div>
+                      <div className="font-mono text-[11px] uppercase tracking-micro text-ochre font-medium">Superadmin</div>
+                      <div className="text-[13px] text-ink/60 mt-0.5">Full platform access</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-ochre/60 group-hover:text-ochre group-hover:translate-x-0.5 transition-all" />
+                </button>
+
+                {/* Admin button */}
+                <button
+                  onClick={() => setSelectedRole('admin')}
+                  className="w-full group flex items-center justify-between p-5 rounded-sm border-2 border-ocean/30 bg-ocean/5 hover:bg-ocean/10 hover:border-ocean/60 transition-all duration-150 cursor-pointer text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-sm bg-ocean/15 border border-ocean/25 flex items-center justify-center flex-shrink-0">
+                      <Lock className="h-5 w-5 text-ocean" />
+                    </div>
+                    <div>
+                      <div className="font-mono text-[11px] uppercase tracking-micro text-ocean font-medium">Admin</div>
+                      <div className="text-[13px] text-ink/60 mt-0.5">Operational access</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-ocean/60 group-hover:text-ocean group-hover:translate-x-0.5 transition-all" />
+                </button>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-ink/8 text-center">
+                <p className="text-[12px] text-ink/40 font-mono uppercase tracking-micro">
+                  Not an administrator?{' '}
+                  <Link href="/" className="text-ink/60 hover:text-ink transition-colors">
+                    Return to main platform
+                  </Link>
+                </p>
+              </div>
+            </div>
+
+          ) : (
+            /* ── SIGN-IN FORM ── */
+            <div>
+              {/* Back + role indicator */}
+              <div className="flex items-center gap-3 mb-6">
+                <button
+                  onClick={() => setSelectedRole(null)}
+                  className="flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-micro text-ink/40 hover:text-ink/70 transition-colors"
+                >
+                  <ChevronRight className="h-3 w-3 rotate-180" />
+                  Back
+                </button>
+                <div className="h-3 w-px bg-ink/15" />
+                <span className={`font-mono text-[10px] uppercase tracking-micro px-2.5 py-1 rounded-sm border ${
+                  selectedRole === 'superadmin'
+                    ? 'bg-ochre/15 text-ochre border-ochre/25'
+                    : 'bg-ocean/10 text-ocean border-ocean/20'
+                }`}>
+                  {selectedRole === 'superadmin' ? 'Superadmin' : 'Admin'}
+                </span>
+              </div>
+
+              <SignIn
+                routing="path"
+                path="/admin/sign-in"
+                afterSignInUrl="/admin/dashboard"
+                initialValues={{
+                  emailAddress: ROLE_EMAILS[selectedRole],
+                }}
+                appearance={{
+                  elements: {
+                    rootBox: 'w-full',
+                    card: 'shadow-none bg-transparent p-0 w-full',
+                    headerTitle: 'font-serif text-[24px] font-light text-ink tracking-display',
+                    headerSubtitle: 'text-[13px] text-ink/55',
+                    socialButtonsBlockButton: 'border border-ink/20 bg-white hover:bg-ink/4 text-ink font-sans text-[13px] rounded-sm',
+                    dividerLine: 'bg-ink/10',
+                    dividerText: 'font-mono text-[10px] uppercase tracking-micro text-ink/40',
+                    formFieldLabel: 'font-mono text-[10px] uppercase tracking-micro text-ink/60',
+                    formFieldInput: `border rounded-sm bg-white text-[14px] text-ink ${
+                      selectedRole === 'superadmin'
+                        ? 'border-ochre/30 focus:border-ochre focus:ring-2 focus:ring-ochre/10'
+                        : 'border-ocean/30 focus:border-ocean focus:ring-2 focus:ring-ocean/10'
+                    }`,
+                    formButtonPrimary: `text-paper font-sans text-[13px] uppercase tracking-[0.08em] rounded-sm ${
+                      selectedRole === 'superadmin'
+                        ? 'bg-ochre hover:bg-ochre/90'
+                        : 'bg-ocean hover:bg-ocean-2'
+                    }`,
+                    footerActionLink: 'text-ocean hover:text-ocean-2 font-sans text-[13px]',
+                    formFieldSuccessText: 'text-success text-[12px]',
+                    formFieldErrorText: 'text-alert text-[12px]',
+                    footer: 'hidden',
+                  },
+                  layout: {
+                    socialButtonsPlacement: 'top',
+                  },
+                }}
+              />
+
+              <div className="mt-8 pt-6 border-t border-ink/8 text-center">
+                <p className="text-[12px] text-ink/40 font-mono uppercase tracking-micro">
+                  Not an administrator?{' '}
+                  <Link href="/" className="text-ink/60 hover:text-ink transition-colors">
+                    Return to main platform
+                  </Link>
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
