@@ -40,6 +40,7 @@
 - **Account**: mottaianiafricawaste-4821
 - **Project**: coastal-corridor
 - **Dashboard**: https://vercel.com/owambe/coastal-corridor
+- **GitHub Auto-Deploy**: ✅ Connected — mottainaisurvey/coastal-corridor → master branch (April 19, 2026)
 - **Deployments**: https://vercel.com/owambe/coastal-corridor/deployments
 - **Environment Variables**: https://vercel.com/owambe/coastal-corridor/settings/environment-variables
 - **Analytics**: https://vercel.com/owambe/coastal-corridor/analytics
