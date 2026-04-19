@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { SignOutButton, useUser } from '@clerk/nextjs';
+import { useClerk, useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { ShieldOff } from 'lucide-react';
 
@@ -9,6 +9,7 @@ export default function UnauthorizedPage() {
   const params = useSearchParams();
   const required = params.get('required');
   const { user } = useUser();
+  const { signOut } = useClerk();
 
   const roleLabel = required === 'admin' ? 'Administrator' : required === 'agent' ? 'Agent' : 'the required';
 
@@ -40,9 +41,12 @@ export default function UnauthorizedPage() {
             Return to Homepage
           </Link>
           {user && (
-            <SignOutButton redirectUrl="/">
-              <button className="btn-primary">Sign Out &amp; Switch Account</button>
-            </SignOutButton>
+            <button
+              className="btn-primary"
+              onClick={() => signOut(() => { window.location.href = '/'; })}
+            >
+              Sign Out &amp; Switch Account
+            </button>
           )}
         </div>
 
