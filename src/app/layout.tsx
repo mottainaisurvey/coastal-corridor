@@ -3,11 +3,6 @@ import './globals.css';
 import { Nav } from '@/components/nav';
 import { Footer } from '@/components/footer';
 
-// Only import ClerkProvider if Clerk is configured
-const ClerkProvider = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-  ? require('@clerk/nextjs').ClerkProvider
-  : ({ children }: { children: React.ReactNode }) => <>{children}</>;
-
 export const metadata: Metadata = {
   title: 'Coastal Corridor — Lagos to Calabar',
   description:
@@ -22,14 +17,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className="min-h-screen flex flex-col">
-          <Nav />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <body className="min-h-screen flex flex-col">
+        <Nav />
+        <main className="flex-1">{children}</main>
+        <Footer />
+      </body>
+    </html>
   );
 }
