@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
-import { Menu, X, Search, User } from 'lucide-react';
-// Clerk imports removed for now
+import { Menu, X, Search } from 'lucide-react';
+import { SignInButton, SignUpButton, UserButton, useAuth } from '@clerk/nextjs';
 
 export function Nav() {
   const [open, setOpen] = useState(false);
@@ -12,7 +12,7 @@ export function Nav() {
   const [searchResults, setSearchResults] = useState<any>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-  const isSignedIn = false; // Clerk disabled for now
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -171,11 +171,16 @@ export function Nav() {
             )}
           </div>
 
-          {/* Auth UI disabled for now */}
-          <Link href="#" className="btn-secondary !py-2 !px-4" onClick={(e) => e.preventDefault()}>
-            <User className="h-4 w-4" />
-            Sign in
-          </Link>
+          {/* Clerk Auth UI */}
+          {isSignedIn ? (
+            <UserButton afterSignOutUrl="/" />
+          ) : (
+            <SignInButton mode="modal">
+              <button className="btn-secondary !py-2 !px-4 flex items-center gap-2 text-sm font-medium">
+                SIGN IN
+              </button>
+            </SignInButton>
+          )}
         </div>
 
         <button
@@ -196,7 +201,6 @@ export function Nav() {
               { href: '/agents', label: 'Agents' },
               { href: '/tourism', label: 'Tourism' },
               { href: '/invest', label: 'Invest' },
-              { href: '/account', label: isSignedIn ? 'Account' : 'Sign in' }
             ].map((item) => (
               <Link
                 key={item.href}
@@ -207,6 +211,19 @@ export function Nav() {
                 {item.label}
               </Link>
             ))}
+            <div className="pt-2 border-t border-ink/8 mt-2">
+              {isSignedIn ? (
+                <Link href="/account" className="py-3 text-base font-medium text-ink/80 hover:text-ink block" onClick={() => setOpen(false)}>
+                  Account
+                </Link>
+              ) : (
+                <SignInButton mode="modal">
+                  <button className="py-3 text-base font-medium text-ink/80 hover:text-ink w-full text-left">
+                    Sign in
+                  </button>
+                </SignInButton>
+              )}
+            </div>
           </nav>
         </div>
       )}

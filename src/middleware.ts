@@ -1,19 +1,24 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { authMiddleware } from '@clerk/nextjs/server';
 
-export function middleware(request: NextRequest) {
-  // Allow all requests to pass through
-  // Clerk authentication will be handled client-side via ClerkProvider
-  return NextResponse.next();
-}
+export default authMiddleware({
+  // Public routes that don't require authentication
+  publicRoutes: [
+    '/',
+    '/properties',
+    '/properties/(.*)',
+    '/destinations',
+    '/destinations/(.*)',
+    '/agents',
+    '/tourism',
+    '/invest',
+    '/api/properties(.*)',
+    '/api/destinations(.*)',
+    '/api/search(.*)',
+    '/api/health(.*)',
+    '/api/inquiries(.*)',
+  ],
+});
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
 };
