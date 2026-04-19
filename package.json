@@ -2,7 +2,7 @@
   "name": "coastal-corridor-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "Coastal Corridor — Lagos-Calabar real estate and tourism platform. Production marketplace MVP.",
+  "description": "Coastal Corridor \u2014 Lagos-Calabar real estate and tourism platform. Production marketplace MVP.",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^4.29.3",
-    "@clerk/react": "^6.4.2",
     "@prisma/client": "^5.17.0",
     "@radix-ui/react-avatar": "^1.1.0",
     "@radix-ui/react-dialog": "^1.1.1",
