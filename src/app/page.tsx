@@ -7,10 +7,10 @@ import { DestinationCard } from '@/components/destination-card';
 import { formatKobo } from '@/lib/utils';
 
 const destinationTypeColors: Record<string, { bg: string; text: string }> = {
-  'Infrastructure': { bg: 'bg-ocean/10', text: 'text-ocean' },
-  'Real Estate': { bg: 'bg-laterite/10', text: 'text-laterite' },
-  'Mixed Use': { bg: 'bg-ochre/10', text: 'text-ochre' },
-  'Tourism': { bg: 'bg-sage/10', text: 'text-sage' },
+  'Infrastructure': { bg: 'bg-ocean/10', text: 'text-ocean-2' },
+  'Real Estate': { bg: 'bg-laterite/10', text: 'text-laterite-2' },
+  'Mixed Use': { bg: 'bg-ochre/10', text: 'text-ochre-2' },
+  'Tourism': { bg: 'bg-sage/10', text: 'text-sage-2' },
 };
 
 const destinationTypeLabels: Record<string, string> = {
@@ -19,6 +19,8 @@ const destinationTypeLabels: Record<string, string> = {
   'Mixed Use': 'Mixed Use',
   'Tourism': 'Tourism',
 };
+
+const destinationTypeColorsFallback = destinationTypeColors;
 
 export default function HomePage() {
   const featuredProperties = properties.filter((p) => p.featured).slice(0, 3);
@@ -270,8 +272,8 @@ export default function HomePage() {
                 </div>
                 <div className="text-[13px] text-ink/60 mt-0.5">{d.tagline}</div>
               </div>
-              <div className={`chip ${destinationTypeColors[d.type].bg} ${destinationTypeColors[d.type].text} hidden md:inline-flex`}>
-                {destinationTypeLabels[d.type]}
+              <div className={`chip ${destinationTypeColors[d.type]?.bg || 'bg-ink/5'} ${destinationTypeColors[d.type]?.text || 'text-ink'} hidden md:inline-flex`}>
+                {destinationTypeLabels[d.type] || d.type}
               </div>
               <div className="text-[11px] font-mono text-ink/40 uppercase tracking-wider hidden md:block w-20 text-right">
                 {d.state}
