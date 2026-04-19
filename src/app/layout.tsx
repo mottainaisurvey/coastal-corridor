@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Nav } from '@/components/nav';
 import { Footer } from '@/components/footer';
-import { ClerkProvider } from '@clerk/nextjs';
+
+// Only import ClerkProvider if Clerk is configured
+const ClerkProvider = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  ? require('@clerk/nextjs').ClerkProvider
+  : ({ children }: { children: React.ReactNode }) => <>{children}</>;
 
 export const metadata: Metadata = {
   title: 'Coastal Corridor — Lagos to Calabar',
