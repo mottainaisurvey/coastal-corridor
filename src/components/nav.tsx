@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { Menu, X, Search, User } from 'lucide-react';
-import { useAuth, UserButton } from '@clerk/nextjs';
+// Clerk imports removed for now
 
 export function Nav() {
   const [open, setOpen] = useState(false);
@@ -12,7 +12,7 @@ export function Nav() {
   const [searchResults, setSearchResults] = useState<any>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-  const { isSignedIn } = useAuth();
+  const isSignedIn = false; // Clerk disabled for now
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -171,14 +171,11 @@ export function Nav() {
             )}
           </div>
 
-          {isSignedIn ? (
-            <UserButton afterSignOutUrl="/" />
-          ) : (
-            <Link href="/account" className="btn-secondary !py-2 !px-4">
-              <User className="h-4 w-4" />
-              Sign in
-            </Link>
-          )}
+          {/* Auth UI disabled for now */}
+          <Link href="#" className="btn-secondary !py-2 !px-4" onClick={(e) => e.preventDefault()}>
+            <User className="h-4 w-4" />
+            Sign in
+          </Link>
         </div>
 
         <button
