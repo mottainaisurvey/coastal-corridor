@@ -1,0 +1,545 @@
+// Coastal Corridor Platform — Database Schema
+// PostgreSQL + PostGIS
+// ---
+// Design principles:
+// - All money amounts stored as BigInt (kobo/pence) to avoid float precision issues
+// - Spatial data uses PostGIS; not fully expressed here (Prisma limited) but noted
+// - Soft-delete via deletedAt for most entities; hard delete only for transient data
+// - Audit trail on every critical entity (createdBy, updatedBy, version)
+// - Separate Identity from Profile to allow identity provider changes
+// ---
+// Status: v0.1 — schema reviewed for MVP marketplace surface only.
+// Pre-production: REQUIRES review by senior backend engineer + Nigerian real estate lawyer.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Config {
+  key   String @id
+  value String
+}
+
+// Enable PostGIS extension
+generator extensions {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =========================================================
+// IDENTITY & USERS
+// =========================================================
+
+enum UserRole {
+  BUYER
+  AGENT
+  DEVELOPER
+  TOUR_OPERATOR
+  ADMIN
+  GOVERNMENT
+  VERIFIER
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  phone           String?    @unique
+  role            UserRole   @default(BUYER)
+  status          UserStatus @default(PENDING_VERIFICATION)
+  emailVerified   DateTime?
+  phoneVerified   DateTime?
+  kycStatus       String?    // references KycRecord
+  diasporaCountry String?    // ISO country code if diaspora buyer
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  profile       Profile?
+  agentProfile  AgentProfile?
+  devProfile    DeveloperProfile?
+  savedPlots    SavedPlot[]
+  inquiries     Inquiry[]
+  transactions  Transaction[]  @relation("TransactionBuyer")
+  listings      Listing[]      @relation("ListingOwner")
+  auditEntries  AuditEntry[]
+
+  @@index([role, status])
+  @@index([diasporaCountry])
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String
+  lastName  String
+  avatar    String?
+  bio       String?
+  language  String   @default("en")
+  currency  String   @default("NGN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AgentProfile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber   String    @unique // ESVARBON registration
+  licenseVerified Boolean   @default(false)
+  licenseExpiry   DateTime?
+  agencyName      String?
+  yearsActive     Int?
+  specialties     String[]  // e.g., ["residential", "commercial", "land"]
+  regionsCovered  String[]  // Nigerian states
+  rating          Float?
+  reviewCount     Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  listings Listing[]
+}
+
+model DeveloperProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName  String
+  cacNumber    String   @unique // Corporate Affairs Commission
+  tin          String?  // Tax identification
+  yearFounded  Int?
+  description  String?
+  projectCount Int      @default(0)
+  verified     Boolean  @default(false)
+  website      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  projects Project[]
+}
+
+// =========================================================
+// CORRIDOR GEOGRAPHY
+// =========================================================
+
+enum DestinationType {
+  INFRASTRUCTURE
+  REAL_ESTATE
+  MIXED_USE
+  TOURISM
+}
+
+model Destination {
+  id          String          @id @default(cuid())
+  slug        String          @unique
+  name        String
+  state       String
+  type        DestinationType
+  latitude    Float
+  longitude   Float
+  description String
+  heroImage   String?
+  corridorKm  Float           // distance from VI terminus
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  plots      Plot[]
+  projects   Project[]
+  pois       PointOfInterest[]
+  stats      DestinationStat[]
+
+  @@index([type])
+  @@index([state])
+}
+
+model DestinationStat {
+  id             String      @id @default(cuid())
+  destinationId  String
+  destination    Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  label          String
+  value          String
+  unit           String?
+  displayOrder   Int         @default(0)
+
+  @@index([destinationId])
+}
+
+model PointOfInterest {
+  id            String          @id @default(cuid())
+  destinationId String
+  destination   Destination     @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  name          String
+  category      String          // "beach", "market", "landmark", etc.
+  latitude      Float
+  longitude     Float
+  description   String?
+  createdAt     DateTime        @default(now())
+}
+
+// =========================================================
+// REAL ESTATE: PARCELS, PROPERTIES, LISTINGS
+// =========================================================
+
+enum PlotStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  DISPUTED
+  UNDER_VERIFICATION
+}
+
+enum TitleStatus {
+  PENDING
+  VERIFIED
+  DISPUTED
+  REJECTED
+}
+
+enum TitleType {
+  CERTIFICATE_OF_OCCUPANCY
+  DEED_OF_ASSIGNMENT
+  GAZETTE
+  GOVERNOR_CONSENT
+  GLOBAL_C_OF_O
+  CUSTOMARY
+}
+
+model Plot {
+  id             String      @id @default(cuid())
+  plotId         String      @unique // Human-readable e.g., "LEKKI-0247"
+  destinationId  String
+  destination    Destination @relation(fields: [destinationId], references: [id])
+  status         PlotStatus  @default(UNDER_VERIFICATION)
+
+  // Location
+  latitude       Float
+  longitude      Float
+  // Boundary geometry (PostGIS GEOGRAPHY type) — not in Prisma types; added via raw SQL
+  // See /prisma/migrations for ALTER TABLE statement adding `boundary geometry(Polygon, 4326)`
+
+  // Specs
+  areaSqm        Float
+  pricePerSqm    BigInt      // in kobo
+  totalPrice     BigInt      // in kobo, computed but denormalized
+  currency       String      @default("NGN")
+
+  // Title
+  titleStatus    TitleStatus @default(PENDING)
+  titleType      TitleType?
+  titleNumber    String?
+  titleIssuer    String?     // e.g., "Lagos State Land Bureau"
+  titleDocumentUrl String?   // secure S3 ref
+  titleVerifiedAt DateTime?
+  titleVerifiedBy String?    // userId of verifier
+
+  // Risk scoring
+  floodRiskScore     Int?    // 0-100
+  erosionRiskScore   Int?    // 0-100
+  disputeRiskScore   Int?    // 0-100
+  accessibilityScore Int?    // 0-100
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  property    Property?
+  listings    Listing[]
+  savedBy     SavedPlot[]
+  inquiries   Inquiry[]
+  verifications PlotVerification[]
+
+  @@index([destinationId, status])
+  @@index([titleStatus])
+}
+
+enum PropertyType {
+  LAND_ONLY
+  HOUSE
+  APARTMENT
+  COMMERCIAL
+  MIXED_USE
+  HOSPITALITY
+}
+
+model Property {
+  id              String       @id @default(cuid())
+  plotId          String       @unique
+  plot            Plot         @relation(fields: [plotId], references: [id])
+  type            PropertyType
+  projectId       String?
+  project         Project?     @relation(fields: [projectId], references: [id])
+  title           String
+  description     String
+  bedrooms        Int?
+  bathrooms       Int?
+  floorArea       Float?       // sqm, built area if applicable
+  yearBuilt       Int?
+  amenities       String[]
+  heroImage       String?
+  images          String[]
+  virtualTourUrl  String?      // Matterport / 360 tour
+  floorPlanUrl    String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  listings Listing[]
+
+  @@index([type])
+  @@index([projectId])
+}
+
+model Project {
+  id                 String          @id @default(cuid())
+  slug               String          @unique
+  developerId        String
+  developer          DeveloperProfile @relation(fields: [developerId], references: [id])
+  destinationId      String
+  destination        Destination     @relation(fields: [destinationId], references: [id])
+  name               String
+  description        String
+  masterplanImage    String?
+  totalUnits         Int
+  availableUnits     Int
+  priceFromKobo      BigInt
+  priceToKobo        BigInt
+  status             String          // "planning" | "active" | "sold_out" | "complete"
+  completionDate     DateTime?
+  amenities          String[]
+  heroImage          String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  properties Property[]
+
+  @@index([destinationId])
+  @@index([status])
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  UNDER_OFFER
+  SOLD
+  WITHDRAWN
+  EXPIRED
+}
+
+model Listing {
+  id              String        @id @default(cuid())
+  status          ListingStatus @default(DRAFT)
+  plotId          String?
+  plot            Plot?         @relation(fields: [plotId], references: [id])
+  propertyId      String?
+  property        Property?     @relation(fields: [propertyId], references: [id])
+
+  ownerId         String        // User who listed (could be agent, developer, or direct owner)
+  owner           User          @relation("ListingOwner", fields: [ownerId], references: [id])
+  agentId         String?
+  agent           AgentProfile? @relation(fields: [agentId], references: [id])
+
+  askingPriceKobo BigInt
+  currency        String        @default("NGN")
+  negotiable      Boolean       @default(false)
+  description     String
+  viewCount       Int           @default(0)
+  inquiryCount    Int           @default(0)
+  featured        Boolean       @default(false)
+  expiresAt       DateTime?
+  soldAt          DateTime?
+  soldPriceKobo   BigInt?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  inquiries    Inquiry[]
+  transactions Transaction[]
+
+  @@index([status])
+  @@index([ownerId])
+  @@index([agentId])
+}
+
+model SavedPlot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plotId    String
+  plot      Plot     @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, plotId])
+}
+
+// =========================================================
+// INQUIRIES, TRANSACTIONS, VERIFICATION
+// =========================================================
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  VIEWING_SCHEDULED
+  NEGOTIATING
+  CONVERTED
+  CLOSED_LOST
+}
+
+model Inquiry {
+  id         String        @id @default(cuid())
+  listingId  String
+  listing    Listing       @relation(fields: [listingId], references: [id])
+  plotId     String?
+  plot       Plot?         @relation(fields: [plotId], references: [id])
+  userId     String
+  user       User          @relation(fields: [userId], references: [id])
+  status     InquiryStatus @default(NEW)
+  message    String
+  preferredContactMethod String @default("email")
+  offeredPriceKobo BigInt?
+  viewingScheduledAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+enum TransactionStatus {
+  INITIATED
+  ESCROW_FUNDED
+  DOCUMENTS_REVIEW
+  AWAITING_GOVT_CONSENT
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+// SECURITY NOTE: Transaction handling is a CRITICAL path.
+// DO NOT use this schema to process real money without:
+// - PCI-DSS review (if card data touched)
+// - CBN FX compliance review (for diaspora inbound)
+// - Legal review of escrow terms by Nigerian real estate counsel
+// - Penetration testing of payment integration
+// - Insurance (E&O + cyber) in place
+model Transaction {
+  id                 String            @id @default(cuid())
+  reference          String            @unique // Human-readable txn ref
+  listingId          String
+  listing            Listing           @relation(fields: [listingId], references: [id])
+  buyerId            String
+  buyer              User              @relation("TransactionBuyer", fields: [buyerId], references: [id])
+  status             TransactionStatus @default(INITIATED)
+
+  agreedPriceKobo    BigInt
+  currency           String            @default("NGN")
+  escrowProvider     String?           // e.g., "Providus", "Sterling"
+  escrowReference    String?
+  escrowFundedAt     DateTime?
+
+  legalRepUserId     String?           // If buyer has legal rep
+  docsChecklistJson  String?           // JSON blob of doc checklist state
+
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+
+  @@index([status])
+  @@index([buyerId])
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  transactionId   String
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+  provider        String   // "paystack" | "flutterwave" | "stripe" | "bank_transfer"
+  providerRef     String   @unique
+  amountKobo      BigInt
+  currency        String
+  status          String   // "pending" | "successful" | "failed" | "refunded"
+  method          String?  // "card" | "bank" | "ussd" | "transfer"
+  rawProviderJson String?  // full provider response for audit
+  processedAt     DateTime?
+  createdAt       DateTime @default(now())
+}
+
+enum VerificationType {
+  FIELD_VISIT
+  TITLE_SEARCH
+  BOUNDARY_CONFIRMATION
+  COMMUNITY_CONSULTATION
+  GOVERNMENT_RECORDS
+}
+
+model PlotVerification {
+  id          String           @id @default(cuid())
+  plotId      String
+  plot        Plot             @relation(fields: [plotId], references: [id])
+  type        VerificationType
+  verifierId  String           // userId of verifier (role: VERIFIER)
+  status      String           // "passed" | "failed" | "inconclusive"
+  findings    String
+  photos      String[]
+  gpsLocation String?          // lat,lng of verifier at time of visit
+  videoUrl    String?
+  signedAt    DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([plotId, type])
+}
+
+// =========================================================
+// TOURISM VERTICAL
+// =========================================================
+
+model TourismListing {
+  id            String   @id @default(cuid())
+  operatorId    String
+  destinationId String
+  category      String   // "hotel" | "tour" | "experience" | "restaurant"
+  name          String
+  description   String
+  pricePerNightKobo BigInt?
+  capacity      Int?
+  amenities     String[]
+  images        String[]
+  rating        Float?
+  reviewCount   Int      @default(0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// =========================================================
+// AUDIT & SYSTEM
+// =========================================================
+
+model AuditEntry {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  entityType String
+  entityId   String
+  action     String   // "create" | "update" | "delete" | "view"
+  metadata   String?  // JSON
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}

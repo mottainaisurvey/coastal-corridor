@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&family=Inter+Tight:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --ink: #0a0e12;
+  --ink-2: #11161c;
+  --paper: #f5f1ea;
+}
+
+@layer base {
+  html,
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-feature-settings: 'ss01', 'ss02', 'cv11';
+  }
+
+  ::selection {
+    background: #c96a3f;
+    color: white;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-serif tracking-display;
+  }
+
+  .font-mono-mini {
+    @apply font-mono text-[10px] uppercase tracking-micro;
+  }
+
+  .hairline {
+    @apply border-ink/10;
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-[1320px] px-5 sm:px-8;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-micro text-ink/60;
+  }
+
+  .eyebrow-on-dark {
+    @apply font-mono text-[11px] uppercase tracking-micro text-paper/60;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm bg-laterite px-5 py-3 font-sans text-[13px] font-medium uppercase tracking-[0.08em] text-paper transition-all hover:bg-laterite-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm border border-ink/20 bg-transparent px-5 py-3 font-sans text-[13px] font-medium uppercase tracking-[0.08em] text-ink transition-all hover:border-ink hover:bg-ink/5;
+  }
+
+  .btn-dark {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm bg-ink px-5 py-3 font-sans text-[13px] font-medium uppercase tracking-[0.08em] text-paper transition-all hover:bg-ink-3;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-sm px-2 py-1 font-mono text-[9px] font-medium uppercase tracking-[0.1em];
+  }
+
+  .stat-value {
+    @apply font-serif text-[22px] font-medium tracking-display;
+  }
+
+  .stat-label {
+    @apply font-mono text-[10px] uppercase tracking-[0.15em] text-ink/60;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(10, 14, 18, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(10, 14, 18, 0.4);
+}
