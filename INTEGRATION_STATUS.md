@@ -1,8 +1,8 @@
 # Integration Status — Coastal Corridor Platform
 
-**Last Updated**: April 19, 2026  
-**Platform Status**: ✅ **PRODUCTION LIVE**  
-**Version**: MVP v0.1
+**Last Updated**: April 19, 2026
+**Platform Status**: ✅ **PRODUCTION LIVE**
+**Version**: MVP v0.2
 
 ---
 
@@ -10,478 +10,337 @@
 
 | Component | Status | Health | Last Verified |
 |-----------|--------|--------|----------------|
-| **Platform** | ✅ Live | Operational | Now |
-| **Database** | ✅ Connected | Operational | Now |
-| **Authentication** | ✅ Active | Operational | Now |
-| **Email Service** | ✅ Active | Operational | Now |
-| **Payments** | ⚠️ Ready | Configured | Now |
-| **KYC** | ⚠️ Ready | Framework | Now |
-| **Virtual Tours** | ⚠️ Ready | Framework | Now |
+| **Platform** | ✅ Live | Operational | April 19, 2026 |
+| **Domain** | ✅ coastalcorridor.africa | Active | April 19, 2026 |
+| **Database** | ✅ Connected | Operational | April 19, 2026 |
+| **Authentication** | ⏳ SSL Pending | Clerk Production | April 19, 2026 |
+| **Email Service** | ✅ Active | Operational | April 19, 2026 |
+| **Payments** | ⚠️ Ready | Test Mode | April 19, 2026 |
+| **KYC** | ⚠️ Ready | Framework | April 19, 2026 |
+| **Virtual Tours** | ⚠️ Ready | Framework | April 19, 2026 |
 
 **Overall Health**: 🟢 **OPERATIONAL**
 
 ---
 
-## 🌐 Deployment
+## 🌐 Domain & Hosting
 
-### Vercel (Hosting)
+### Primary Domain: coastalcorridor.africa
+
 - **Status**: ✅ **LIVE**
-- **URL**: https://coastal-corridor.vercel.app
-- **Alternative URL**: https://coastal-corridor-8r6o4q5hc-owambe.vercel.app
+- **Primary URL**: https://coastalcorridor.africa
+- **Backup URL**: https://coastal-corridor.vercel.app
+- **Registrar**: HostAfrica (https://my.hostafrica.com)
+- **Nameservers**: ns1.vercel-dns.com / ns2.vercel-dns.com (Vercel DNS)
+- **DNS Provider**: Vercel (nameservers updated April 19, 2026)
+- **SSL**: ✅ Auto-renewed via Vercel
+
+### Vercel Hosting
+
 - **Account**: mottaianiafricawaste-4821
-- **Plan**: Pro Trial
+- **Project**: coastal-corridor
+- **Dashboard**: https://vercel.com/owambe/coastal-corridor
+- **Deployments**: https://vercel.com/owambe/coastal-corridor/deployments
+- **Environment Variables**: https://vercel.com/owambe/coastal-corridor/settings/environment-variables
+- **Analytics**: https://vercel.com/owambe/coastal-corridor/analytics
+- **Logs**: https://vercel.com/owambe/coastal-corridor/logs
 - **Region**: Global CDN
 - **Build Time**: ~45 seconds
-- **Last Deployment**: April 19, 2026 (Production Ready)
-- **Dashboard**: https://vercel.com/owambe/coastal-corridor
-
-**Configuration**:
-```
-✅ Environment Variables: 3/3 configured
-✅ Build Settings: Optimized for Next.js 14
-✅ Deployment Protection: Enabled
-✅ Auto-deployments: Enabled on git push
-```
 
 ---
 
-## 🗄️ Database
+## 🗂️ Subdomain Registry
 
-### Supabase (PostgreSQL + PostGIS)
-- **Status**: ✅ **CONNECTED**
-- **Project URL**: https://zpgdjffavjtccyjfshnu.supabase.co
-- **Connection String**: `postgresql://postgres:UPU92s1e3jmsD3Ws@zpgdjffavjtccyjfshnu.supabase.co:5432/postgres`
-- **Region**: us-east-1
-- **Backup**: Automatic daily
-- **Encryption**: At rest & in transit
+All 14 subdomains are registered on the Vercel project. CNAME DNS records point to `cname.vercel-dns.com`. DNS propagation completes within 24–48 hours of nameserver change (initiated April 19, 2026).
 
-**Schema Status**:
-```
-✅ Users table: Created
-✅ Properties table: Created
-✅ Destinations table: Created
-✅ Agents table: Created
-✅ Inquiries table: Created
-✅ Transactions table: Created
-✅ KYC_Verifications table: Created
-✅ Indexes: Optimized
-```
+### Clerk Authentication Subdomains (DNS Verified)
 
-**Environment Variable**:
-```
-DATABASE_URL=postgresql://postgres:UPU92s1e3jmsD3Ws@zpgdjffavjtccyjfshnu.supabase.co:5432/postgres
-```
+| Subdomain | Purpose | DNS | SSL |
+|-----------|---------|-----|-----|
+| `clerk.coastalcorridor.africa` | Clerk Frontend API | ✅ Verified | ⏳ Issuing |
+| `accounts.coastalcorridor.africa` | Clerk Account Portal (sign-in/sign-up UI) | ✅ Verified | ⏳ Issuing |
+| `clkmail.coastalcorridor.africa` | Clerk transactional email sending | ✅ Verified | ⏳ Issuing |
+| `clk._domainkey.coastalcorridor.africa` | Clerk DKIM signing key 1 | ✅ Verified | N/A |
+| `clk2._domainkey.coastalcorridor.africa` | Clerk DKIM signing key 2 | ✅ Verified | N/A |
+
+### Platform Service Subdomains
+
+| Subdomain | Purpose | Status | Notes |
+|-----------|---------|--------|-------|
+| `www.coastalcorridor.africa` | Redirect to apex domain | ✅ Configured | 308 permanent → coastalcorridor.africa |
+| `api.coastalcorridor.africa` | Dedicated API endpoint | ✅ Registered | Routes to /api/* on main app |
+| `admin.coastalcorridor.africa` | Admin dashboard | ✅ Registered | Routes to /admin/dashboard |
+| `agent.coastalcorridor.africa` | Agent portal | ✅ Registered | Routes to /agent/dashboard |
+| `map.coastalcorridor.africa` | 3D/2D map viewer | ✅ Registered | Routes to /map |
+
+### Future Service Subdomains (Reserved & Registered)
+
+| Subdomain | Purpose | Status | Activation Trigger |
+|-----------|---------|--------|--------------------|
+| `pay.coastalcorridor.africa` | Payment gateway redirect | ✅ Registered | Add Paystack/Stripe live keys |
+| `kyc.coastalcorridor.africa` | KYC verification flow | ✅ Registered | Add Smile Identity credentials |
+| `tours.coastalcorridor.africa` | Virtual tour embed host | ✅ Registered | Upload Matterport tours |
+| `cdn.coastalcorridor.africa` | Media/image CDN | ✅ Registered | Configure Cloudflare/CloudFront |
+| `mail.coastalcorridor.africa` | Custom email sending domain | ✅ Registered | Verify in Postmark dashboard |
+| `status.coastalcorridor.africa` | Platform uptime status page | ✅ Registered | Set up Betterstack/UptimeRobot |
+| `docs.coastalcorridor.africa` | API documentation | ✅ Registered | Deploy Swagger/Redoc |
 
 ---
 
-## 🔐 Authentication
+## 🔐 Authentication — Clerk
 
-### Clerk (User Authentication & OAuth)
-- **Status**: ✅ **ACTIVE**
+- **Status**: ⏳ **SSL PENDING** (will activate automatically)
+- **Instance Type**: ✅ **Production** (not development)
+- **Domain**: coastalcorridor.africa
 - **Dashboard**: https://dashboard.clerk.com
-- **Publishable Key**: `pk_test_c2luZ3VsYXItaG9uZXliZWUtNzQuY2xlcmsuYWNjb3VudHMuZGV2JA`
-- **Environment**: Test/Development
-- **Features Enabled**:
-  - ✅ Email/Password signup
-  - ✅ Email verification
-  - ✅ OAuth2 ready
-  - ✅ User management
-  - ✅ Session management
+- **App ID**: app_3CZr01R65zpiCf4HggyW7fvXCHA
+- **Production Instance ID**: ins_3CaCbSEKiQautN22Hcg0XMpFxld
 
-**Implementation**:
-```
-✅ Clerk provider: Integrated in layout
-✅ Sign-in page: Functional
-✅ User button: In navigation
-✅ Protected routes: Middleware configured
-✅ User sync: Database sync ready
-```
+| Item | Status | Details |
+|------|--------|---------|
+| DNS Configuration | ✅ Verified | All 5 CNAME records confirmed by Clerk |
+| SSL Certificates | ⏳ Pending | Being issued (typically 5–30 min, up to 24hrs) |
+| Publishable Key | ✅ Set in Vercel | `pk_live_*` production key |
+| Secret Key | ✅ Set in Vercel | `sk_live_*` production key |
+| Sign-In UI | ⏳ Pending SSL | Will activate once SSL completes |
+| Email/Password | ✅ Enabled | Ready |
+| OAuth2 | ✅ Ready | Google/Apple can be added in Clerk dashboard |
+| User Management | ✅ Ready | Full user management at dashboard.clerk.com |
 
 **Environment Variables**:
 ```
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_c2luZ3VsYXItaG9uZXliZWUtNzQuY2xlcmsuYWNjb3VudHMuZGV2JA
-CLERK_SECRET_KEY=sk_test_[CONFIGURED_IN_VERCEL]
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_[SET_IN_VERCEL]
+CLERK_SECRET_KEY=sk_live_[SET_IN_VERCEL]
 ```
-
-**Sign-In URL**: https://coastal-corridor.vercel.app/sign-in
 
 ---
 
-## 📧 Email Service
+## 🗄️ Database — Supabase PostgreSQL
 
-### Postmark (Transactional Email)
+- **Status**: ✅ **CONNECTED**
+- **Provider**: Supabase (managed PostgreSQL)
+- **Project URL**: https://zpgdjffavjtccyjfshnu.supabase.co
+- **Region**: us-east-1
+- **Backup**: Automatic daily
+- **Encryption**: At rest and in transit
+
+| Item | Status |
+|------|--------|
+| DATABASE_URL | ✅ Set in Vercel |
+| Schema (Prisma) | ✅ Defined |
+| Migrations | ⚠️ Pending — run `npx prisma migrate deploy` |
+| Seed Data | ⚠️ Pending — run `npx prisma db seed` |
+| PostGIS Extension | ⚠️ Optional — enable for geospatial queries |
+
+**Environment Variable**:
+```
+DATABASE_URL=postgresql://postgres:***@zpgdjffavjtccyjfshnu.supabase.co:5432/postgres
+```
+
+---
+
+## 📧 Email — Postmark
+
 - **Status**: ✅ **ACTIVE**
 - **Account**: collanomics
-- **API Token**: `859fd39d-d3bf-43f1-8655-bac08dbf59a9`
 - **Dashboard**: https://account.postmarkapp.com
 - **API Tokens**: https://account.postmarkapp.com/account/api_tokens
 
-**Email Templates Configured**:
-```
-✅ Inquiry Confirmation: Ready
-✅ Inquiry Received (Admin): Ready
-✅ Payment Confirmation: Ready
-✅ KYC Verification Started: Ready
-✅ KYC Verification Complete: Ready
-```
+| Item | Status |
+|------|--------|
+| API Token | ✅ Set in Vercel |
+| Inquiry Notifications | ✅ Ready |
+| Payment Confirmations | ✅ Ready |
+| KYC Notifications | ✅ Ready |
+| Custom Sender Domain | ⚠️ Pending — verify `mail.coastalcorridor.africa` in Postmark |
+
+**Next Step**: Go to https://account.postmarkapp.com → Sender Signatures → Add `noreply@coastalcorridor.africa` to send from your own domain.
 
 **Environment Variable**:
 ```
 POSTMARK_API_TOKEN=859fd39d-d3bf-43f1-8655-bac08dbf59a9
 ```
 
-**Implementation**:
-```
-✅ Email service: /src/lib/email.ts
-✅ Inquiry notifications: API route wired
-✅ Transaction emails: API route wired
-✅ KYC emails: API route wired
-✅ Error handling: Graceful fallback
-```
-
-**Test Endpoint**: POST `/api/inquiries` with email field
-
 ---
 
-## 💳 Payment Processing
+## 💳 Payments — Stripe
 
-### Stripe (Payment Gateway)
-- **Status**: ⚠️ **CONFIGURED - NOT LIVE**
-- **Environment**: Test Mode (Publishable & Secret keys in Vercel)
-- **Features**:
-  - ✅ Payment intents
-  - ✅ Refunds
-  - ✅ Webhooks
-  - ✅ Connect accounts (for agent payouts)
+- **Status**: ⚠️ **TEST MODE — NOT LIVE**
+- **Implementation**: Complete (payment intents, refunds, webhooks, escrow)
 
-**Implementation**:
-```
-✅ Payment service: /src/lib/payments.ts
-✅ Transaction API: /api/transactions
-✅ Webhook handler: /api/webhooks/stripe
-✅ Error handling: Implemented
-⚠️ Live keys: Not yet configured
-```
+| Item | Status |
+|------|--------|
+| Payment service (`/src/lib/payments.ts`) | ✅ Built |
+| Transaction API (`/api/transactions`) | ✅ Built |
+| Webhook handler (`/api/webhooks/stripe`) | ✅ Built |
+| Escrow flow | ✅ Built |
+| Live keys | ❌ Not configured |
 
 **To Activate**:
-1. Get live Stripe keys from https://dashboard.stripe.com
-2. Add to Vercel environment:
-   - `STRIPE_SECRET_KEY=sk_live_...`
-   - `STRIPE_WEBHOOK_SECRET=whsec_...`
+1. Get live keys from https://dashboard.stripe.com
+2. Add to Vercel: `STRIPE_SECRET_KEY=sk_live_...` and `STRIPE_WEBHOOK_SECRET=whsec_...`
 3. Redeploy
 
-**Test Payment Flow**:
-```
-POST /api/transactions
-{
-  "propertyId": "PLOT-0001",
-  "amount": 185000000,
-  "currency": "NGN",
-  "paymentMethod": "stripe"
-}
-```
+---
+
+## 🪪 KYC — Smile Identity
+
+- **Status**: ⚠️ **FRAMEWORK READY — NOT LIVE**
+- **Service**: Nigerian identity verification (BVN, NIN, liveness detection)
+
+| Item | Status |
+|------|--------|
+| KYC service (`/src/lib/kyc.ts`) | ✅ Built |
+| Verification API (`/api/kyc/verify`) | ✅ Built |
+| Webhook handler (`/api/webhooks/kyc`) | ✅ Built |
+| API credentials | ❌ Not configured |
+
+**To Activate**: Sign up at https://usesmileid.com → Get API key → Add `SMILE_IDENTITY_API_KEY` and `SMILE_IDENTITY_PARTNER_ID` to Vercel.
 
 ---
 
-## 🆔 KYC Verification
+## 🏠 Virtual Tours — Matterport
 
-### Smile Identity (Identity Verification)
-- **Status**: ⚠️ **FRAMEWORK READY - NOT LIVE**
-- **Service**: Nigerian identity verification
-- **Features**:
-  - ✅ BVN verification
-  - ✅ NIN verification
-  - ✅ Liveness detection
-  - ✅ Document verification
+- **Status**: ⚠️ **FRAMEWORK READY — NOT LIVE**
 
-**Implementation**:
-```
-✅ KYC service: /src/lib/kyc.ts
-✅ Verification API: /api/kyc/verify
-✅ Webhook handler: /api/webhooks/kyc
-✅ Database schema: Ready
-⚠️ API credentials: Not configured
-```
+| Item | Status |
+|------|--------|
+| Tour embed component | ✅ Built |
+| Tour buttons on property pages | ✅ Present |
+| Matterport account | ❌ Not configured |
+| Tour URLs linked to properties | ❌ Not linked |
 
-**To Activate**:
-1. Sign up at https://smileid.com
-2. Get API credentials
-3. Add to Vercel environment:
-   - `SMILE_IDENTITY_API_KEY=...`
-   - `SMILE_IDENTITY_API_SECRET=...`
-4. Configure webhook URL in Smile Identity dashboard
-5. Redeploy
-
-**KYC Endpoint**:
-```
-POST /api/kyc/verify
-{
-  "userId": "user_123",
-  "idType": "BVN",
-  "idNumber": "12345678901"
-}
-```
+**To Activate**: Upload tours at https://matterport.com → Get embed URLs → Update property records in database.
 
 ---
 
-## 🎥 Virtual Tours
+## 📱 API Routes (15 Total)
 
-### Matterport Integration
-- **Status**: ⚠️ **FRAMEWORK READY - NOT LIVE**
-- **Service**: 3D virtual property tours
-- **Features**:
-  - ✅ Embed tours in property pages
-  - ✅ Track viewer engagement
-  - ✅ Analytics dashboard
-
-**Implementation**:
-```
-✅ Virtual tour component: /src/components/virtual-tour.tsx
-✅ Property detail pages: Tour buttons present
-⚠️ Matterport account: Not configured
-⚠️ Tour URLs: Not linked to properties
-```
-
-**To Activate**:
-1. Create Matterport account at https://matterport.com
-2. Upload property tours
-3. Get embed URLs for each property
-4. Update property data in database with tour URLs
-5. Tours will auto-display in property detail pages
-
-**Property Data Update**:
-```sql
-UPDATE properties 
-SET virtual_tour_url = 'https://my.matterport.com/show/?m=...'
-WHERE id = 'PLOT-0001';
-```
-
----
-
-## 📱 API Routes Status
-
-### Core APIs
-| Route | Method | Status | Purpose |
-|-------|--------|--------|---------|
-| `/api/health` | GET | ✅ Live | Health check |
-| `/api/properties` | GET | ✅ Live | List properties |
-| `/api/destinations` | GET | ✅ Live | List destinations |
+| Route | Method | Status | Description |
+|-------|--------|--------|-------------|
+| `/api/health` | GET | ✅ Live | Platform health check |
+| `/api/properties` | GET | ✅ Live | List properties with filters |
+| `/api/destinations` | GET | ✅ Live | List corridor destinations |
 | `/api/search` | GET | ✅ Live | Full-text search |
-
-### User APIs
-| Route | Method | Status | Purpose |
-|-------|--------|--------|---------|
-| `/api/inquiries` | POST | ✅ Live | Submit inquiry |
-| `/api/inquiries` | GET | ✅ Live | Get inquiries |
-| `/api/transactions` | POST | ⚠️ Ready | Create transaction |
-| `/api/transactions` | GET | ⚠️ Ready | Get transactions |
-
-### Agent APIs
-| Route | Method | Status | Purpose |
-|-------|--------|--------|---------|
-| `/api/agent/stats` | GET | ✅ Live | Agent dashboard stats |
-| `/api/agent/listings` | GET | ✅ Live | Agent listings |
-| `/api/agent/listings` | POST | ✅ Live | Create listing |
-| `/api/agent/inquiries` | GET | ✅ Live | Agent inquiries |
-
-### Admin APIs
-| Route | Method | Status | Purpose |
-|-------|--------|--------|---------|
-| `/api/admin/stats` | GET | ✅ Live | Admin dashboard |
-
-### Webhook APIs
-| Route | Method | Status | Purpose |
-|-------|--------|--------|---------|
-| `/api/webhooks/stripe` | POST | ⚠️ Ready | Stripe events |
+| `/api/inquiries` | GET/POST | ✅ Live | Submit & retrieve inquiries |
+| `/api/transactions` | GET/POST | ⚠️ Ready | Payment & escrow flow |
+| `/api/agent/stats` | GET | ✅ Live | Agent dashboard metrics |
+| `/api/agent/listings` | GET/POST | ✅ Live | Agent listings management |
+| `/api/agent/inquiries` | GET | ✅ Live | Agent inquiry inbox |
+| `/api/admin/stats` | GET | ✅ Live | Platform overview stats |
+| `/api/kyc/verify` | POST | ⚠️ Ready | KYC verification request |
+| `/api/webhooks/stripe` | POST | ⚠️ Ready | Stripe payment confirmations |
 | `/api/webhooks/kyc` | POST | ⚠️ Ready | KYC verification results |
 
 ---
 
-## 🎯 Feature Implementation Status
+## 📄 Platform Pages
 
-### Completed Features
-```
-✅ Homepage with hero, featured properties, corridor spine
-✅ Properties listing with filtering and search
-✅ Property detail pages with gallery and specs
-✅ Destinations directory (all 12 destinations)
-✅ Agents directory (6 verified agents)
-✅ 3D/2D interactive maps (Cesium + MapLibre)
-✅ Inquiry submission form
-✅ User authentication (Clerk)
-✅ Account pages for users
-✅ Agent dashboard with KPI stats
-✅ Agent listings management (CRUD)
-✅ Agent inquiries inbox
-✅ Admin dashboard overview
-✅ Search functionality (full-text database)
-✅ Email notifications (Postmark)
-✅ Responsive design (mobile, tablet, desktop)
-```
-
-### Ready for Activation
-```
-⚠️ Payment processing (Stripe - needs live keys)
-⚠️ KYC verification (Smile Identity - needs API keys)
-⚠️ Virtual tours (Matterport - needs tour URLs)
-⚠️ Transaction escrow flow (needs payment activation)
-⚠️ Agent payouts (needs Stripe Connect setup)
-```
-
-### Not Yet Implemented
-```
-❌ Real transactions with escrow
-❌ Live KYC/identity verification
-❌ VR property tours (separate Unity repo)
-❌ Live Parcel Fabric integration
-❌ State registry API integrations
-❌ Advanced analytics dashboard
-❌ Mobile app (separate React Native repo)
-```
+| Page | URL | Status |
+|------|-----|--------|
+| Homepage | https://coastalcorridor.africa/ | ✅ Live |
+| Properties | https://coastalcorridor.africa/properties | ✅ Live |
+| Property Detail | https://coastalcorridor.africa/properties/[slug] | ✅ Live |
+| Destinations | https://coastalcorridor.africa/destinations | ✅ Live |
+| Destination Detail | https://coastalcorridor.africa/destinations/[slug] | ✅ Live |
+| Agents | https://coastalcorridor.africa/agents | ✅ Live |
+| Map (3D/2D) | https://coastalcorridor.africa/map | ✅ Live |
+| Account | https://coastalcorridor.africa/account | ⏳ Clerk SSL pending |
+| Agent Dashboard | https://agent.coastalcorridor.africa/agent/dashboard | ⏳ Clerk SSL pending |
+| Admin Console | https://admin.coastalcorridor.africa/admin/dashboard | ⏳ Clerk SSL pending |
 
 ---
 
-## 🔄 Integration Checklist
+## 🔑 Environment Variables (Vercel)
 
-### Pre-Launch
-- [x] Platform deployed to Vercel
-- [x] Database connected (Supabase)
-- [x] Authentication integrated (Clerk)
-- [x] Email service active (Postmark)
-- [x] All pages functional
-- [x] All API routes tested
-- [x] Search working
-- [x] Inquiries persisting
-
-### For Payment Activation
-- [ ] Get live Stripe keys
-- [ ] Add keys to Vercel environment
-- [ ] Configure Stripe webhook
-- [ ] Test payment flow end-to-end
-- [ ] Set up Stripe Connect for agent payouts
-- [ ] Configure escrow logic
-- [ ] Test refund flow
-
-### For KYC Activation
-- [ ] Create Smile Identity account
-- [ ] Get API credentials
-- [ ] Add to Vercel environment
-- [ ] Configure webhook URL
-- [ ] Test verification flow
-- [ ] Set up compliance reporting
-
-### For Virtual Tours
-- [ ] Create Matterport account
-- [ ] Upload property tours
-- [ ] Get embed URLs
-- [ ] Update property database
-- [ ] Test tour display on property pages
+| Variable | Status | Service |
+|----------|--------|---------|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | ✅ Set | Clerk (Production) |
+| `CLERK_SECRET_KEY` | ✅ Set | Clerk (Production) |
+| `DATABASE_URL` | ✅ Set | Supabase PostgreSQL |
+| `POSTMARK_API_TOKEN` | ✅ Set | Postmark Email |
+| `STRIPE_SECRET_KEY` | ⚠️ Test only | Stripe Payments |
+| `STRIPE_WEBHOOK_SECRET` | ⚠️ Pending | Stripe Webhooks |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | ⚠️ Test only | Stripe (Client) |
+| `SMILE_IDENTITY_API_KEY` | ❌ Not set | Smile Identity KYC |
+| `SMILE_IDENTITY_PARTNER_ID` | ❌ Not set | Smile Identity KYC |
 
 ---
 
-## 🚨 Known Limitations
+## 📁 Repository
 
-1. **Payments**: Stripe in test mode only. Live keys needed for real transactions.
-2. **KYC**: Framework ready but no live verification. Smile Identity API not connected.
-3. **Virtual Tours**: Buttons present but no Matterport URLs configured.
-4. **Authentication**: Clerk in test mode. Production keys needed for live auth.
-5. **Database**: Supabase connected but no data seeding yet. Mock data used for display.
+| Item | Details |
+|------|---------|
+| **GitHub Repo** | https://github.com/mottainaisurvey/coastal-corridor |
+| **Visibility** | Private |
+| **Branch** | master |
+| **Files** | 195+ files |
+| **Vercel Auto-Deploy** | ⚠️ Pending — connect GitHub repo in Vercel settings |
 
----
-
-## 📞 Support & Troubleshooting
-
-### Common Issues
-
-**Issue**: "500: INTERNAL_SERVER_ERROR" on inquiry submission
-- **Cause**: Postmark API token missing or invalid
-- **Fix**: Verify `POSTMARK_API_TOKEN` in Vercel environment
-
-**Issue**: Sign-in button not working
-- **Cause**: Clerk keys not configured
-- **Fix**: Verify `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` in Vercel environment
-
-**Issue**: Search returns no results
-- **Cause**: Database not connected or empty
-- **Fix**: Verify `DATABASE_URL` and run seed script
-
-**Issue**: Deployment fails with "Prisma client error"
-- **Cause**: DATABASE_URL missing during build
-- **Fix**: Ensure DATABASE_URL is set in Vercel environment
+**To Enable Auto-Deploy**: Go to https://vercel.com/owambe/coastal-corridor/settings/git → Connect GitHub → Select `mottainaisurvey/coastal-corridor`.
 
 ---
 
-## 📈 Monitoring
+## 🔒 Security Status
 
-### Vercel Analytics
-- **Dashboard**: https://vercel.com/owambe/coastal-corridor/analytics
-- **Speed Insights**: https://vercel.com/owambe/coastal-corridor/speed-insights
-- **Logs**: https://vercel.com/owambe/coastal-corridor/logs
-
-### Database Monitoring
-- **Supabase Dashboard**: https://zpgdjffavjtccyjfshnu.supabase.co
-- **Query Performance**: Available in Supabase console
-- **Backups**: Automatic daily
-
-### Email Monitoring
-- **Postmark Dashboard**: https://account.postmarkapp.com
-- **Bounce Rate**: Monitor in Postmark console
-- **Delivery Status**: Real-time tracking
+| Check | Status |
+|-------|--------|
+| HTTPS enforced | ✅ |
+| Environment variables secured | ✅ |
+| API keys not hardcoded | ✅ |
+| Webhook signature verification | ✅ |
+| Input validation on all endpoints | ✅ |
+| Database connection encrypted | ✅ |
+| CORS configured | ✅ |
+| Rate limiting (framework) | ✅ |
+| Audit logging (critical paths) | ✅ |
 
 ---
 
-## 🔐 Security Status
+## 📊 Monitoring
 
-```
-✅ HTTPS enforced (Vercel)
-✅ Environment variables secured (Vercel)
-✅ Database encryption at rest (Supabase)
-✅ Database encryption in transit (Supabase)
-✅ API authentication ready (Clerk)
-✅ Webhook signature verification (Stripe/KYC)
-✅ Input validation on all endpoints
-✅ CORS configured
-✅ Rate limiting framework in place
-```
+| Service | URL | Status |
+|---------|-----|--------|
+| Vercel Dashboard | https://vercel.com/owambe/coastal-corridor | ✅ Active |
+| Vercel Analytics | https://vercel.com/owambe/coastal-corridor/analytics | ✅ Active |
+| Vercel Logs | https://vercel.com/owambe/coastal-corridor/logs | ✅ Active |
+| Supabase Dashboard | https://zpgdjffavjtccyjfshnu.supabase.co | ✅ Active |
+| Clerk Dashboard | https://dashboard.clerk.com | ✅ Active |
+| Postmark Dashboard | https://account.postmarkapp.com | ✅ Active |
+| Status Page | https://status.coastalcorridor.africa | ⚠️ Not yet configured |
 
 ---
 
-## 📅 Next Steps
+## 🗓️ Roadmap
 
 ### Immediate (This Week)
-1. Test all user flows on live platform
-2. Verify email notifications working
-3. Test search functionality
-4. Gather user feedback
+- [ ] Wait for Clerk SSL certificates to complete (auto-activates sign-in)
+- [ ] Run Prisma migrations on Supabase: `npx prisma migrate deploy`
+- [ ] Seed database: `npx prisma db seed`
+- [ ] Verify Postmark sender domain (`mail.coastalcorridor.africa`)
+- [ ] Add Stripe live keys to Vercel
+- [ ] Connect GitHub repo to Vercel for auto-deploy
 
-### Short-term (Next 2 Weeks)
-1. Activate Stripe payments (get live keys)
-2. Set up Stripe Connect for agent payouts
-3. Activate Smile Identity KYC
-4. Configure Matterport virtual tours
+### Short-Term (2 Weeks)
+- [ ] Activate Smile Identity KYC
+- [ ] Upload Matterport virtual tours
+- [ ] Set up Betterstack at `status.coastalcorridor.africa`
+- [ ] Deploy API docs at `docs.coastalcorridor.africa`
+- [ ] Configure Cloudflare CDN at `cdn.coastalcorridor.africa`
 
-### Medium-term (Next Month)
-1. Launch beta user testing
-2. Implement analytics dashboard
-3. Set up compliance reporting
-4. Optimize performance
+### Medium-Term (1 Month)
+- [ ] Add Google/Apple OAuth via Clerk
+- [ ] Build developer dashboard
+- [ ] Property listing submission workflow
+- [ ] Advanced analytics
 
-### Long-term (Q2-Q3)
-1. Mobile app (React Native)
-2. VR property tours (Unity)
-3. Advanced search filters
-4. Agent/developer dashboards v2
-
----
-
-## 📞 Contact & Support
-
-**Platform**: https://coastal-corridor.vercel.app  
-**Vercel Project**: https://vercel.com/owambe/coastal-corridor  
-**Support Email**: support@coastalcorridor.ng (when configured)
+### Long-Term (Q2–Q3)
+- [ ] Live Parcel Fabric integration
+- [ ] State registry API integrations
+- [ ] VR build (Unity, separate repo)
+- [ ] Mobile app (React Native/Expo)
+- [ ] Multi-language support (Yoruba, Igbo, Hausa)
 
 ---
 
-**Last Updated**: April 19, 2026  
-**Status**: ✅ PRODUCTION LIVE  
-**Next Review**: April 26, 2026
+*This document is the single source of truth for all platform integrations. Update after every significant change.*
