@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import path from 'path'
 
 const execAsync = promisify(exec)
 
@@ -15,11 +16,17 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Use the prisma binary directly from node_modules
+    const prismaBin = path.join(process.cwd(), 'node_modules', '.bin', 'prisma')
     const { stdout, stderr } = await execAsync(
-      'npx prisma db push --accept-data-loss',
+      `${prismaBin} db push --accept-data-loss`,
       { 
         cwd: process.cwd(),
-        env: { ...process.env },
+        env: { 
+          ...process.env,
+          HOME: '/tmp',
+          npm_config_cache: '/tmp/.npm'
+        },
         timeout: 60000
       }
     )
