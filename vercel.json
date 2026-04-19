@@ -1,16 +1,5 @@
 {
   "buildCommand": "prisma generate && next build",
-  "env": {
-    "POSTMARK_API_TOKEN": "@postmark_api_token",
-    "STRIPE_SECRET_KEY": "@stripe_secret_key",
-    "STRIPE_WEBHOOK_SECRET": "@stripe_webhook_secret",
-    "DATABASE_URL": "@database_url",
-    "NEXT_PUBLIC_APP_URL": "@next_public_app_url",
-    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "@next_public_clerk_publishable_key",
-    "CLERK_SECRET_KEY": "@clerk_secret_key",
-    "SMILE_IDENTITY_API_KEY": "@smile_identity_api_key",
-    "SMILE_IDENTITY_PARTNER_ID": "@smile_identity_partner_id"
-  },
   "functions": {
     "src/app/api/**/*.ts": {
       "runtime": "nodejs18.x",
