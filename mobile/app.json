@@ -13,14 +13,19 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "africa.coastalcorridor.app"
+      "bundleIdentifier": "africa.coastalcorridor.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0e12"
       },
-      "package": "africa.coastalcorridor.app"
+      "package": "africa.coastalcorridor.app",
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",
