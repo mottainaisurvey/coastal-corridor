@@ -34,6 +34,15 @@
     "experiments": {
       "typedRoutes": true
     },
-    "scheme": "coastalcorridor"
+    "scheme": "coastalcorridor",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "029072c2-e8b6-4e6e-8157-5eff2e52fb67"
+      }
+    },
+    "owner": "owambeeventflow"
   }
 }
