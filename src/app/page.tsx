@@ -7,17 +7,17 @@ import { DestinationCard } from '@/components/destination-card';
 import { formatKobo } from '@/lib/utils';
 
 const destinationTypeColors: Record<string, { bg: string; text: string }> = {
-  'Infrastructure': { bg: 'bg-ocean/10', text: 'text-ocean-2' },
-  'Real Estate': { bg: 'bg-laterite/10', text: 'text-laterite-2' },
-  'Mixed Use': { bg: 'bg-ochre/10', text: 'text-ochre-2' },
-  'Tourism': { bg: 'bg-sage/10', text: 'text-sage-2' },
+  'INFRASTRUCTURE': { bg: 'bg-ocean/10', text: 'text-ocean-2' },
+  'REAL_ESTATE': { bg: 'bg-laterite/10', text: 'text-laterite-2' },
+  'MIXED_USE': { bg: 'bg-ochre/10', text: 'text-ochre-2' },
+  'TOURISM': { bg: 'bg-sage/10', text: 'text-sage-2' },
 };
 
 const destinationTypeLabels: Record<string, string> = {
-  'Infrastructure': 'Infrastructure',
-  'Real Estate': 'Real Estate',
-  'Mixed Use': 'Mixed Use',
-  'Tourism': 'Tourism',
+  'INFRASTRUCTURE': 'Infrastructure',
+  'REAL_ESTATE': 'Real Estate',
+  'MIXED_USE': 'Mixed Use',
+  'TOURISM': 'Tourism',
 };
 
 const destinationTypeColorsFallback = destinationTypeColors;

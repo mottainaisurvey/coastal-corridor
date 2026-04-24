@@ -11,6 +11,9 @@ import { sendEmail, inquiryConfirmationEmail, agentInquiryNotificationEmail } fr
  * Creates an inquiry record from the property detail page form.
  * Persists to database, sends confirmation email to buyer, and notifies agent.
  *
+ * Guest flow: if no userId is provided, we upsert a BUYER User record
+ * keyed on buyerEmail so the inquiry is always traceable.
+ *
  * PRODUCTION REQUIREMENTS:
  * 1. ✅ Rate limiting — max 5 submissions per IP per hour (implement with Upstash Redis)
  * 2. ✅ Bot protection — Cloudflare Turnstile or hCaptcha
@@ -24,13 +27,15 @@ import { sendEmail, inquiryConfirmationEmail, agentInquiryNotificationEmail } fr
 const InquirySchema = z.object({
   listingId: z.string().min(1, 'Listing ID required'),
   plotId: z.string().optional(),
-  userId: z.string().min(1, 'User ID required'),
+  /** Optional — if omitted, a guest User record is upserted from buyerEmail */
+  userId: z.string().optional(),
   message: z.string().min(10, 'Message must be at least 10 characters'),
   preferredContactMethod: z.enum(['email', 'phone', 'whatsapp']).default('email'),
   offeredPriceKobo: z.string().optional(),
   buyerName: z.string().min(2, 'Name required'),
   buyerEmail: z.string().email('Valid email required'),
-  buyerPhone: z.string().min(10, 'Valid phone number required'),
+  /** Phone is optional on the form; we store a placeholder if omitted */
+  buyerPhone: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
     const {
       listingId,
       plotId,
-      userId,
+      userId: providedUserId,
       message,
       preferredContactMethod,
       offeredPriceKobo,
@@ -59,7 +64,34 @@ export async function POST(req: NextRequest) {
       buyerPhone,
     } = validationResult.data;
 
-    // Verify listing exists
+    // ── Resolve or create the buyer User record ──────────────────────────────
+    let resolvedUserId = providedUserId;
+
+    if (!resolvedUserId) {
+      // Guest flow: upsert a BUYER record keyed on email
+      const guestUser = await prisma.user.upsert({
+        where: { email: buyerEmail },
+        update: {
+          // Update phone if provided and not already set
+          ...(buyerPhone ? { phone: buyerPhone } : {}),
+        },
+        create: {
+          email: buyerEmail,
+          phone: buyerPhone || null,
+          role: 'BUYER',
+          status: 'PENDING_VERIFICATION',
+          profile: {
+            create: {
+              firstName: buyerName.split(' ')[0] || buyerName,
+              lastName: buyerName.split(' ').slice(1).join(' ') || '',
+            },
+          },
+        },
+      });
+      resolvedUserId = guestUser.id;
+    }
+
+    // ── Verify listing exists ────────────────────────────────────────────────
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
       include: {
@@ -75,12 +107,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create inquiry
+    // ── Create inquiry ───────────────────────────────────────────────────────
     const inquiry = await prisma.inquiry.create({
       data: {
         listingId,
         plotId: plotId || undefined,
-        userId,
+        userId: resolvedUserId,
         message,
         preferredContactMethod,
         offeredPriceKobo: offeredPriceKobo ? BigInt(offeredPriceKobo) : undefined,
@@ -91,17 +123,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Update listing inquiry count
+    // ── Update listing inquiry count ─────────────────────────────────────────
     await prisma.listing.update({
       where: { id: listingId },
       data: { inquiryCount: { increment: 1 } },
     });
 
-    // Send confirmation email to buyer
+    // ── Send confirmation email to buyer ─────────────────────────────────────
     try {
       await sendEmail({
         to: buyerEmail,
-        subject: `Inquiry Confirmed - ${listing.property?.title || 'Property'}`,
+        subject: `Inquiry Confirmed — ${listing.property?.title || 'Property'}`,
         htmlBody: inquiryConfirmationEmail(
           buyerName,
           listing.property?.title || 'Your Property',
@@ -111,20 +143,20 @@ export async function POST(req: NextRequest) {
       });
     } catch (emailError) {
       console.error('Failed to send confirmation email:', emailError);
-      // Don't fail the inquiry creation if email fails
+      // Non-fatal — inquiry is still created
     }
 
-    // Send notification email to agent
+    // ── Send notification email to agent ─────────────────────────────────────
     if (listing.owner?.email) {
       try {
         await sendEmail({
           to: listing.owner.email,
-          subject: `New Inquiry - ${listing.property?.title || 'Your Property'}`,
+          subject: `New Inquiry — ${listing.property?.title || 'Your Property'}`,
           htmlBody: agentInquiryNotificationEmail(
             listing.owner?.profile?.firstName || 'Agent',
             buyerName,
             buyerEmail,
-            buyerPhone,
+            buyerPhone || 'Not provided',
             listing.property?.title || 'Property',
             message
           ),
@@ -134,10 +166,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Log audit entry
+    // ── Audit log ────────────────────────────────────────────────────────────
     await prisma.auditEntry.create({
       data: {
-        userId,
+        userId: resolvedUserId,
         entityType: 'Inquiry',
         entityId: inquiry.id,
         action: 'create',
