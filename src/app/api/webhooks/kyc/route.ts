@@ -15,96 +15,81 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const { verificationId, status, userId, verified, data } = body;
+    // Support both Smile Identity native payload and manual test payload
+    const smileJobId = body.SmileJobID || body.smileJobId;
+    const partnerParams = body.PartnerParams || body.partner_params || {};
+    const internalUserId = partnerParams.user_id || body.userId;
+    const verificationId = partnerParams.job_id || body.verificationId;
+    const resultCode = body.ResultCode || body.resultCode;
+    const resultText = body.ResultText || body.resultText || '';
 
-    if (!verificationId || !userId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+    if (!internalUserId) {
+      return NextResponse.json({ error: 'Missing user_id in webhook payload' }, { status: 400 });
     }
 
-    // Find user by KYC status (which contains the verification ID)
+    // Smile Identity result codes:
+    // 1012 = Exact Match (APPROVED), 1013 = Partial Match (REVIEW), others = REJECTED
+    const approved = resultCode === '1012';
+    const review = resultCode === '1013';
+    const kycOutcome = approved ? 'APPROVED' : review ? 'REVIEW' : 'REJECTED';
+
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: internalUserId },
       include: { profile: true },
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      console.error('[KYC webhook] User not found:', internalUserId);
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Update user KYC status
-    const kycStatus = verified ? 'APPROVED' : 'REJECTED';
+    const newKycStatus = verificationId ? `${kycOutcome}:${verificationId}` : kycOutcome;
     await prisma.user.update({
-      where: { id: userId },
-      data: {
-        kycStatus,
-      },
+      where: { id: internalUserId },
+      data: { kycStatus: newKycStatus },
     });
 
-    // Log audit entry
     await prisma.auditEntry.create({
       data: {
-        userId,
-        entityType: 'KYCVerification',
-        entityId: verificationId,
+        userId: internalUserId,
+        entityType: 'User',
+        entityId: internalUserId,
         action: 'update',
-        metadata: JSON.stringify({ status: kycStatus, verified }),
+        metadata: JSON.stringify({
+          event: 'kyc_result',
+          outcome: kycOutcome,
+          resultCode,
+          resultText,
+          smileJobId,
+          verificationId,
+        }),
       },
     });
 
-    // Send email notification
     if (user.email) {
-      const emailSubject = verified
-        ? 'KYC Verification Approved'
-        : 'KYC Verification Rejected';
-
-      const emailHtml = verified
-        ? `
-          <div style="font-family: 'Inter Tight', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h1 style="font-size: 24px; font-weight: 300;">Verification Approved</h1>
-            <p>Congratulations! Your identity verification has been approved.</p>
-            <p>You can now:</p>
-            <ul>
-              <li>List properties for sale</li>
-              <li>Make property inquiries</li>
-              <li>Participate in transactions</li>
-            </ul>
-            <p>Thank you for using Coastal Corridor.</p>
-          </div>
-        `
-        : `
-          <div style="font-family: 'Inter Tight', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h1 style="font-size: 24px; font-weight: 300;">Verification Rejected</h1>
-            <p>Your identity verification could not be completed at this time.</p>
-            <p>Please contact support for more information.</p>
-          </div>
-        `;
-
+      const name = user.profile
+        ? `${user.profile.firstName} ${user.profile.lastName}`
+        : user.email;
+      const subject = approved
+        ? 'Your identity verification has been approved'
+        : review
+        ? 'Your identity verification is under review'
+        : 'Your identity verification could not be completed';
+      const htmlBody = approved
+        ? `<div style="font-family:'Inter Tight',sans-serif;max-width:600px;margin:0 auto;padding:20px;"><h1 style="font-size:24px;font-weight:300;">Verification Approved ✓</h1><p>Hi ${name},</p><p>Your identity has been verified. You can now make property inquiries and participate in transactions on Coastal Corridor.</p><p><a href="${process.env.NEXT_PUBLIC_APP_URL}/account">Go to your account →</a></p></div>`
+        : review
+        ? `<div style="font-family:'Inter Tight',sans-serif;max-width:600px;margin:0 auto;padding:20px;"><h1 style="font-size:24px;font-weight:300;">Verification Under Review</h1><p>Hi ${name},</p><p>Your identity verification requires a manual review. Our team will complete this within 24 hours.</p></div>`
+        : `<div style="font-family:'Inter Tight',sans-serif;max-width:600px;margin:0 auto;padding:20px;"><h1 style="font-size:24px;font-weight:300;">Verification Could Not Be Completed</h1><p>Hi ${name},</p><p>We were unable to verify your identity. Please try again or contact support@coastalcorridor.africa.</p><p><a href="${process.env.NEXT_PUBLIC_APP_URL}/account/kyc">Try again →</a></p></div>`;
       try {
-        await sendEmail({
-          to: user.email,
-          subject: emailSubject,
-          htmlBody: emailHtml,
-        });
+        await sendEmail({ to: user.email, subject, htmlBody });
       } catch (emailError) {
-        console.error('Failed to send KYC notification email:', emailError);
+        console.error('[KYC webhook] Email failed:', emailError);
       }
     }
 
-    return NextResponse.json({
-      received: true,
-      status: kycStatus,
-    });
+    return NextResponse.json({ received: true, outcome: kycOutcome });
   } catch (error) {
-    console.error('KYC webhook processing failed:', error);
-    return NextResponse.json(
-      { error: 'Webhook processing failed' },
-      { status: 500 }
-    );
+    console.error('[KYC webhook] Processing failed:', error);
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
