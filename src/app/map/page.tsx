@@ -2,23 +2,72 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { destinations } from '@/lib/mock/destinations';
-import { properties } from '@/lib/mock/properties';
+import { destinations as mockDestinations } from '@/lib/mock/destinations';
+import { properties as mockProperties } from '@/lib/mock/properties';
 import { destinationTypeColors, destinationTypeLabels, formatKobo, formatArea } from '@/lib/utils';
-import { ArrowRight, Layers, Navigation, X } from 'lucide-react';
-import type { Destination, Property } from '@/lib/mock/types';
+import { ArrowRight, Layers, X } from 'lucide-react';
+
+interface MapDestination {
+  id: string;
+  name: string;
+  slug: string;
+  state: string;
+  type: string;
+  corridorKm: number;
+  latitude: number;
+  longitude: number;
+  description: string;
+}
+
+interface MapProperty {
+  id: string;
+  title: string;
+  slug: string;
+  plotId: string;
+  priceKobo: number;
+  areaSqm: number;
+  latitude: number;
+  longitude: number;
+  heroImage: string;
+}
 
 export default function MapPage() {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
-  const [selectedProp, setSelectedProp] = useState<Property | null>(null);
+  const mapRef = useRef<unknown>(null);
+  const [selectedDest, setSelectedDest] = useState<MapDestination | null>(null);
+  const [selectedProp, setSelectedProp] = useState<MapProperty | null>(null);
   const [showProperties, setShowProperties] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
+  const [liveDestinations, setLiveDestinations] = useState<MapDestination[]>([]);
+  const [liveProperties, setLiveProperties] = useState<MapProperty[]>([]);
+  const [counts, setCounts] = useState({ destinations: 12, listings: mockProperties.length });
+
+  // Load live data on mount
+  useEffect(() => {
+    fetch('/api/map')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.destinations?.length) {
+          setLiveDestinations(data.destinations);
+          setCounts({ destinations: data.destinations.length, listings: data.properties?.length ?? 0 });
+        }
+        if (data?.properties?.length) setLiveProperties(data.properties);
+      })
+      .catch(() => {/* use mock */});
+  }, []);
+
+  const destinations: MapDestination[] = liveDestinations.length > 0
+    ? liveDestinations
+    : mockDestinations.map(d => ({ id: d.id, name: d.name, slug: d.slug, state: d.state, type: d.type, corridorKm: d.corridorKm, latitude: d.latitude, longitude: d.longitude, description: d.description }));
+
+  const properties: MapProperty[] = liveProperties.length > 0
+    ? liveProperties
+    : mockProperties.map(p => ({ id: p.id, title: p.title, slug: p.slug, plotId: p.plotId, priceKobo: p.priceKobo, areaSqm: p.areaSqm, latitude: p.latitude, longitude: p.longitude, heroImage: p.heroImage }));
 
   useEffect(() => {
     if (!mapContainer.current) return;
     if (mapRef.current) return;
+    if (destinations.length === 0) return;
 
     let cleanup: (() => void) | undefined;
 
@@ -44,7 +93,7 @@ export default function MapPage() {
             { id: 'bg', type: 'background', paint: { 'background-color': '#0a0e12' } },
             { id: 'basemap', type: 'raster', source: 'carto-dark', paint: { 'raster-opacity': 0.85 } }
           ]
-        } as any,
+        } as unknown as import('maplibre-gl').StyleSpecification,
         center: [5.8, 5.8],
         zoom: 5.4,
         pitch: 40,
@@ -54,7 +103,7 @@ export default function MapPage() {
       mapRef.current = map;
 
       map.on('load', () => {
-        // Route
+        // Route line
         map.addSource('route', {
           type: 'geojson',
           data: {
@@ -83,12 +132,13 @@ export default function MapPage() {
 
         // Destination markers
         destinations.forEach((d) => {
-          const color = {
+          const typeColor: Record<string, string> = {
             INFRASTRUCTURE: '#4db3b3',
             MIXED_USE: '#d4a24c',
             REAL_ESTATE: '#c96a3f',
             TOURISM: '#8aa876'
-          }[d.type];
+          };
+          const color = typeColor[d.type] ?? '#d4a24c';
 
           const el = document.createElement('div');
           el.className = 'corridor-pin cursor-pointer';
@@ -136,7 +186,7 @@ export default function MapPage() {
     })();
 
     return () => { cleanup?.(); };
-  }, []);
+  }, [destinations, properties, showProperties]);
 
   return (
     <div className="h-[calc(100vh-64px)] relative bg-ink">
@@ -152,7 +202,7 @@ export default function MapPage() {
           Lagos ⟶ Calabar
         </div>
         <div className="font-mono text-[10px] text-paper/50 mt-1">
-          700.3 km · 12 destinations · {properties.length} listings
+          700.3 km · {counts.destinations} destinations · {counts.listings} listings
         </div>
       </div>
 
@@ -189,8 +239,8 @@ export default function MapPage() {
         <div className="absolute bottom-6 left-6 right-6 md:right-auto md:w-[380px] z-10 bg-ink/95 backdrop-blur border border-paper/10 rounded-lg p-5 text-paper">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <span className={`chip ${destinationTypeColors[selectedDest.type].bg} ${destinationTypeColors[selectedDest.type].text}`}>
-                {destinationTypeLabels[selectedDest.type]}
+              <span className={`chip ${(destinationTypeColors as Record<string, { bg: string; text: string }>)[selectedDest.type]?.bg ?? 'bg-ochre/15'} ${(destinationTypeColors as Record<string, { bg: string; text: string }>)[selectedDest.type]?.text ?? 'text-ochre'}`}>
+                {(destinationTypeLabels as Record<string, string>)[selectedDest.type] ?? selectedDest.type}
               </span>
             </div>
             <button onClick={() => setSelectedDest(null)} className="text-paper/60 hover:text-paper">

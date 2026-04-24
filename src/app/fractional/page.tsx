@@ -1,69 +1,38 @@
 import Link from 'next/link';
 import { ArrowRight, PieChart, TrendingUp, Shield, Users, Calendar, Check, AlertCircle } from 'lucide-react';
 import { formatKobo } from '@/lib/utils';
+import { prisma } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Fractional Ownership · Coastal Corridor',
   description: 'Own a fraction of corridor real estate from ₦2M — quarterly distributions, transparent exit mechanics'
 };
 
-// Sample fractional estates for demo
-const fractionalEstates = [
-  {
-    id: 'epe-1',
-    name: 'Epe Coastal Estate · Tranche B',
-    destination: 'Epe Coastal Extension',
-    totalValueKobo: 120000000000, // ₦1.2B
-    sharesIssued: 600,
-    sharesAvailable: 184,
-    pricePerShareKobo: 200000000, // ₦2M
-    projectedYield: 14.2,
-    threeYearAppreciation: 68,
-    lockup: '36 months',
-    status: 'ACTIVE'
-  },
-  {
-    id: 'ondo-resort',
-    name: 'Ondo Beachfront Resort · Phase I',
-    destination: 'Ondo Coastal Belt',
-    totalValueKobo: 450000000000, // ₦4.5B
-    sharesIssued: 900,
-    sharesAvailable: 312,
-    pricePerShareKobo: 500000000, // ₦5M
-    projectedYield: 11.8,
-    threeYearAppreciation: 94,
-    lockup: '48 months',
-    status: 'ACTIVE'
-  },
-  {
-    id: 'lekki-mixed',
-    name: 'Lekki Corridor Mixed-Use · Tower A',
-    destination: 'Lekki Peninsula',
-    totalValueKobo: 880000000000, // ₦8.8B
-    sharesIssued: 1760,
-    sharesAvailable: 44,
-    pricePerShareKobo: 500000000,
-    projectedYield: 9.6,
-    threeYearAppreciation: 52,
-    lockup: '60 months',
-    status: 'NEARLY_FULL'
-  },
-  {
-    id: 'tinapa',
-    name: 'Tinapa Resort Residences · Block C',
-    destination: 'Tinapa & Marina Resort',
-    totalValueKobo: 240000000000,
-    sharesIssued: 480,
-    sharesAvailable: 480,
-    pricePerShareKobo: 500000000,
-    projectedYield: 13.4,
-    threeYearAppreciation: 78,
-    lockup: '36 months',
-    status: 'OPENING'
-  }
+const MOCK_ESTATES = [
+  { id: 'epe-1', name: 'Epe Coastal Estate · Tranche B', destination: 'Epe Coastal Extension', totalValueKobo: 120000000000, sharesIssued: 600, sharesAvailable: 184, pricePerShareKobo: 200000000, projectedYield: 14.2, threeYearAppreciation: 68, lockup: '36 months', status: 'ACTIVE' },
+  { id: 'ondo-resort', name: 'Ondo Beachfront Resort · Phase I', destination: 'Ondo Coastal Belt', totalValueKobo: 450000000000, sharesIssued: 900, sharesAvailable: 312, pricePerShareKobo: 500000000, projectedYield: 11.8, threeYearAppreciation: 94, lockup: '48 months', status: 'ACTIVE' },
+  { id: 'lekki-mixed', name: 'Lekki Corridor Mixed-Use · Tower A', destination: 'Lekki Peninsula', totalValueKobo: 880000000000, sharesIssued: 1760, sharesAvailable: 44, pricePerShareKobo: 500000000, projectedYield: 9.6, threeYearAppreciation: 52, lockup: '60 months', status: 'NEARLY_FULL' },
+  { id: 'tinapa', name: 'Tinapa Resort Residences · Block C', destination: 'Tinapa & Marina Resort', totalValueKobo: 240000000000, sharesIssued: 480, sharesAvailable: 480, pricePerShareKobo: 500000000, projectedYield: 13.4, threeYearAppreciation: 78, lockup: '36 months', status: 'OPENING' },
 ];
 
-export default function FractionalPage() {
+async function getEstates() {
+  try {
+    const schemes = await (prisma as unknown as {
+      fractionalScheme: { findMany: (a: unknown) => Promise<Array<{ id: string; name: string; totalValueKobo: bigint; sharesIssued: number; sharesAvailable: number; pricePerShareKobo: bigint; projectedYield: number; threeYearAppreciation: number; lockupMonths: number; status: string; destination: { name: string } }>> };
+    }).fractionalScheme.findMany({
+      where: { status: { not: 'CLOSED' } },
+      include: { destination: { select: { name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (schemes.length > 0) return schemes.map(s => ({ id: s.id, name: s.name, destination: s.destination.name, totalValueKobo: Number(s.totalValueKobo), sharesIssued: s.sharesIssued, sharesAvailable: s.sharesAvailable, pricePerShareKobo: Number(s.pricePerShareKobo), projectedYield: s.projectedYield, threeYearAppreciation: s.threeYearAppreciation, lockup: `${s.lockupMonths} months`, status: s.status }));
+  } catch { /* fallback */ }
+  return MOCK_ESTATES;
+}
+
+export default async function FractionalPage() {
+  const fractionalEstates = await getEstates();
   return (
     <>
       {/* HERO */}

@@ -43,7 +43,16 @@ const INTEGRATIONS = [
   {
     category: 'Storage & Media',
     items: [
-      { id: 's3', name: 'AWS S3 / Cloudflare R2', description: 'Document and image storage for listings and KYC files', status: 'pending', docs: 'https://docs.aws.amazon.com/s3/', env: 'AWS_S3_BUCKET' },
+      { id: 'supabase-storage', name: 'Supabase Storage', description: 'Private document bucket for KYC files, title documents, and contracts', status: 'active', docs: 'https://supabase.com/docs/guides/storage', env: 'SUPABASE_SERVICE_ROLE_KEY' },
+    ],
+  },
+  {
+    category: 'State Registries',
+    items: [
+      { id: 'lasrera', name: 'LASRERA', description: 'Lagos State Real Estate Regulatory Authority — agent licence and transaction verification', status: 'pending', docs: 'https://lasrera.lagosstate.gov.ng', env: 'LASRERA_API_KEY' },
+      { id: 'ogunirs', name: 'OGUNIRS', description: 'Ogun State Internal Revenue Service — land use charge and title registry', status: 'pending', docs: 'https://ogunirs.gov.ng', env: 'OGUNIRS_API_KEY' },
+      { id: 'nis', name: 'NIS (National Identity)', description: 'National Identity Management Commission — NIN cross-check for KYC', status: 'pending', docs: 'https://nimc.gov.ng', env: 'NIS_API_KEY' },
+      { id: 'cac', name: 'CAC', description: 'Corporate Affairs Commission — developer company registration verification', status: 'pending', docs: 'https://cac.gov.ng', env: 'CAC_API_KEY' },
     ],
   },
   {

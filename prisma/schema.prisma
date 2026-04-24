@@ -53,6 +53,7 @@ enum UserStatus {
 
 model User {
   id              String     @id @default(cuid())
+  clerkId         String?    @unique
   email           String     @unique
   phone           String?    @unique
   role            UserRole   @default(BUYER)
@@ -65,14 +66,15 @@ model User {
   updatedAt       DateTime   @updatedAt
   deletedAt       DateTime?
 
-  profile       Profile?
-  agentProfile  AgentProfile?
-  devProfile    DeveloperProfile?
-  savedPlots    SavedPlot[]
-  inquiries     Inquiry[]
-  transactions  Transaction[]  @relation("TransactionBuyer")
-  listings      Listing[]      @relation("ListingOwner")
-  auditEntries  AuditEntry[]
+  profile          Profile?
+  agentProfile     AgentProfile?
+  devProfile       DeveloperProfile?
+  savedPlots       SavedPlot[]
+  inquiries        Inquiry[]
+  transactions     Transaction[]  @relation("TransactionBuyer")
+  listings         Listing[]      @relation("ListingOwner")
+  auditEntries     AuditEntry[]
+  fractionalShares FractionalShare[]
 
   @@index([role, status])
   @@index([diasporaCountry])
@@ -154,10 +156,11 @@ model Destination {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  plots      Plot[]
-  projects   Project[]
-  pois       PointOfInterest[]
-  stats      DestinationStat[]
+  plots             Plot[]
+  projects          Project[]
+  pois              PointOfInterest[]
+  stats             DestinationStat[]
+  fractionalSchemes FractionalScheme[]
 
   @@index([type])
   @@index([state])
@@ -524,8 +527,77 @@ model TourismListing {
 }
 
 // =========================================================
+// FRACTIONAL OWNERSHIP
+// =========================================================
+
+model FractionalScheme {
+  id                    String      @id @default(cuid())
+  slug                  String      @unique
+  name                  String
+  destinationId         String
+  destination           Destination @relation(fields: [destinationId], references: [id])
+  totalValueKobo        BigInt
+  sharesIssued          Int
+  sharesAvailable       Int
+  pricePerShareKobo     BigInt
+  currency              String      @default("NGN")
+  projectedYield        Float       // annual % yield
+  threeYearAppreciation Float       // % appreciation over 3 years
+  lockupMonths          Int         @default(36)
+  status                String      @default("ACTIVE") // ACTIVE | NEARLY_FULL | FULL | CLOSED
+  description           String?
+  imageUrl              String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  shares FractionalShare[]
+
+  @@index([destinationId])
+  @@index([status])
+}
+
+model FractionalShare {
+  id          String           @id @default(cuid())
+  schemeId    String
+  scheme      FractionalScheme @relation(fields: [schemeId], references: [id])
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  quantity    Int
+  priceKobo   BigInt           // price per share at time of purchase
+  currency    String           @default("NGN")
+  reference   String           @unique
+  status      String           @default("ACTIVE") // ACTIVE | TRANSFERRED | REDEEMED
+  purchasedAt DateTime         @default(now())
+  maturesAt   DateTime?
+
+  @@index([schemeId])
+  @@index([userId])
+}
+
+// =========================================================
+// STATE REGISTRY CONNECTORS
+// =========================================================
+
+model RegistryRecord {
+  id          String   @id @default(cuid())
+  registry    String   // "LASRERA" | "OGUNIRS" | "NIS" | "FMBN"
+  externalId  String   // ID in the external registry
+  plotId      String?  // linked plot if matched
+  rawPayload  String   // JSON blob from registry
+  status      String   @default("RECEIVED") // RECEIVED | MATCHED | UNMATCHED | ERROR
+  matchedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([registry, externalId])
+  @@index([registry])
+  @@index([plotId])
+}
+
+// =========================================================
 // AUDIT & SYSTEM
 // =========================================================
+
 
 model AuditEntry {
   id         String   @id @default(cuid())
