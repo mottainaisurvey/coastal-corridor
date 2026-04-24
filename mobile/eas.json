@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 12.0.0"
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -14,10 +15,19 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": {
+        "image": "latest"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-key.json",
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
   }
 }
