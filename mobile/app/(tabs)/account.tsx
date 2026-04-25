@@ -54,12 +54,28 @@ export default function AccountScreen() {
 
   const kyc = KYC_CONFIG[summary?.kycStatus ?? 'NOT_STARTED'];
 
+  const legalItems = [
+    {
+      icon: 'document-text-outline' as const,
+      label: 'Terms of Service',
+      sub: 'Read our terms',
+      onPress: () => router.push('/(legal)/terms'),
+    },
+    {
+      icon: 'shield-outline' as const,
+      label: 'Privacy Policy',
+      sub: 'How we use your data',
+      onPress: () => router.push('/(legal)/privacy'),
+    },
+  ];
+
   const menuItems = [
     {
       icon: 'bookmark-outline' as const,
       label: 'Saved Properties',
       sub: `${summary?.savedCount ?? 0} saved`,
       onPress: () => Alert.alert('Coming soon', 'Saved properties will be available in the next update.'),
+      // TODO: router.push('/saved')
     },
     {
       icon: 'chatbubble-outline' as const,
@@ -89,13 +105,9 @@ export default function AccountScreen() {
       icon: 'shield-checkmark-outline' as const,
       label: 'Identity Verification',
       sub: kyc.label,
-      onPress: () => Alert.alert(
-        'Identity Verification',
-        summary?.kycStatus === 'APPROVED'
-          ? 'Your identity is verified.'
-          : 'Identity verification will be available in the next update. Please contact support to start the process.',
-        [{ text: 'OK' }]
-      ),
+      onPress: () => summary?.kycStatus === 'APPROVED'
+        ? Alert.alert('Identity Verified', 'Your identity has been successfully verified.', [{ text: 'OK' }])
+        : router.push('/kyc/'),
     },
   ];
 
@@ -151,6 +163,29 @@ export default function AccountScreen() {
           <TouchableOpacity
             key={i}
             style={[styles.menuRow, i < menuItems.length - 1 && styles.menuRowBorder]}
+            onPress={item.onPress}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <View style={styles.menuIcon}>
+                <Ionicons name={item.icon} size={18} color="#d4a24c" />
+              </View>
+              <View>
+                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Text style={styles.menuSub}>{item.sub}</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Legal */}
+      <View style={[styles.menu, { marginBottom: 16 }]}>
+        {legalItems.map((item, i) => (
+          <TouchableOpacity
+            key={i}
+            style={[styles.menuRow, i < legalItems.length - 1 && styles.menuRowBorder]}
             onPress={item.onPress}
             activeOpacity={0.7}
           >

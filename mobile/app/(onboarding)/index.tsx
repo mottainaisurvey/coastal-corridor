@@ -9,7 +9,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 
 const { width, height } = Dimensions.get('window');
-
 export const ONBOARDING_KEY = 'cc_onboarding_seen_v1';
 
 const SLIDES = [
@@ -43,26 +42,32 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  // Guard against double-taps / race conditions
   const navigating = useRef(false);
 
   const markSeenAndNavigate = useCallback(async () => {
-    if (navigating.current) return;
+    if (navigating.current) {
+      console.log('[Onboarding] markSeenAndNavigate called but already navigating, skipping');
+      return;
+    }
     navigating.current = true;
+    console.log('[Onboarding] marking onboarding as seen and navigating to sign-in');
     try {
       await SecureStore.setItemAsync(ONBOARDING_KEY, '1');
-    } catch {
-      // ignore storage errors — still navigate
+      console.log('[Onboarding] SecureStore flag set successfully');
+    } catch (err) {
+      console.warn('[Onboarding] SecureStore setItem failed:', err);
     }
-    // Use push instead of replace so AuthGuard doesn't fight us
+    console.log('[Onboarding] calling router.replace to /(auth)/sign-in');
     router.replace('/(auth)/sign-in');
   }, [router]);
 
   const handleSkip = useCallback(() => {
+    console.log('[Onboarding] Skip pressed on slide', activeIndex);
     markSeenAndNavigate();
-  }, [markSeenAndNavigate]);
+  }, [markSeenAndNavigate, activeIndex]);
 
   const handleNext = useCallback(() => {
+    console.log('[Onboarding] Next pressed on slide', activeIndex);
     if (activeIndex < SLIDES.length - 1) {
       flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
     } else {
@@ -74,6 +79,7 @@ export default function OnboardingScreen() {
     ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
         setActiveIndex(viewableItems[0].index);
+        console.log('[Onboarding] slide changed to', viewableItems[0].index);
       }
     }
   ).current;
@@ -83,7 +89,6 @@ export default function OnboardingScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
       <FlatList
         ref={flatListRef}
         data={SLIDES}
@@ -97,48 +102,34 @@ export default function OnboardingScreen() {
         viewabilityConfig={viewabilityConfig}
         renderItem={({ item }) => (
           <ImageBackground source={item.image} style={styles.slide} resizeMode="cover">
-            {/* Dark gradient overlay */}
             <View style={styles.overlay} />
             <SafeAreaView style={styles.slideContent} edges={['top', 'bottom']}>
-              {/* Top: Skip */}
               <View style={styles.topBar}>
                 <View />
                 <TouchableOpacity
                   onPress={handleSkip}
                   style={styles.skipBtn}
                   activeOpacity={0.7}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
                 >
                   <Text style={styles.skipText}>Skip</Text>
                 </TouchableOpacity>
               </View>
-
-              {/* Bottom: Content */}
               <View style={styles.bottomContent}>
                 <Text style={styles.eyebrow}>{item.eyebrow}</Text>
                 <Text style={styles.title}>{item.title}</Text>
                 <Text style={styles.body}>{item.body}</Text>
-
-                {/* Dots */}
                 <View style={styles.dotsRow}>
                   {SLIDES.map((_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.dot,
-                        i === activeIndex ? styles.dotActive : styles.dotInactive,
-                      ]}
-                    />
+                    <View key={i} style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]} />
                   ))}
                 </View>
-
-                {/* CTA or Next */}
                 {item.cta ? (
                   <TouchableOpacity
                     style={styles.ctaBtn}
                     onPress={markSeenAndNavigate}
                     activeOpacity={0.8}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
                     <Text style={styles.ctaBtnText}>{item.cta}</Text>
                   </TouchableOpacity>
@@ -147,7 +138,7 @@ export default function OnboardingScreen() {
                     style={styles.nextBtn}
                     onPress={handleNext}
                     activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
                     <Text style={styles.nextBtnText}>Next →</Text>
                   </TouchableOpacity>
@@ -164,10 +155,7 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0e12' },
   slide: { width, height },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 14, 18, 0.55)',
-  },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(10, 14, 18, 0.55)' },
   slideContent: { flex: 1, justifyContent: 'space-between' },
   topBar: {
     flexDirection: 'row',
@@ -182,71 +170,28 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   skipText: { color: '#f5f0e8', fontSize: 13, fontWeight: '500' },
-  bottomContent: {
-    paddingHorizontal: 28,
-    paddingBottom: 40,
-  },
+  bottomContent: { paddingHorizontal: 28, paddingBottom: 40 },
   eyebrow: {
-    color: '#d4a24c',
-    fontSize: 10,
-    fontFamily: 'monospace',
-    letterSpacing: 2.5,
-    textTransform: 'uppercase',
-    marginBottom: 14,
+    color: '#d4a24c', fontSize: 10, fontFamily: 'monospace',
+    letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 14,
   },
   title: {
-    color: '#f5f0e8',
-    fontSize: 34,
-    fontWeight: '300',
-    lineHeight: 42,
-    letterSpacing: 0.3,
-    marginBottom: 16,
+    color: '#f5f0e8', fontSize: 34, fontWeight: '300',
+    lineHeight: 42, letterSpacing: 0.3, marginBottom: 16,
   },
-  body: {
-    color: 'rgba(245, 240, 232, 0.80)',
-    fontSize: 15,
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 28,
-  },
-  dot: {
-    height: 4,
-    borderRadius: 2,
-  },
-  dotActive: {
-    width: 28,
-    backgroundColor: '#d4a24c',
-  },
-  dotInactive: {
-    width: 8,
-    backgroundColor: 'rgba(255,255,255,0.30)',
-  },
+  body: { color: 'rgba(245, 240, 232, 0.80)', fontSize: 15, lineHeight: 24, marginBottom: 32 },
+  dotsRow: { flexDirection: 'row', gap: 8, marginBottom: 28 },
+  dot: { height: 4, borderRadius: 2 },
+  dotActive: { width: 28, backgroundColor: '#d4a24c' },
+  dotInactive: { width: 8, backgroundColor: 'rgba(255,255,255,0.30)' },
   ctaBtn: {
-    backgroundColor: '#c96a3f',
-    borderRadius: 12,
-    paddingVertical: 17,
-    alignItems: 'center',
+    backgroundColor: '#c96a3f', borderRadius: 12,
+    paddingVertical: 17, alignItems: 'center',
   },
-  ctaBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
+  ctaBtnText: { color: '#fff', fontSize: 16, fontWeight: '600', letterSpacing: 0.3 },
   nextBtn: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.30)',
-    borderRadius: 12,
-    paddingVertical: 17,
-    alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.30)',
+    borderRadius: 12, paddingVertical: 17, alignItems: 'center',
   },
-  nextBtnText: {
-    color: '#f5f0e8',
-    fontSize: 15,
-    fontWeight: '500',
-  },
+  nextBtnText: { color: '#f5f0e8', fontSize: 15, fontWeight: '500' },
 });

@@ -1,13 +1,13 @@
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 export const ONBOARDING_KEY = 'cc_onboarding_seen_v1';
 
-// Secure token cache for Clerk — clearToken required by @clerk/clerk-expo v2+
+// Secure token cache for Clerk
 const tokenCache = {
   async getToken(key: string) {
     try { return await SecureStore.getItemAsync(key); } catch { return null; }
@@ -22,59 +22,24 @@ const tokenCache = {
 
 function AuthGuard() {
   const { isLoaded, isSignedIn } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
   const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
-  // Prevent multiple simultaneous navigations
-  const isNavigating = useRef(false);
 
-  // Check onboarding flag on mount
   useEffect(() => {
     SecureStore.getItemAsync(ONBOARDING_KEY)
-      .then(val => setOnboardingSeen(val === '1'))
-      .catch(() => setOnboardingSeen(false));
+      .then(val => {
+        const seen = val === '1';
+        console.log('[AuthGuard] onboarding flag loaded:', seen);
+        setOnboardingSeen(seen);
+      })
+      .catch(err => {
+        console.warn('[AuthGuard] SecureStore error, defaulting to false:', err);
+        setOnboardingSeen(false);
+      });
   }, []);
 
-  useEffect(() => {
-    // Wait for everything to be ready
-    if (!isLoaded || onboardingSeen === null || segments.length === 0) return;
-    if (isNavigating.current) return;
-
-    const currentSegment = segments[0] as string | undefined;
-    const inOnboarding = currentSegment === '(onboarding)';
-    const inAuthGroup = currentSegment === '(auth)';
-
-    // User hasn't seen onboarding yet → show onboarding
-    if (!onboardingSeen) {
-      if (!inOnboarding) {
-        isNavigating.current = true;
-        router.replace('/(onboarding)/');
-        // Reset flag after a short delay to allow future navigations
-        setTimeout(() => { isNavigating.current = false; }, 1000);
-      }
-      return;
-    }
-
-    // Onboarding done, not signed in → sign in page
-    if (!isSignedIn) {
-      if (!inAuthGroup) {
-        isNavigating.current = true;
-        router.replace('/(auth)/sign-in');
-        setTimeout(() => { isNavigating.current = false; }, 1000);
-      }
-      return;
-    }
-
-    // Signed in but in auth or onboarding → go to app
-    if (isSignedIn && (inAuthGroup || inOnboarding)) {
-      isNavigating.current = true;
-      router.replace('/(tabs)/');
-      setTimeout(() => { isNavigating.current = false; }, 1000);
-    }
-  }, [isLoaded, isSignedIn, onboardingSeen, segments]);
-
-  // Show loading while Clerk or onboarding state is not ready
+  // Show splash/loader until both Clerk and SecureStore are ready
   if (!isLoaded || onboardingSeen === null) {
+    console.log('[AuthGuard] waiting — isLoaded:', isLoaded, 'onboardingSeen:', onboardingSeen);
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12' }}>
         <ActivityIndicator color="#d4a24c" size="large" />
@@ -82,33 +47,56 @@ function AuthGuard() {
     );
   }
 
+  console.log('[AuthGuard] routing — isSignedIn:', isSignedIn, 'onboardingSeen:', onboardingSeen);
+
+  // Decision tree rendered as JSX — no imperative router.replace() calls
+  // Expo Router processes <Redirect /> synchronously before painting any screen
+
+  // New user: show onboarding first
+  if (!onboardingSeen) {
+    console.log('[AuthGuard] → redirecting to onboarding');
+    return (
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0e12' } }}>
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="property/[slug]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Redirect href="/(onboarding)/" />
+      </Stack>
+    );
+  }
+
+  // Onboarding done, not signed in: go to sign-in
+  if (!isSignedIn) {
+    console.log('[AuthGuard] → redirecting to sign-in');
+    return (
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0e12' } }}>
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="property/[slug]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Redirect href="/(auth)/sign-in" />
+      </Stack>
+    );
+  }
+
+  // Signed in: go to main app
+  console.log('[AuthGuard] → user signed in, rendering tabs');
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: '#0a0e12' },
-        animation: 'fade',
-      }}
-    >
-      <Stack.Screen name="(onboarding)" options={{ headerShown: false, animation: 'fade' }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false, animation: 'fade' }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
-      <Stack.Screen
-        name="property/[slug]"
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          animation: 'slide_from_right',
-        }}
-      />
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0e12' } }}>
+      <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="property/[slug]" options={{ headerShown: false, animation: 'slide_from_right' }} />
     </Stack>
   );
 }
 
 export default function RootLayout() {
   if (!CLERK_PUBLISHABLE_KEY) {
+    console.error('[RootLayout] EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set!');
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12', padding: 24 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12' }}>
         <ActivityIndicator color="#d4a24c" size="large" />
       </View>
     );
