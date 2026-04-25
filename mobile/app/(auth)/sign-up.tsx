@@ -25,14 +25,29 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  // Block the UI until any stale session has been fully cleared
+  const [clearing, setClearing] = useState(true);
 
-  // Clear any stale session when arriving at sign-up screen
   useEffect(() => {
-    if (isSignedIn) {
-      console.log('[SignUp] stale session detected — signing out');
-      signOut().catch(() => {});
+    let cancelled = false;
+    const clearStaleSession = async () => {
+      try {
+        if (isSignedIn) {
+          console.log('[SignUp] stale session detected — signing out before rendering');
+          await signOut();
+          console.log('[SignUp] stale session cleared');
+        }
+      } catch (err) {
+        console.warn('[SignUp] signOut error (ignored):', err);
+      } finally {
+        if (!cancelled) setClearing(false);
+      }
+    };
+    if (isLoaded) {
+      clearStaleSession();
     }
-  }, [isSignedIn]);
+    return () => { cancelled = true; };
+  }, [isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSignUp = async () => {
     if (!isLoaded) return;
@@ -120,6 +135,15 @@ export default function SignUpScreen() {
       setGoogleLoading(false);
     }
   };
+
+  // Show a full-screen loader while we await the signOut (prevents "already signed in" error)
+  if (clearing || !isLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator color="#d4a24c" size="large" />
+      </View>
+    );
+  }
 
   // Email verification step
   if (pendingVerification) {
@@ -264,6 +288,7 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12' },
   container: { flex: 1, backgroundColor: '#0a0e12' },
   inner: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40 },
   logoArea: { alignItems: 'center', marginBottom: 40 },

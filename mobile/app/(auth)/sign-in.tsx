@@ -20,14 +20,30 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  // Block the UI until any stale session has been fully cleared
+  const [clearing, setClearing] = useState(true);
 
-  // If somehow a stale session exists while we're on the sign-in screen, clear it
   useEffect(() => {
-    if (isSignedIn) {
-      console.log('[SignIn] stale session detected — signing out');
-      signOut().catch(() => {});
+    let cancelled = false;
+    const clearStaleSession = async () => {
+      try {
+        if (isSignedIn) {
+          console.log('[SignIn] stale session detected — signing out before rendering');
+          await signOut();
+          console.log('[SignIn] stale session cleared');
+        }
+      } catch (err) {
+        console.warn('[SignIn] signOut error (ignored):', err);
+      } finally {
+        if (!cancelled) setClearing(false);
+      }
+    };
+    // Only run once Clerk has loaded its state
+    if (isLoaded) {
+      clearStaleSession();
     }
-  }, [isSignedIn]);
+    return () => { cancelled = true; };
+  }, [isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSignIn = async () => {
     if (!isLoaded) return;
@@ -67,7 +83,6 @@ export default function SignInScreen() {
         await result.setActive({ session: result.createdSessionId });
         router.replace('/(tabs)/');
       } else if (result.signIn?.status === 'complete') {
-        // Already handled by Clerk internally
         router.replace('/(tabs)/');
       } else {
         console.warn('[SignIn] SSO flow returned no session:', result);
@@ -76,7 +91,6 @@ export default function SignInScreen() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google sign in failed';
       console.error('[SignIn] Google SSO error:', msg);
-      // Don't show error if user simply cancelled the browser
       if (!msg.includes('cancel') && !msg.includes('dismiss')) {
         Alert.alert('Google sign in failed', msg);
       }
@@ -84,6 +98,15 @@ export default function SignInScreen() {
       setGoogleLoading(false);
     }
   };
+
+  // Show a full-screen loader while we await the signOut (prevents "already signed in" error)
+  if (clearing || !isLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator color="#d4a24c" size="large" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -182,6 +205,7 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12' },
   container: { flex: 1, backgroundColor: '#0a0e12' },
   inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 28 },
   logoArea: { alignItems: 'center', marginBottom: 48 },
