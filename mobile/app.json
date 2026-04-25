@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "africa.coastalcorridor.app",
-      "buildNumber": "19",
+      "buildNumber": "20",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -25,7 +25,7 @@
         "backgroundColor": "#0a0e12"
       },
       "package": "africa.coastalcorridor.app",
-      "versionCode": 11
+      "versionCode": 12
     },
     "web": {
       "bundler": "metro",
