@@ -1,6 +1,6 @@
-import { useSignUp, useOAuth } from '@clerk/clerk-expo';
+import { useSignUp, useSSO, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -13,7 +13,8 @@ WebBrowser.maybeCompleteAuthSession();
 
 export default function SignUpScreen() {
   const { signUp, setActive, isLoaded } = useSignUp();
-  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+  const { startSSOFlow } = useSSO();
+  const { isSignedIn, signOut } = useAuth();
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -25,19 +26,42 @@ export default function SignUpScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Clear any stale session when arriving at sign-up screen
+  useEffect(() => {
+    if (isSignedIn) {
+      console.log('[SignUp] stale session detected — signing out');
+      signOut().catch(() => {});
+    }
+  }, [isSignedIn]);
+
   const handleSignUp = async () => {
     if (!isLoaded) return;
     if (!agreedToTerms) {
       Alert.alert('Agreement required', 'Please agree to the Terms of Service and Privacy Policy to continue.');
       return;
     }
+    if (!firstName.trim() || !email.trim() || !password.trim()) {
+      Alert.alert('Missing fields', 'Please fill in all required fields.');
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert('Password too short', 'Your password must be at least 8 characters.');
+      return;
+    }
     setLoading(true);
     try {
-      await signUp.create({ firstName, lastName, emailAddress: email, password });
+      await signUp.create({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        emailAddress: email.trim(),
+        password,
+      });
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
     } catch (err: unknown) {
-      Alert.alert('Sign up failed', err instanceof Error ? err.message : 'Unknown error');
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[SignUp] create error:', msg);
+      Alert.alert('Sign up failed', msg);
     } finally {
       setLoading(false);
     }
@@ -51,9 +75,13 @@ export default function SignUpScreen() {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         router.replace('/(tabs)/');
+      } else {
+        Alert.alert('Verification incomplete', 'Please check the code and try again.');
       }
     } catch (err: unknown) {
-      Alert.alert('Verification failed', err instanceof Error ? err.message : 'Invalid code');
+      const msg = err instanceof Error ? err.message : 'Invalid code';
+      console.error('[SignUp] verify error:', msg);
+      Alert.alert('Verification failed', msg);
     } finally {
       setLoading(false);
     }
@@ -66,18 +94,34 @@ export default function SignUpScreen() {
     }
     setGoogleLoading(true);
     try {
-      const { createdSessionId, setActive: oauthSetActive } = await startOAuthFlow();
-      if (createdSessionId && oauthSetActive) {
-        await oauthSetActive({ session: createdSessionId });
+      console.log('[SignUp] starting Google SSO flow');
+      const result = await startSSOFlow({ strategy: 'oauth_google' });
+      console.log('[SignUp] SSO result:', JSON.stringify({
+        createdSessionId: result.createdSessionId,
+        hasSetActive: !!result.setActive,
+      }));
+
+      if (result.createdSessionId && result.setActive) {
+        await result.setActive({ session: result.createdSessionId });
         router.replace('/(tabs)/');
+      } else if (result.signUp?.status === 'complete') {
+        router.replace('/(tabs)/');
+      } else {
+        console.warn('[SignUp] SSO flow returned no session:', result);
+        Alert.alert('Google sign up', 'Sign up was cancelled or did not complete. Please try again.');
       }
     } catch (err: unknown) {
-      Alert.alert('Google sign up failed', err instanceof Error ? err.message : 'Unknown error');
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[SignUp] Google SSO error:', msg);
+      if (!msg.includes('cancel') && !msg.includes('dismiss')) {
+        Alert.alert('Google sign up failed', msg);
+      }
     } finally {
       setGoogleLoading(false);
     }
   };
 
+  // Email verification step
   if (pendingVerification) {
     return (
       <View style={styles.container}>
@@ -94,9 +138,14 @@ export default function SignUpScreen() {
             value={code}
             onChangeText={setCode}
             keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
           />
-          <TouchableOpacity style={styles.btn} onPress={handleVerify} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Verify</Text>}
+          <TouchableOpacity style={styles.btn} onPress={handleVerify} disabled={loading} activeOpacity={0.8}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Verify email</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backBtn} onPress={() => setPendingVerification(false)} activeOpacity={0.7}>
+            <Text style={styles.backBtnText}>← Back</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -113,8 +162,8 @@ export default function SignUpScreen() {
 
         <Text style={styles.heading}>Get started</Text>
 
-        {/* Google OAuth */}
-        <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleSignUp} disabled={googleLoading}>
+        {/* Google SSO */}
+        <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleSignUp} disabled={googleLoading} activeOpacity={0.75}>
           {googleLoading ? (
             <ActivityIndicator color="#f5f0e8" size="small" />
           ) : (
@@ -138,6 +187,7 @@ export default function SignUpScreen() {
             placeholderTextColor="#6b7280"
             value={firstName}
             onChangeText={setFirstName}
+            textContentType="givenName"
           />
           <TextInput
             style={[styles.input, styles.half]}
@@ -145,6 +195,7 @@ export default function SignUpScreen() {
             placeholderTextColor="#6b7280"
             value={lastName}
             onChangeText={setLastName}
+            textContentType="familyName"
           />
         </View>
 
@@ -156,6 +207,8 @@ export default function SignUpScreen() {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
         />
         <TextInput
           style={styles.input}
@@ -164,9 +217,10 @@ export default function SignUpScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          textContentType="newPassword"
         />
 
-        {/* Terms agreement checkbox */}
+        {/* Terms agreement */}
         <TouchableOpacity
           style={styles.checkboxRow}
           onPress={() => setAgreedToTerms(v => !v)}
@@ -187,14 +241,19 @@ export default function SignUpScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.btn, !agreedToTerms && styles.btnDisabled]} onPress={handleSignUp} disabled={loading || !agreedToTerms}>
+        <TouchableOpacity
+          style={[styles.btn, !agreedToTerms && styles.btnDisabled]}
+          onPress={handleSignUp}
+          disabled={loading || !agreedToTerms}
+          activeOpacity={0.8}
+        >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Create account</Text>}
         </TouchableOpacity>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account? </Text>
           <Link href="/(auth)/sign-in" asChild>
-            <TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7}>
               <Text style={styles.link}>Sign in</Text>
             </TouchableOpacity>
           </Link>
@@ -241,6 +300,8 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: '#c96a3f', borderRadius: 8, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
   btnDisabled: { backgroundColor: '#c96a3f60' },
   btnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  backBtn: { alignItems: 'center', marginTop: 16 },
+  backBtnText: { color: '#d4a24c', fontSize: 14 },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
   footerText: { color: '#9ca3af', fontSize: 14 },
   link: { color: '#d4a24c', fontSize: 14, fontWeight: '500' },

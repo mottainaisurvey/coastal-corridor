@@ -1,36 +1,52 @@
-import { useSignIn, useOAuth } from '@clerk/clerk-expo';
+import { useSignIn, useSSO, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Alert, Image,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
-// Required for OAuth redirect handling on Android
+// Required for OAuth redirect handling — must be called before any OAuth flow
 WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
-  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+  const { startSSOFlow } = useSSO();
+  const { isSignedIn, signOut } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // If somehow a stale session exists while we're on the sign-in screen, clear it
+  useEffect(() => {
+    if (isSignedIn) {
+      console.log('[SignIn] stale session detected — signing out');
+      signOut().catch(() => {});
+    }
+  }, [isSignedIn]);
+
   const handleSignIn = async () => {
     if (!isLoaded) return;
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Missing fields', 'Please enter your email and password.');
+      return;
+    }
     setLoading(true);
     try {
-      const result = await signIn.create({ identifier: email, password });
+      const result = await signIn.create({ identifier: email.trim(), password });
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         router.replace('/(tabs)/');
+      } else {
+        Alert.alert('Sign in incomplete', 'Additional verification required. Please try again.');
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Sign in failed';
+      const msg = err instanceof Error ? err.message : 'Sign in failed. Please check your credentials.';
+      console.error('[SignIn] email sign-in error:', msg);
       Alert.alert('Sign in failed', msg);
     } finally {
       setLoading(false);
@@ -40,14 +56,30 @@ export default function SignInScreen() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const { createdSessionId, setActive: oauthSetActive } = await startOAuthFlow();
-      if (createdSessionId && oauthSetActive) {
-        await oauthSetActive({ session: createdSessionId });
+      console.log('[SignIn] starting Google SSO flow');
+      const result = await startSSOFlow({ strategy: 'oauth_google' });
+      console.log('[SignIn] SSO result:', JSON.stringify({
+        createdSessionId: result.createdSessionId,
+        hasSetActive: !!result.setActive,
+      }));
+
+      if (result.createdSessionId && result.setActive) {
+        await result.setActive({ session: result.createdSessionId });
         router.replace('/(tabs)/');
+      } else if (result.signIn?.status === 'complete') {
+        // Already handled by Clerk internally
+        router.replace('/(tabs)/');
+      } else {
+        console.warn('[SignIn] SSO flow returned no session:', result);
+        Alert.alert('Google sign in', 'Sign in was cancelled or did not complete. Please try again.');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google sign in failed';
-      Alert.alert('Google sign in failed', msg);
+      console.error('[SignIn] Google SSO error:', msg);
+      // Don't show error if user simply cancelled the browser
+      if (!msg.includes('cancel') && !msg.includes('dismiss')) {
+        Alert.alert('Google sign in failed', msg);
+      }
     } finally {
       setGoogleLoading(false);
     }
@@ -59,7 +91,7 @@ export default function SignInScreen() {
       style={styles.container}
     >
       <View style={styles.inner}>
-        {/* Logo / wordmark */}
+        {/* Logo */}
         <View style={styles.logoArea}>
           <Text style={styles.logoText}>Coastal Corridor</Text>
           <Text style={styles.logoSub}>Lagos ⟶ Calabar</Text>
@@ -67,11 +99,12 @@ export default function SignInScreen() {
 
         <Text style={styles.heading}>Sign in</Text>
 
-        {/* Google OAuth button */}
+        {/* Google SSO button */}
         <TouchableOpacity
           style={styles.googleBtn}
           onPress={handleGoogleSignIn}
           disabled={googleLoading}
+          activeOpacity={0.75}
         >
           {googleLoading ? (
             <ActivityIndicator color="#f5f0e8" size="small" />
@@ -99,6 +132,7 @@ export default function SignInScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
           autoComplete="email"
+          textContentType="emailAddress"
         />
 
         <TextInput
@@ -109,12 +143,15 @@ export default function SignInScreen() {
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="password"
+          textContentType="password"
         />
 
         {/* Forgot password */}
         <TouchableOpacity
           style={styles.forgotBtn}
           onPress={() => router.push('/(auth)/forgot-password')}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.forgotText}>Forgot password?</Text>
         </TouchableOpacity>
@@ -123,6 +160,7 @@ export default function SignInScreen() {
           style={styles.btn}
           onPress={handleSignIn}
           disabled={loading}
+          activeOpacity={0.8}
         >
           {loading
             ? <ActivityIndicator color="#fff" />
@@ -133,7 +171,7 @@ export default function SignInScreen() {
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don&apos;t have an account? </Text>
           <Link href="/(auth)/sign-up" asChild>
-            <TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7}>
               <Text style={styles.link}>Create one</Text>
             </TouchableOpacity>
           </Link>
@@ -162,18 +200,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 20,
   },
-  googleIcon: {
-    color: '#4285F4',
-    fontSize: 17,
-    fontWeight: '700',
-  },
+  googleIcon: { color: '#4285F4', fontSize: 17, fontWeight: '700' },
   googleBtnText: { color: '#f5f0e8', fontSize: 15, fontWeight: '500' },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-  },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#2a3040' },
   dividerText: { color: '#6b7280', fontSize: 12 },
   input: {
