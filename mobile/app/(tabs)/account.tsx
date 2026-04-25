@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert
+  StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -55,12 +55,48 @@ export default function AccountScreen() {
   const kyc = KYC_CONFIG[summary?.kycStatus ?? 'NOT_STARTED'];
 
   const menuItems = [
-    { icon: 'bookmark-outline', label: 'Saved Properties', sub: `${summary?.savedCount ?? 0} saved`, route: null },
-    { icon: 'chatbubble-outline', label: 'My Inquiries', sub: `${summary?.inquiryCount ?? 0} inquiries`, route: null },
-    { icon: 'receipt-outline', label: 'Transactions', sub: `${summary?.transactionCount ?? 0} transactions`, route: null },
-    { icon: 'document-text-outline', label: 'Documents', sub: 'Upload and manage files', route: null },
-    { icon: 'pie-chart-outline', label: 'My Portfolio', sub: 'Fractional holdings', route: null },
-    { icon: 'shield-checkmark-outline', label: 'Identity Verification', sub: kyc.label, route: null },
+    {
+      icon: 'bookmark-outline' as const,
+      label: 'Saved Properties',
+      sub: `${summary?.savedCount ?? 0} saved`,
+      onPress: () => Alert.alert('Coming soon', 'Saved properties will be available in the next update.'),
+    },
+    {
+      icon: 'chatbubble-outline' as const,
+      label: 'My Inquiries',
+      sub: `${summary?.inquiryCount ?? 0} inquiries`,
+      onPress: () => Alert.alert('Coming soon', 'Your inquiry history will be available in the next update.'),
+    },
+    {
+      icon: 'receipt-outline' as const,
+      label: 'Transactions',
+      sub: `${summary?.transactionCount ?? 0} transactions`,
+      onPress: () => Alert.alert('Coming soon', 'Transaction history will be available in the next update.'),
+    },
+    {
+      icon: 'document-text-outline' as const,
+      label: 'Documents',
+      sub: 'Upload and manage files',
+      onPress: () => Alert.alert('Coming soon', 'Document management will be available in the next update.'),
+    },
+    {
+      icon: 'pie-chart-outline' as const,
+      label: 'My Portfolio',
+      sub: 'Fractional holdings',
+      onPress: () => router.push('/(tabs)/fractional'),
+    },
+    {
+      icon: 'shield-checkmark-outline' as const,
+      label: 'Identity Verification',
+      sub: kyc.label,
+      onPress: () => Alert.alert(
+        'Identity Verification',
+        summary?.kycStatus === 'APPROVED'
+          ? 'Your identity is verified.'
+          : 'Identity verification will be available in the next update. Please contact support to start the process.',
+        [{ text: 'OK' }]
+      ),
+    },
   ];
 
   return (
@@ -74,7 +110,9 @@ export default function AccountScreen() {
         </View>
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>
-            {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.emailAddresses?.[0]?.emailAddress ?? 'Account'}
+            {user?.firstName && user?.lastName
+              ? `${user.firstName} ${user.lastName}`
+              : user?.emailAddresses?.[0]?.emailAddress ?? 'Account'}
           </Text>
           <Text style={styles.profileEmail}>{user?.emailAddresses?.[0]?.emailAddress}</Text>
         </View>
@@ -110,10 +148,15 @@ export default function AccountScreen() {
       {/* Menu */}
       <View style={styles.menu}>
         {menuItems.map((item, i) => (
-          <TouchableOpacity key={i} style={[styles.menuRow, i < menuItems.length - 1 && styles.menuRowBorder]}>
+          <TouchableOpacity
+            key={i}
+            style={[styles.menuRow, i < menuItems.length - 1 && styles.menuRowBorder]}
+            onPress={item.onPress}
+            activeOpacity={0.7}
+          >
             <View style={styles.menuLeft}>
               <View style={styles.menuIcon}>
-                <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={18} color="#d4a24c" />
+                <Ionicons name={item.icon} size={18} color="#d4a24c" />
               </View>
               <View>
                 <Text style={styles.menuLabel}>{item.label}</Text>

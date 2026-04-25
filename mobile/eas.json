@@ -23,6 +23,14 @@
   },
   "submit": {
     "production": {
+      "ios": {
+        "ascAppId": "6763654743",
+        "appleId": "adeyadewuyi@icloud.com",
+        "appleTeamId": "77P97UVCSF",
+        "ascApiKeyPath": "/home/ubuntu/ios-certs/AuthKey_77FVQ269UN.p8",
+        "ascApiKeyIssuerId": "9e1f04e0-f44a-4fd9-91d6-58bbc29171c1",
+        "ascApiKeyId": "77FVQ269UN"
+      },
       "android": {
         "serviceAccountKeyPath": "./google-play-key.json",
         "track": "internal",

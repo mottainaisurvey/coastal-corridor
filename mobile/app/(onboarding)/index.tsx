@@ -1,0 +1,225 @@
+import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet,
+  Dimensions, FlatList, ImageBackground, StatusBar,
+  Animated, Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as SecureStore from 'expo-secure-store';
+
+const { width, height } = Dimensions.get('window');
+
+const SLIDES = [
+  {
+    id: '1',
+    image: require('../../assets/onboarding1.png'),
+    eyebrow: '700 KM · LAGOS TO CALABAR',
+    title: "Africa's Greatest\nCoastal Opportunity",
+    body: "Nigeria's 700km Atlantic coastline is opening up. Be among the first to own a piece of the most strategically positioned land corridor on the continent.",
+    cta: null,
+  },
+  {
+    id: '2',
+    image: require('../../assets/onboarding2.png'),
+    eyebrow: 'PREMIUM PROPERTIES',
+    title: 'Luxury Living\nMeets Smart Investment',
+    body: "From beachfront villas to mixed-use developments — browse verified listings across 12 corridor destinations, each with full title documentation.",
+    cta: null,
+  },
+  {
+    id: '3',
+    image: require('../../assets/onboarding3.png'),
+    eyebrow: 'VERIFIED · SECURE · YOURS',
+    title: 'Own Your Share\nof the Corridor',
+    body: "Every title verified through Lagos State LandWeb. Fractional ownership from ₦500K. Your investment, protected.",
+    cta: 'Explore the Corridor',
+  },
+];
+
+export const ONBOARDING_KEY = 'cc_onboarding_seen_v1';
+
+export default function OnboardingScreen() {
+  const router = useRouter();
+  const flatListRef = useRef<FlatList>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  const markSeenAndNavigate = async () => {
+    try { await SecureStore.setItemAsync(ONBOARDING_KEY, '1'); } catch {}
+    router.replace('/(auth)/sign-in');
+  };
+
+  const handleSkip = () => markSeenAndNavigate();
+
+  const handleNext = () => {
+    if (activeIndex < SLIDES.length - 1) {
+      flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
+    } else {
+      markSeenAndNavigate();
+    }
+  };
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+    if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+      setActiveIndex(viewableItems[0].index);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      <FlatList
+        ref={flatListRef}
+        data={SLIDES}
+        keyExtractor={(item) => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        renderItem={({ item }) => (
+          <ImageBackground source={item.image} style={styles.slide} resizeMode="cover">
+            {/* Dark gradient overlay */}
+            <View style={styles.overlay} />
+            <SafeAreaView style={styles.slideContent} edges={['top', 'bottom']}>
+              {/* Top: Skip */}
+              <View style={styles.topBar}>
+                <View />
+                <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
+                  <Text style={styles.skipText}>Skip</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Bottom: Content */}
+              <View style={styles.bottomContent}>
+                <Text style={styles.eyebrow}>{item.eyebrow}</Text>
+                <Text style={styles.title}>{item.title}</Text>
+                <Text style={styles.body}>{item.body}</Text>
+
+                {/* Dots */}
+                <View style={styles.dotsRow}>
+                  {SLIDES.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.dot,
+                        i === activeIndex ? styles.dotActive : styles.dotInactive,
+                      ]}
+                    />
+                  ))}
+                </View>
+
+                {/* CTA or Next */}
+                {item.cta ? (
+                  <TouchableOpacity style={styles.ctaBtn} onPress={markSeenAndNavigate}>
+                    <Text style={styles.ctaBtnText}>{item.cta}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
+                    <Text style={styles.nextBtnText}>Next →</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </SafeAreaView>
+          </ImageBackground>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0a0e12' },
+  slide: { width, height },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 14, 18, 0.55)',
+  },
+  slideContent: { flex: 1, justifyContent: 'space-between' },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'android' ? 16 : 8,
+  },
+  skipBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 20,
+  },
+  skipText: { color: '#f5f0e8', fontSize: 13, fontWeight: '500' },
+  bottomContent: {
+    paddingHorizontal: 28,
+    paddingBottom: 40,
+  },
+  eyebrow: {
+    color: '#d4a24c',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    marginBottom: 14,
+  },
+  title: {
+    color: '#f5f0e8',
+    fontSize: 34,
+    fontWeight: '300',
+    lineHeight: 42,
+    letterSpacing: 0.3,
+    marginBottom: 16,
+  },
+  body: {
+    color: 'rgba(245, 240, 232, 0.80)',
+    fontSize: 15,
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 28,
+  },
+  dot: {
+    height: 4,
+    borderRadius: 2,
+  },
+  dotActive: {
+    width: 28,
+    backgroundColor: '#d4a24c',
+  },
+  dotInactive: {
+    width: 8,
+    backgroundColor: 'rgba(255,255,255,0.30)',
+  },
+  ctaBtn: {
+    backgroundColor: '#c96a3f',
+    borderRadius: 12,
+    paddingVertical: 17,
+    alignItems: 'center',
+  },
+  ctaBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  nextBtn: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.30)',
+    borderRadius: 12,
+    paddingVertical: 17,
+    alignItems: 'center',
+  },
+  nextBtnText: {
+    color: '#f5f0e8',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+});

@@ -1,13 +1,19 @@
-import { useSignUp } from '@clerk/clerk-expo';
+import { useSignUp, useOAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView
+  StyleSheet, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+
+// Required for OAuth redirect handling on Android
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignUpScreen() {
   const { signUp, setActive, isLoaded } = useSignUp();
+  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -16,6 +22,7 @@ export default function SignUpScreen() {
   const [code, setCode] = useState('');
   const [pendingVerification, setPendingVerification] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleSignUp = async () => {
     if (!isLoaded) return;
@@ -47,6 +54,21 @@ export default function SignUpScreen() {
     }
   };
 
+  const handleGoogleSignUp = async () => {
+    setGoogleLoading(true);
+    try {
+      const { createdSessionId, setActive: oauthSetActive } = await startOAuthFlow();
+      if (createdSessionId && oauthSetActive) {
+        await oauthSetActive({ session: createdSessionId });
+        router.replace('/(tabs)/');
+      }
+    } catch (err: unknown) {
+      Alert.alert('Google sign up failed', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   if (pendingVerification) {
     return (
       <View style={styles.container}>
@@ -70,7 +92,10 @@ export default function SignUpScreen() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
       <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
         <View style={styles.logoArea}>
           <Text style={styles.logoText}>Coastal Corridor</Text>
@@ -79,13 +104,63 @@ export default function SignUpScreen() {
 
         <Text style={styles.heading}>Get started</Text>
 
-        <View style={styles.row}>
-          <TextInput style={[styles.input, styles.half]} placeholder="First name" placeholderTextColor="#6b7280" value={firstName} onChangeText={setFirstName} />
-          <TextInput style={[styles.input, styles.half]} placeholder="Last name" placeholderTextColor="#6b7280" value={lastName} onChangeText={setLastName} />
+        {/* Google OAuth button */}
+        <TouchableOpacity
+          style={styles.googleBtn}
+          onPress={handleGoogleSignUp}
+          disabled={googleLoading}
+        >
+          {googleLoading ? (
+            <ActivityIndicator color="#f5f0e8" size="small" />
+          ) : (
+            <>
+              <Text style={styles.googleIcon}>G</Text>
+              <Text style={styles.googleBtnText}>Continue with Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
         </View>
 
-        <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#6b7280" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-        <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#6b7280" value={password} onChangeText={setPassword} secureTextEntry />
+        <View style={styles.row}>
+          <TextInput
+            style={[styles.input, styles.half]}
+            placeholder="First name"
+            placeholderTextColor="#6b7280"
+            value={firstName}
+            onChangeText={setFirstName}
+          />
+          <TextInput
+            style={[styles.input, styles.half]}
+            placeholder="Last name"
+            placeholderTextColor="#6b7280"
+            value={lastName}
+            onChangeText={setLastName}
+          />
+        </View>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Email address"
+          placeholderTextColor="#6b7280"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password (min 8 characters)"
+          placeholderTextColor="#6b7280"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
 
         <TouchableOpacity style={styles.btn} onPress={handleSignUp} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Create account</Text>}
@@ -94,7 +169,9 @@ export default function SignUpScreen() {
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account? </Text>
           <Link href="/(auth)/sign-in" asChild>
-            <TouchableOpacity><Text style={styles.link}>Sign in</Text></TouchableOpacity>
+            <TouchableOpacity>
+              <Text style={styles.link}>Sign in</Text>
+            </TouchableOpacity>
           </Link>
         </View>
       </ScrollView>
@@ -110,14 +187,39 @@ const styles = StyleSheet.create({
   logoSub: { color: '#d4a24c', fontSize: 12, fontFamily: 'monospace', marginTop: 4, letterSpacing: 2 },
   heading: { color: '#f5f0e8', fontSize: 28, fontWeight: '300', marginBottom: 24 },
   sub: { color: '#9ca3af', fontSize: 14, marginBottom: 24 },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#1e2530',
+    borderWidth: 1,
+    borderColor: '#2a3040',
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  googleIcon: { color: '#4285F4', fontSize: 17, fontWeight: '700' },
+  googleBtnText: { color: '#f5f0e8', fontSize: 15, fontWeight: '500' },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#2a3040' },
+  dividerText: { color: '#6b7280', fontSize: 12 },
   row: { flexDirection: 'row', gap: 10 },
   half: { flex: 1 },
   input: {
     backgroundColor: '#161b22', borderWidth: 1, borderColor: '#2a3040',
     borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14,
-    color: '#f5f0e8', fontSize: 15, marginBottom: 14
+    color: '#f5f0e8', fontSize: 15, marginBottom: 14,
   },
-  btn: { backgroundColor: '#c96a3f', borderRadius: 8, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
+  btn: {
+    backgroundColor: '#c96a3f', borderRadius: 8, paddingVertical: 15,
+    alignItems: 'center', marginTop: 8,
+  },
   btnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
   footerText: { color: '#9ca3af', fontSize: 14 },
