@@ -25,21 +25,27 @@ function AuthGuard() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoaded) return;
+    // Wait until Clerk is loaded AND the router has resolved the initial segment
+    if (!isLoaded || segments.length === 0) return;
+
     const inAuthGroup = segments[0] === '(auth)';
     const inProtectedGroup = segments[0] === '(tabs)';
 
     if (!isSignedIn && inProtectedGroup) {
+      router.replace('/(auth)/sign-in');
+    } else if (!isSignedIn && !inAuthGroup) {
+      // Not signed in and not yet in auth group — redirect to sign-in
       router.replace('/(auth)/sign-in');
     } else if (isSignedIn && inAuthGroup) {
       router.replace('/(tabs)/');
     }
   }, [isLoaded, isSignedIn, segments]);
 
-  if (!isLoaded) {
+  // Show loading spinner while Clerk initialises OR while segments are unresolved
+  if (!isLoaded || segments.length === 0) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12' }}>
-        <ActivityIndicator color="#d4a24c" />
+        <ActivityIndicator color="#d4a24c" size="large" />
       </View>
     );
   }
