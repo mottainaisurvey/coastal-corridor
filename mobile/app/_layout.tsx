@@ -2,17 +2,20 @@ import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Text } from 'react-native';
 
-const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
-// Secure token cache for Clerk
+// Secure token cache for Clerk — clearToken required by @clerk/clerk-expo v2+
 const tokenCache = {
   async getToken(key: string) {
     try { return await SecureStore.getItemAsync(key); } catch { return null; }
   },
   async saveToken(key: string, value: string) {
     try { await SecureStore.setItemAsync(key, value); } catch {}
+  },
+  async clearToken(key: string) {
+    try { await SecureStore.deleteItemAsync(key); } catch {}
   },
 };
 
@@ -45,6 +48,15 @@ function AuthGuard() {
 }
 
 export default function RootLayout() {
+  if (!CLERK_PUBLISHABLE_KEY) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12', padding: 24 }}>
+        <Text style={{ color: '#d4a24c', fontSize: 16, textAlign: 'center' }}>
+          Configuration error: missing publishable key.
+        </Text>
+      </View>
+    );
+  }
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
       <AuthGuard />
