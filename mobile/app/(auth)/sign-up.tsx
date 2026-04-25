@@ -24,6 +24,7 @@ export default function SignUpScreen() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   // Block the UI until any stale session has been fully cleared
   const [clearing, setClearing] = useState(true);
@@ -111,7 +112,7 @@ export default function SignUpScreen() {
     try {
       console.log('[SignUp] starting Google SSO flow');
       const result = await startSSOFlow({ strategy: 'oauth_google' });
-      console.log('[SignUp] SSO result:', JSON.stringify({
+      console.log('[SignUp] Google SSO result:', JSON.stringify({
         createdSessionId: result.createdSessionId,
         hasSetActive: !!result.setActive,
       }));
@@ -122,7 +123,7 @@ export default function SignUpScreen() {
       } else if (result.signUp?.status === 'complete') {
         router.replace('/(tabs)/');
       } else {
-        console.warn('[SignUp] SSO flow returned no session:', result);
+        console.warn('[SignUp] Google SSO flow returned no session:', result);
         Alert.alert('Google sign up', 'Sign up was cancelled or did not complete. Please try again.');
       }
     } catch (err: unknown) {
@@ -133,6 +134,40 @@ export default function SignUpScreen() {
       }
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    if (!agreedToTerms) {
+      Alert.alert('Agreement required', 'Please agree to the Terms of Service and Privacy Policy to continue.');
+      return;
+    }
+    setAppleLoading(true);
+    try {
+      console.log('[SignUp] starting Apple SSO flow');
+      const result = await startSSOFlow({ strategy: 'oauth_apple' });
+      console.log('[SignUp] Apple SSO result:', JSON.stringify({
+        createdSessionId: result.createdSessionId,
+        hasSetActive: !!result.setActive,
+      }));
+
+      if (result.createdSessionId && result.setActive) {
+        await result.setActive({ session: result.createdSessionId });
+        router.replace('/(tabs)/');
+      } else if (result.signUp?.status === 'complete') {
+        router.replace('/(tabs)/');
+      } else {
+        console.warn('[SignUp] Apple SSO flow returned no session:', result);
+        Alert.alert('Apple sign up', 'Sign up was cancelled or did not complete. Please try again.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[SignUp] Apple SSO error:', msg);
+      if (!msg.includes('cancel') && !msg.includes('dismiss')) {
+        Alert.alert('Apple sign up failed', msg);
+      }
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -187,13 +222,25 @@ export default function SignUpScreen() {
         <Text style={styles.heading}>Get started</Text>
 
         {/* Google SSO */}
-        <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleSignUp} disabled={googleLoading} activeOpacity={0.75}>
+        <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleSignUp} disabled={googleLoading || appleLoading} activeOpacity={0.75}>
           {googleLoading ? (
             <ActivityIndicator color="#f5f0e8" size="small" />
           ) : (
             <>
               <Text style={styles.googleIcon}>G</Text>
               <Text style={styles.googleBtnText}>Continue with Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Apple SSO */}
+        <TouchableOpacity style={styles.appleBtn} onPress={handleAppleSignUp} disabled={googleLoading || appleLoading} activeOpacity={0.75}>
+          {appleLoading ? (
+            <ActivityIndicator color="#000" size="small" />
+          ) : (
+            <>
+              <Text style={styles.appleIcon}></Text>
+              <Text style={styles.appleBtnText}>Continue with Apple</Text>
             </>
           )}
         </TouchableOpacity>
@@ -299,10 +346,17 @@ const styles = StyleSheet.create({
   googleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: '#1e2530', borderWidth: 1, borderColor: '#2a3040',
-    borderRadius: 8, paddingVertical: 14, marginBottom: 20,
+    borderRadius: 8, paddingVertical: 14, marginBottom: 12,
   },
   googleIcon: { color: '#4285F4', fontSize: 17, fontWeight: '700' },
   googleBtnText: { color: '#f5f0e8', fontSize: 15, fontWeight: '500' },
+  appleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    backgroundColor: '#f5f0e8',
+    borderRadius: 8, paddingVertical: 14, marginBottom: 20,
+  },
+  appleIcon: { color: '#000', fontSize: 17 },
+  appleBtnText: { color: '#000', fontSize: 15, fontWeight: '600' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#2a3040' },
   dividerText: { color: '#6b7280', fontSize: 12 },

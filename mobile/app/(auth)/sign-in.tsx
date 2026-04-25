@@ -20,6 +20,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   // Block the UI until any stale session has been fully cleared
   const [clearing, setClearing] = useState(true);
 
@@ -62,10 +63,10 @@ export default function SignInScreen() {
         result.status === 'needs_second_factor' ||
         result.status === 'needs_identifier'
       ) {
-        // Account may have been created via Google — no password set
+        // Account may have been created via Google/Apple — no password set
         Alert.alert(
           'Sign in incomplete',
-          'This account may use Google Sign-In. Please tap "Continue with Google" instead, or reset your password.',
+          'This account may use Google or Apple Sign-In. Please tap the relevant button instead, or reset your password.',
         );
       } else {
         Alert.alert('Sign in incomplete', 'Additional verification required. Please try again.');
@@ -81,12 +82,13 @@ export default function SignInScreen() {
         code === 'strategy_for_user_invalid' ||
         code === 'form_password_incorrect' ||
         rawMsg.toLowerCase().includes('google') ||
+        rawMsg.toLowerCase().includes('apple') ||
         rawMsg.toLowerCase().includes('oauth') ||
         rawMsg.toLowerCase().includes('social')
       ) {
         Alert.alert(
           'Sign in failed',
-          'This account was created with Google. Please tap "Continue with Google" to sign in.',
+          'This account was created with a social provider. Please tap "Continue with Google" or "Continue with Apple" to sign in.',
         );
       } else if (code === 'form_identifier_not_found' || rawMsg.toLowerCase().includes('identifier')) {
         Alert.alert('Sign in failed', 'No account found with this email address. Please sign up first.');
@@ -104,7 +106,7 @@ export default function SignInScreen() {
     try {
       console.log('[SignIn] starting Google SSO flow');
       const result = await startSSOFlow({ strategy: 'oauth_google' });
-      console.log('[SignIn] SSO result:', JSON.stringify({
+      console.log('[SignIn] Google SSO result:', JSON.stringify({
         createdSessionId: result.createdSessionId,
         hasSetActive: !!result.setActive,
       }));
@@ -115,7 +117,7 @@ export default function SignInScreen() {
       } else if (result.signIn?.status === 'complete') {
         router.replace('/(tabs)/');
       } else {
-        console.warn('[SignIn] SSO flow returned no session:', result);
+        console.warn('[SignIn] Google SSO flow returned no session:', result);
         Alert.alert('Google sign in', 'Sign in was cancelled or did not complete. Please try again.');
       }
     } catch (err: unknown) {
@@ -126,6 +128,36 @@ export default function SignInScreen() {
       }
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setAppleLoading(true);
+    try {
+      console.log('[SignIn] starting Apple SSO flow');
+      const result = await startSSOFlow({ strategy: 'oauth_apple' });
+      console.log('[SignIn] Apple SSO result:', JSON.stringify({
+        createdSessionId: result.createdSessionId,
+        hasSetActive: !!result.setActive,
+      }));
+
+      if (result.createdSessionId && result.setActive) {
+        await result.setActive({ session: result.createdSessionId });
+        router.replace('/(tabs)/');
+      } else if (result.signIn?.status === 'complete') {
+        router.replace('/(tabs)/');
+      } else {
+        console.warn('[SignIn] Apple SSO flow returned no session:', result);
+        Alert.alert('Apple sign in', 'Sign in was cancelled or did not complete. Please try again.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Apple sign in failed';
+      console.error('[SignIn] Apple SSO error:', msg);
+      if (!msg.includes('cancel') && !msg.includes('dismiss')) {
+        Alert.alert('Apple sign in failed', msg);
+      }
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -156,7 +188,7 @@ export default function SignInScreen() {
         <TouchableOpacity
           style={styles.googleBtn}
           onPress={handleGoogleSignIn}
-          disabled={googleLoading}
+          disabled={googleLoading || appleLoading}
           activeOpacity={0.75}
         >
           {googleLoading ? (
@@ -165,6 +197,23 @@ export default function SignInScreen() {
             <>
               <Text style={styles.googleIcon}>G</Text>
               <Text style={styles.googleBtnText}>Continue with Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Apple SSO button */}
+        <TouchableOpacity
+          style={styles.appleBtn}
+          onPress={handleAppleSignIn}
+          disabled={googleLoading || appleLoading}
+          activeOpacity={0.75}
+        >
+          {appleLoading ? (
+            <ActivityIndicator color="#000" size="small" />
+          ) : (
+            <>
+              <Text style={styles.appleIcon}></Text>
+              <Text style={styles.appleBtnText}>Continue with Apple</Text>
             </>
           )}
         </TouchableOpacity>
@@ -252,10 +301,22 @@ const styles = StyleSheet.create({
     borderColor: '#2a3040',
     borderRadius: 8,
     paddingVertical: 14,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   googleIcon: { color: '#4285F4', fontSize: 17, fontWeight: '700' },
   googleBtnText: { color: '#f5f0e8', fontSize: 15, fontWeight: '500' },
+  appleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#f5f0e8',
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  appleIcon: { color: '#000', fontSize: 17 },
+  appleBtnText: { color: '#000', fontSize: 15, fontWeight: '600' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#2a3040' },
   dividerText: { color: '#6b7280', fontSize: 12 },
