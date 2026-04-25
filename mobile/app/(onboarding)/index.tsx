@@ -1,14 +1,16 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Dimensions, FlatList, ImageBackground, StatusBar,
-  Animated, Platform,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 
 const { width, height } = Dimensions.get('window');
+
+export const ONBOARDING_KEY = 'cc_onboarding_seen_v1';
 
 const SLIDES = [
   {
@@ -37,34 +39,44 @@ const SLIDES = [
   },
 ];
 
-export const ONBOARDING_KEY = 'cc_onboarding_seen_v1';
-
 export default function OnboardingScreen() {
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  // Guard against double-taps / race conditions
+  const navigating = useRef(false);
 
-  const markSeenAndNavigate = async () => {
-    try { await SecureStore.setItemAsync(ONBOARDING_KEY, '1'); } catch {}
+  const markSeenAndNavigate = useCallback(async () => {
+    if (navigating.current) return;
+    navigating.current = true;
+    try {
+      await SecureStore.setItemAsync(ONBOARDING_KEY, '1');
+    } catch {
+      // ignore storage errors — still navigate
+    }
+    // Use push instead of replace so AuthGuard doesn't fight us
     router.replace('/(auth)/sign-in');
-  };
+  }, [router]);
 
-  const handleSkip = () => markSeenAndNavigate();
+  const handleSkip = useCallback(() => {
+    markSeenAndNavigate();
+  }, [markSeenAndNavigate]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (activeIndex < SLIDES.length - 1) {
       flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
     } else {
       markSeenAndNavigate();
     }
-  };
+  }, [activeIndex, markSeenAndNavigate]);
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
-    if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-      setActiveIndex(viewableItems[0].index);
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        setActiveIndex(viewableItems[0].index);
+      }
     }
-  }).current;
+  ).current;
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
@@ -80,7 +92,7 @@ export default function OnboardingScreen() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         bounces={false}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+        scrollEventThrottle={16}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         renderItem={({ item }) => (
@@ -91,7 +103,12 @@ export default function OnboardingScreen() {
               {/* Top: Skip */}
               <View style={styles.topBar}>
                 <View />
-                <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
+                <TouchableOpacity
+                  onPress={handleSkip}
+                  style={styles.skipBtn}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
                   <Text style={styles.skipText}>Skip</Text>
                 </TouchableOpacity>
               </View>
@@ -117,11 +134,21 @@ export default function OnboardingScreen() {
 
                 {/* CTA or Next */}
                 {item.cta ? (
-                  <TouchableOpacity style={styles.ctaBtn} onPress={markSeenAndNavigate}>
+                  <TouchableOpacity
+                    style={styles.ctaBtn}
+                    onPress={markSeenAndNavigate}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <Text style={styles.ctaBtnText}>{item.cta}</Text>
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
+                  <TouchableOpacity
+                    style={styles.nextBtn}
+                    onPress={handleNext}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <Text style={styles.nextBtnText}>Next →</Text>
                   </TouchableOpacity>
                 )}

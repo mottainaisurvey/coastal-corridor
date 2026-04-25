@@ -1,11 +1,11 @@
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
-const ONBOARDING_KEY = 'cc_onboarding_seen_v1';
+export const ONBOARDING_KEY = 'cc_onboarding_seen_v1';
 
 // Secure token cache for Clerk — clearToken required by @clerk/clerk-expo v2+
 const tokenCache = {
@@ -25,6 +25,8 @@ function AuthGuard() {
   const segments = useSegments();
   const router = useRouter();
   const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
+  // Prevent multiple simultaneous navigations
+  const isNavigating = useRef(false);
 
   // Check onboarding flag on mount
   useEffect(() => {
@@ -34,35 +36,45 @@ function AuthGuard() {
   }, []);
 
   useEffect(() => {
-    if (!isLoaded || onboardingSeen === null) return;
-    if (segments.length === 0) return;
+    // Wait for everything to be ready
+    if (!isLoaded || onboardingSeen === null || segments.length === 0) return;
+    if (isNavigating.current) return;
 
-    const inOnboarding = segments[0] === '(onboarding)';
-    const inAuthGroup = segments[0] === '(auth)';
-    const inProtectedGroup = segments[0] === '(tabs)';
-    const inProperty = segments[0] === 'property';
+    const currentSegment = segments[0] as string | undefined;
+    const inOnboarding = currentSegment === '(onboarding)';
+    const inAuthGroup = currentSegment === '(auth)';
 
-    // Not seen onboarding yet → go to onboarding
-    if (!onboardingSeen && !inOnboarding) {
-      router.replace('/(onboarding)/');
+    // User hasn't seen onboarding yet → show onboarding
+    if (!onboardingSeen) {
+      if (!inOnboarding) {
+        isNavigating.current = true;
+        router.replace('/(onboarding)/');
+        // Reset flag after a short delay to allow future navigations
+        setTimeout(() => { isNavigating.current = false; }, 1000);
+      }
       return;
     }
 
-    // Seen onboarding, not signed in, not in auth → go to sign in
-    if (onboardingSeen && !isSignedIn && !inAuthGroup && !inOnboarding) {
-      router.replace('/(auth)/sign-in');
+    // Onboarding done, not signed in → sign in page
+    if (!isSignedIn) {
+      if (!inAuthGroup) {
+        isNavigating.current = true;
+        router.replace('/(auth)/sign-in');
+        setTimeout(() => { isNavigating.current = false; }, 1000);
+      }
       return;
     }
 
-    // Signed in but in auth or onboarding → go to tabs
+    // Signed in but in auth or onboarding → go to app
     if (isSignedIn && (inAuthGroup || inOnboarding)) {
+      isNavigating.current = true;
       router.replace('/(tabs)/');
-      return;
+      setTimeout(() => { isNavigating.current = false; }, 1000);
     }
-  }, [isLoaded, isSignedIn, segments, onboardingSeen]);
+  }, [isLoaded, isSignedIn, onboardingSeen, segments]);
 
   // Show loading while Clerk or onboarding state is not ready
-  if (!isLoaded || onboardingSeen === null || segments.length === 0) {
+  if (!isLoaded || onboardingSeen === null) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12' }}>
         <ActivityIndicator color="#d4a24c" size="large" />
@@ -75,12 +87,12 @@ function AuthGuard() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: '#0a0e12' },
-        animation: 'slide_from_right',
+        animation: 'fade',
       }}
     >
-      <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(onboarding)" options={{ headerShown: false, animation: 'fade' }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false, animation: 'fade' }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
       <Stack.Screen
         name="property/[slug]"
         options={{
