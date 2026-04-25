@@ -57,13 +57,43 @@ export default function SignInScreen() {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         router.replace('/(tabs)/');
+      } else if (
+        result.status === 'needs_first_factor' ||
+        result.status === 'needs_second_factor' ||
+        result.status === 'needs_identifier'
+      ) {
+        // Account may have been created via Google — no password set
+        Alert.alert(
+          'Sign in incomplete',
+          'This account may use Google Sign-In. Please tap "Continue with Google" instead, or reset your password.',
+        );
       } else {
         Alert.alert('Sign in incomplete', 'Additional verification required. Please try again.');
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Sign in failed. Please check your credentials.';
-      console.error('[SignIn] email sign-in error:', msg);
-      Alert.alert('Sign in failed', msg);
+      // Detect Clerk error codes for OAuth-only accounts
+      const clerkErr = err as { errors?: { code?: string; message?: string }[] };
+      const code = clerkErr?.errors?.[0]?.code ?? '';
+      const rawMsg = clerkErr?.errors?.[0]?.message ?? (err instanceof Error ? err.message : '');
+      console.error('[SignIn] email sign-in error:', code, rawMsg);
+
+      if (
+        code === 'strategy_for_user_invalid' ||
+        code === 'form_password_incorrect' ||
+        rawMsg.toLowerCase().includes('google') ||
+        rawMsg.toLowerCase().includes('oauth') ||
+        rawMsg.toLowerCase().includes('social')
+      ) {
+        Alert.alert(
+          'Sign in failed',
+          'This account was created with Google. Please tap "Continue with Google" to sign in.',
+        );
+      } else if (code === 'form_identifier_not_found' || rawMsg.toLowerCase().includes('identifier')) {
+        Alert.alert('Sign in failed', 'No account found with this email address. Please sign up first.');
+      } else {
+        const msg = rawMsg || 'Sign in failed. Please check your credentials.';
+        Alert.alert('Sign in failed', msg);
+      }
     } finally {
       setLoading(false);
     }

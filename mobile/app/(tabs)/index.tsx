@@ -128,7 +128,10 @@ export default function ExploreScreen() {
             <TouchableOpacity
               key={d.id}
               style={styles.resultRow}
-              onPress={() => router.push(`/(tabs)/properties?destination=${d.slug}`)}
+              onPress={() => router.push({
+                pathname: '/(tabs)/properties',
+                params: { destinationId: d.id, destinationName: d.name },
+              })}
               activeOpacity={0.7}
             >
               <Ionicons name="location-outline" size={14} color="#4db3b3" style={{ marginRight: 8 }} />
@@ -155,7 +158,10 @@ export default function ExploreScreen() {
               <TouchableOpacity
                 key={d.id}
                 style={styles.destCard}
-                onPress={() => router.push(`/(tabs)/properties?destination=${d.slug}`)}
+                onPress={() => router.push({
+                  pathname: '/(tabs)/properties',
+                  params: { destinationId: d.id, destinationName: d.name },
+                })}
                 activeOpacity={0.75}
               >
                 <View style={styles.destCardInner}>

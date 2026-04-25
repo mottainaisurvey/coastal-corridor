@@ -34,6 +34,7 @@ function AppStack({ children }: { children?: React.ReactNode }) {
       <Stack.Screen name="(legal)" options={{ headerShown: false }} />
       <Stack.Screen name="property/[slug]" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="kyc/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <Stack.Screen name="sso-callback" options={{ headerShown: false }} />
       {children}
     </Stack>
   );

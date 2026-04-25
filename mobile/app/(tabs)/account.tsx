@@ -48,7 +48,21 @@ export default function AccountScreen() {
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (err) {
+            console.warn('[Account] signOut error (ignored):', err);
+          } finally {
+            // Explicitly navigate to sign-in so the transition is immediate
+            // and does not depend on AuthGuard re-render timing
+            router.replace('/(auth)/sign-in');
+          }
+        },
+      },
     ]);
   };
 

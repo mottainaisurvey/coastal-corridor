@@ -4,6 +4,8 @@ import {
   StyleSheet, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 const API_BASE = 'https://coastalcorridor.africa';
 
@@ -13,6 +15,7 @@ interface Property {
   title: string;
   slug: string;
   type: string;
+  destinationId: string;
   destinationName: string;
   state: string;
   priceKobo: number;
@@ -56,29 +59,28 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function PropertiesScreen() {
   const router = useRouter();
-  const { destination } = useLocalSearchParams<{ destination?: string }>();
-  const [properties, setProperties] = useState<Property[]>([]);
+  // destinationId and destinationName are passed as params when navigating from a destination tap
+  const { destinationId, destinationName } = useLocalSearchParams<{
+    destinationId?: string;
+    destinationName?: string;
+  }>();
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
 
-  const buildUrl = (p: number) => {
-    const base = `${API_BASE}/api/properties?page=${p}&limit=20`;
-    return destination ? `${base}&destination=${encodeURIComponent(destination)}` : base;
-  };
-
-  const load = async (reset = false) => {
-    const p = reset ? 1 : page;
+  const load = async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
     try {
-      const r = await fetch(buildUrl(p));
+      // Fetch all properties — the backend does not support destination filtering,
+      // so we fetch everything and filter client-side.
+      const r = await fetch(`${API_BASE}/api/properties?page=1&limit=100`);
       const data = await r.json();
-      // API returns flat property objects — map directly
       const items: Property[] = (data.data ?? []).map((item: Record<string, unknown>) => ({
         id: item.id as string,
         title: item.title as string,
         slug: item.slug as string,
         type: item.type as string,
+        destinationId: (item.destinationId as string) ?? '',
         destinationName: (item.destinationName as string) ?? '',
         state: (item.state as string) ?? '',
         priceKobo: (item.priceKobo as number) ?? 0,
@@ -87,14 +89,7 @@ export default function PropertiesScreen() {
         listingStatus: (item.listingStatus as string) ?? '',
         featured: (item.featured as boolean) ?? false,
       }));
-      if (reset) {
-        setProperties(items);
-        setPage(2);
-      } else {
-        setProperties(prev => [...prev, ...items]);
-        setPage(p + 1);
-      }
-      setHasMore(data.pagination?.hasMore ?? items.length === 20);
+      setAllProperties(items);
     } catch {}
     setLoading(false);
     setRefreshing(false);
@@ -102,11 +97,13 @@ export default function PropertiesScreen() {
 
   useEffect(() => {
     setLoading(true);
-    setProperties([]);
-    setPage(1);
-    setHasMore(true);
-    load(true);
-  }, [destination]);
+    load();
+  }, []);
+
+  // Client-side filter: if a destinationId param is present, show only matching properties
+  const properties = destinationId
+    ? allProperties.filter(p => p.destinationId === destinationId)
+    : allProperties;
 
   const renderItem = ({ item }: { item: Property }) => {
     const typeColor = TYPE_COLORS[item.type] ?? '#6b7280';
@@ -151,45 +148,65 @@ export default function PropertiesScreen() {
   }
 
   return (
-    <FlatList
-      style={styles.container}
-      contentContainerStyle={styles.list}
-      data={properties}
-      keyExtractor={item => item.id}
-      renderItem={renderItem}
-      onEndReached={() => { if (hasMore) load(); }}
-      onEndReachedThreshold={0.3}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => { setRefreshing(true); load(true); }}
-          tintColor="#d4a24c"
-        />
-      }
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Properties</Text>
-          <Text style={styles.headerSub}>
-            {destination
-              ? `Listings in ${destination.replace(/-/g, ' ')}`
-              : `${properties.length} listings along the corridor`}
-          </Text>
-        </View>
-      }
-      ListEmptyComponent={
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>No properties found</Text>
-        </View>
-      }
-    />
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <FlatList
+        style={styles.container}
+        contentContainerStyle={styles.list}
+        data={properties}
+        keyExtractor={item => item.id}
+        renderItem={renderItem}
+        onEndReachedThreshold={0.3}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => load(true)}
+            tintColor="#d4a24c"
+          />
+        }
+        ListHeaderComponent={
+          <View style={styles.header}>
+            {/* Back button — only shown when filtering by destination */}
+            {destinationId ? (
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => router.back()}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="arrow-back" size={20} color="#d4a24c" />
+                <Text style={styles.backText}>Back</Text>
+              </TouchableOpacity>
+            ) : null}
+            <Text style={styles.headerTitle}>Properties</Text>
+            <Text style={styles.headerSub}>
+              {destinationName
+                ? `Listings in ${destinationName}`
+                : `${allProperties.length} listings along the corridor`}
+            </Text>
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>
+              {destinationId
+                ? `No properties found in ${destinationName ?? 'this destination'}`
+                : 'No properties found'}
+            </Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#0a0e12' },
   container: { flex: 1, backgroundColor: '#0a0e12' },
   list: { paddingHorizontal: 16, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0e12', paddingTop: 60 },
-  header: { paddingTop: 24, paddingBottom: 16 },
+  header: { paddingTop: 16, paddingBottom: 16 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  backText: { color: '#d4a24c', fontSize: 14, fontWeight: '500' },
   headerTitle: { color: '#f5f0e8', fontSize: 26, fontWeight: '300' },
   headerSub: { color: '#6b7280', fontSize: 13, marginTop: 4 },
   card: {
