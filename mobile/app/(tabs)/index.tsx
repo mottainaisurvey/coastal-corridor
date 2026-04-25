@@ -68,8 +68,13 @@ export default function ExploreScreen() {
       setSearching(true);
       try {
         const r = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&limit=5`);
-        const data = await r.json();
-        setSearchResults(data);
+        const json = await r.json();
+        // API returns { data: { properties, destinations, agents, total }, pagination }
+        const inner = json.data ?? json;
+        setSearchResults({
+          properties: inner.properties ?? [],
+          destinations: inner.destinations ?? [],
+        });
       } catch {}
       setSearching(false);
     }, 300);
@@ -111,7 +116,7 @@ export default function ExploreScreen() {
             <TouchableOpacity
               key={p.id}
               style={styles.resultRow}
-              onPress={() => router.push(`/property/${p.slug}`)}
+              onPress={() => router.push({ pathname: '/property/[slug]', params: { slug: p.slug } })}
               activeOpacity={0.7}
             >
               <Ionicons name="home-outline" size={14} color="#d4a24c" style={{ marginRight: 8 }} />

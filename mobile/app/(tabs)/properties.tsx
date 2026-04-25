@@ -1,25 +1,29 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl
+  StyleSheet, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const API_BASE = 'https://coastalcorridor.africa';
 
+// Flat API shape (matches /api/properties list items)
 interface Property {
   id: string;
   title: string;
   slug: string;
   type: string;
-  destination: string;
+  destinationName: string;
+  state: string;
   priceKobo: number;
   areaSqm: number;
   plotId: string;
-  status: string;
+  listingStatus: string;
+  featured: boolean;
 }
 
 function formatKobo(kobo: number): string {
+  if (!kobo) return '₦0';
   const naira = kobo / 100;
   if (naira >= 1_000_000_000) return `₦${(naira / 1_000_000_000).toFixed(1)}B`;
   if (naira >= 1_000_000) return `₦${(naira / 1_000_000).toFixed(1)}M`;
@@ -27,41 +31,61 @@ function formatKobo(kobo: number): string {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  LAND_ONLY: 'Land',
-  RESIDENTIAL: 'Residential',
+  LAND: 'Land',
+  APARTMENT: 'Apartment',
+  HOUSE: 'House',
   COMMERCIAL: 'Commercial',
   MIXED_USE: 'Mixed Use',
   HOSPITALITY: 'Hospitality',
   INDUSTRIAL: 'Industrial',
+  LAND_ONLY: 'Land',
+  RESIDENTIAL: 'Residential',
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  LAND: '#d4a24c',
+  APARTMENT: '#4db3b3',
+  HOUSE: '#8aa876',
+  COMMERCIAL: '#c96a3f',
+  MIXED_USE: '#a78bfa',
+  HOSPITALITY: '#f59e0b',
+  INDUSTRIAL: '#6b7280',
+  LAND_ONLY: '#d4a24c',
+  RESIDENTIAL: '#8aa876',
 };
 
 export default function PropertiesScreen() {
   const router = useRouter();
+  const { destination } = useLocalSearchParams<{ destination?: string }>();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  const buildUrl = (p: number) => {
+    const base = `${API_BASE}/api/properties?page=${p}&limit=20`;
+    return destination ? `${base}&destination=${encodeURIComponent(destination)}` : base;
+  };
+
   const load = async (reset = false) => {
     const p = reset ? 1 : page;
     try {
-      const r = await fetch(`${API_BASE}/api/properties?page=${p}&limit=20`);
+      const r = await fetch(buildUrl(p));
       const data = await r.json();
-      const items: Property[] = (data.data ?? []).map((item: {
-        id: string; title: string; slug: string; type: string;
-        destination?: { name: string }; listing?: { askingPriceKobo: number };
-        plot?: { areaSqm: number; plotNumber: string }; status: string;
-      }) => ({
-        id: item.id,
-        title: item.title,
-        slug: item.slug,
-        type: item.type,
-        destination: item.destination?.name ?? '',
-        priceKobo: item.listing?.askingPriceKobo ?? 0,
-        areaSqm: item.plot?.areaSqm ?? 0,
-        plotId: item.plot?.plotNumber ?? '',
-        status: item.status,
+      // API returns flat property objects — map directly
+      const items: Property[] = (data.data ?? []).map((item: Record<string, unknown>) => ({
+        id: item.id as string,
+        title: item.title as string,
+        slug: item.slug as string,
+        type: item.type as string,
+        destinationName: (item.destinationName as string) ?? '',
+        state: (item.state as string) ?? '',
+        priceKobo: (item.priceKobo as number) ?? 0,
+        areaSqm: (item.areaSqm as number) ?? 0,
+        plotId: (item.plotId as string) ?? '',
+        listingStatus: (item.listingStatus as string) ?? '',
+        featured: (item.featured as boolean) ?? false,
       }));
       if (reset) {
         setProperties(items);
@@ -70,30 +94,53 @@ export default function PropertiesScreen() {
         setProperties(prev => [...prev, ...items]);
         setPage(p + 1);
       }
-      setHasMore(items.length === 20);
+      setHasMore(data.pagination?.hasMore ?? items.length === 20);
     } catch {}
     setLoading(false);
     setRefreshing(false);
   };
 
-  useEffect(() => { load(true); }, []);
+  useEffect(() => {
+    setLoading(true);
+    setProperties([]);
+    setPage(1);
+    setHasMore(true);
+    load(true);
+  }, [destination]);
 
-  const renderItem = ({ item }: { item: Property }) => (
-    <TouchableOpacity style={styles.card} onPress={() => router.push(`/property/${item.slug}`)}>
-      <View style={styles.cardHeader}>
-        <View style={styles.typePill}>
-          <Text style={styles.typeText}>{TYPE_LABELS[item.type] ?? item.type}</Text>
+  const renderItem = ({ item }: { item: Property }) => {
+    const typeColor = TYPE_COLORS[item.type] ?? '#6b7280';
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push({ pathname: '/property/[slug]', params: { slug: item.slug } })}
+        activeOpacity={0.8}
+      >
+        <View style={styles.cardHeader}>
+          <View style={[styles.typePill, { backgroundColor: typeColor + '22' }]}>
+            <Text style={[styles.typeText, { color: typeColor }]}>
+              {TYPE_LABELS[item.type] ?? item.type}
+            </Text>
+          </View>
+          {item.featured && (
+            <View style={styles.featuredPill}>
+              <Text style={styles.featuredText}>Featured</Text>
+            </View>
+          )}
         </View>
-        <Text style={styles.plotId}>{item.plotId}</Text>
-      </View>
-      <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-      <Text style={styles.destination}>{item.destination}</Text>
-      <View style={styles.cardFooter}>
-        <Text style={styles.price}>{formatKobo(item.priceKobo)}</Text>
-        <Text style={styles.area}>{item.areaSqm.toLocaleString()} sqm</Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.destination}>
+          {item.destinationName}{item.state ? `, ${item.state}` : ''}
+        </Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.price}>{formatKobo(item.priceKobo)}</Text>
+          <Text style={styles.area}>
+            {item.areaSqm ? `${item.areaSqm.toLocaleString()} sqm` : ''}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -122,7 +169,11 @@ export default function PropertiesScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Properties</Text>
-          <Text style={styles.headerSub}>{properties.length} listings along the corridor</Text>
+          <Text style={styles.headerSub}>
+            {destination
+              ? `Listings in ${destination.replace(/-/g, ' ')}`
+              : `${properties.length} listings along the corridor`}
+          </Text>
         </View>
       }
       ListEmptyComponent={
@@ -143,12 +194,13 @@ const styles = StyleSheet.create({
   headerSub: { color: '#6b7280', fontSize: 13, marginTop: 4 },
   card: {
     backgroundColor: '#161b22', borderWidth: 1, borderColor: '#2a3040',
-    borderRadius: 12, padding: 16, marginBottom: 12
+    borderRadius: 12, padding: 16, marginBottom: 12,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  typePill: { backgroundColor: '#c96a3f22', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
-  typeText: { color: '#c96a3f', fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  plotId: { color: '#6b7280', fontSize: 11, fontFamily: 'monospace' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  typePill: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+  typeText: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  featuredPill: { backgroundColor: '#d4a24c22', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+  featuredText: { color: '#d4a24c', fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   title: { color: '#f5f0e8', fontSize: 16, fontWeight: '400', lineHeight: 22, marginBottom: 4 },
   destination: { color: '#9ca3af', fontSize: 12, marginBottom: 12 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
