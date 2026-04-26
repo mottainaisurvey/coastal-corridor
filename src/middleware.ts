@@ -57,6 +57,8 @@ function subdomainRewrite(request: NextRequest): NextResponse | null {
 const ADMIN_ROLES = ['admin', 'superadmin', 'ADMIN'];
 const AGENT_ROLES = ['agent', 'AGENT', 'admin', 'superadmin', 'ADMIN'];
 const DEVELOPER_ROLES = ['developer', 'DEVELOPER', 'admin', 'superadmin', 'ADMIN'];
+const OPERATOR_ROLES = ['operator', 'OPERATOR', 'admin', 'superadmin', 'ADMIN'];
+const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 
 // ---------------------------------------------------------------------------
 // Main auth middleware
@@ -93,6 +95,17 @@ export default authMiddleware({
     '/developer/sign-in/(.*)',
     '/for-developers',         // developer marketing landing page
     '/for-developers/(.*)',
+    '/professional',             // professional category selection page
+    '/operator/sign-up',         // operator sign-up page
+    '/operator/sign-up/(.*)',
+    '/operator/sign-in',         // operator sign-in page
+    '/operator/sign-in/(.*)',
+    '/host/sign-up',             // host sign-up page
+    '/host/sign-up/(.*)',
+    '/host/sign-in',             // host sign-in page
+    '/host/sign-in/(.*)',
+    '/for-operators',            // operator/host marketing landing page
+    '/for-operators/(.*)',
     // Public API routes
     '/api/properties(.*)',
     '/api/destinations(.*)',
@@ -185,6 +198,30 @@ export default authMiddleware({
         }
       }
       // Not logged in → Clerk's default auth handling redirects to sign-in
+    }
+
+    // ---- Operator routes (/operator/*) — protect dashboard and sub-pages ----
+    if (url.pathname.startsWith('/operator/dashboard')) {
+      if (userId) {
+        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+        if (!role || !OPERATOR_ROLES.includes(role)) {
+          url.pathname = '/unauthorized';
+          url.searchParams.set('required', 'operator');
+          return NextResponse.redirect(url);
+        }
+      }
+    }
+
+    // ---- Host routes (/host/*) — protect dashboard and sub-pages ------------
+    if (url.pathname.startsWith('/host/dashboard')) {
+      if (userId) {
+        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+        if (!role || !HOST_ROLES.includes(role)) {
+          url.pathname = '/unauthorized';
+          url.searchParams.set('required', 'host');
+          return NextResponse.redirect(url);
+        }
+      }
     }
 
     return NextResponse.next();
