@@ -2,7 +2,8 @@
 
 import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
-import { Shield, MapPin, Users, TrendingUp } from 'lucide-react';
+import { Shield, MapPin, Users, TrendingUp, ChevronDown, ChevronUp, Building2, HardHat, Ruler, Paintbrush2, UserCheck } from 'lucide-react';
+import { useState } from 'react';
 
 const VALUE_PROPS = [
   {
@@ -27,7 +28,42 @@ const VALUE_PROPS = [
   },
 ];
 
+const PROFESSIONAL_TYPES = [
+  {
+    label: 'Real Estate Agent',
+    description: 'Licensed agent or broker',
+    icon: UserCheck,
+    href: '/agent/sign-up',
+  },
+  {
+    label: 'Property Developer',
+    description: 'Development company or project owner',
+    icon: Building2,
+    href: '/developer/sign-up',
+  },
+  {
+    label: 'Architect',
+    description: 'Registered architect or design firm',
+    icon: HardHat,
+    href: '/sign-up?role=architect',
+  },
+  {
+    label: 'Surveyor',
+    description: 'Licensed estate surveyor or valuer',
+    icon: Ruler,
+    href: '/sign-up?role=surveyor',
+  },
+  {
+    label: 'Interior Designer',
+    description: 'Interior design studio or consultant',
+    icon: Paintbrush2,
+    href: '/sign-up?role=interior_designer',
+  },
+];
+
 export default function SignUpPage() {
+  const [proOpen, setProOpen] = useState(false);
+
   return (
     <div className="min-h-screen flex">
 
@@ -156,12 +192,44 @@ export default function SignUpPage() {
             }}
           />
 
-          <p className="text-center text-[11px] text-ink/40 mt-6 font-mono uppercase tracking-micro">
-            Are you an agent?{' '}
-            <Link href="/agent/sign-up" className="text-ocean hover:text-ocean-2 transition-colors">
-              Apply for agent access
-            </Link>
-          </p>
+          {/* ── "I'm a Professional" section ── */}
+          <div className="mt-5 border border-ink/12 rounded-sm overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setProOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-paper hover:bg-ink/3 transition-colors text-left group"
+            >
+              <span className="font-mono text-[11px] uppercase tracking-micro text-ocean group-hover:text-ocean-2 transition-colors">
+                I am a professional
+              </span>
+              {proOpen
+                ? <ChevronUp className="h-3.5 w-3.5 text-ink/40" />
+                : <ChevronDown className="h-3.5 w-3.5 text-ink/40" />
+              }
+            </button>
+
+            {proOpen && (
+              <div className="border-t border-ink/10 divide-y divide-ink/6">
+                {PROFESSIONAL_TYPES.map(({ label, description, icon: Icon, href }) => (
+                  <Link
+                    key={label}
+                    href={href}
+                    className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-ocean/4 transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-sm bg-ocean/8 border border-ocean/15 flex items-center justify-center flex-shrink-0 group-hover:bg-ocean/15 transition-colors">
+                      <Icon className="h-3.5 w-3.5 text-ocean" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-medium text-ink leading-none mb-0.5">{label}</div>
+                      <div className="text-[11px] text-ink/45 truncate">{description}</div>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-ink/25 -rotate-90 flex-shrink-0" />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
 

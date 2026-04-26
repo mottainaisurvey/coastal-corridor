@@ -13,6 +13,10 @@ import type { NextRequest } from 'next/server';
 //   - unauthenticated "/" → /agent          (marketing landing page)
 //   - authenticated "/" → /agent/dashboard  (handled in afterAuth)
 //
+// developer.coastalcorridor.africa:
+//   - unauthenticated "/" → /developer/sign-up  (developer sign-up page)
+//   - authenticated "/" → /developer/dashboard  (handled in afterAuth)
+//
 // map.coastalcorridor.africa:
 //   - "/" → /map  (always public)
 // ---------------------------------------------------------------------------
@@ -33,6 +37,12 @@ function subdomainRewrite(request: NextRequest): NextResponse | null {
     return NextResponse.rewrite(url);
   }
 
+  if (subdomain === 'developer' && url.pathname === '/') {
+    // Show developer sign-up for unauthenticated; afterAuth redirects auth'd developers to dashboard
+    url.pathname = '/developer/sign-up';
+    return NextResponse.rewrite(url);
+  }
+
   if (subdomain === 'map' && url.pathname === '/') {
     url.pathname = '/map';
     return NextResponse.rewrite(url);
@@ -46,6 +56,7 @@ function subdomainRewrite(request: NextRequest): NextResponse | null {
 // ---------------------------------------------------------------------------
 const ADMIN_ROLES = ['admin', 'superadmin', 'ADMIN'];
 const AGENT_ROLES = ['agent', 'AGENT', 'admin', 'superadmin', 'ADMIN'];
+const DEVELOPER_ROLES = ['developer', 'DEVELOPER', 'admin', 'superadmin', 'ADMIN'];
 
 // ---------------------------------------------------------------------------
 // Main auth middleware
@@ -76,6 +87,12 @@ export default authMiddleware({
     '/agent/sign-in/(.*)',
     '/admin/sign-in',          // branded admin sign-in page
     '/admin/sign-in/(.*)',
+    '/developer/sign-up',      // developer sign-up page
+    '/developer/sign-up/(.*)',
+    '/developer/sign-in',      // developer sign-in page
+    '/developer/sign-in/(.*)',
+    '/for-developers',         // developer marketing landing page
+    '/for-developers/(.*)',
     // Public API routes
     '/api/properties(.*)',
     '/api/destinations(.*)',
@@ -102,6 +119,15 @@ export default authMiddleware({
       const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
       if (role && AGENT_ROLES.includes(role)) {
         url.pathname = '/agent/dashboard';
+        return NextResponse.redirect(url);
+      }
+    }
+
+    // ---- Authenticated developer on the sign-up page → dashboard ----
+    if (url.pathname === '/developer/sign-up' && userId) {
+      const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+      if (role && DEVELOPER_ROLES.includes(role)) {
+        url.pathname = '/developer/dashboard';
         return NextResponse.redirect(url);
       }
     }
@@ -138,6 +164,23 @@ export default authMiddleware({
         if (!role || !AGENT_ROLES.includes(role)) {
           url.pathname = '/unauthorized';
           url.searchParams.set('required', 'agent');
+          return NextResponse.redirect(url);
+        }
+      }
+      // Not logged in → Clerk's default auth handling redirects to sign-in
+    }
+
+    // ---- Developer routes (/developer/*) — protect dashboard and sub-pages --
+    if (
+      url.pathname.startsWith('/developer/dashboard') ||
+      url.pathname.startsWith('/developer/projects') ||
+      url.pathname.startsWith('/developer/profile')
+    ) {
+      if (userId) {
+        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+        if (!role || !DEVELOPER_ROLES.includes(role)) {
+          url.pathname = '/unauthorized';
+          url.searchParams.set('required', 'developer');
           return NextResponse.redirect(url);
         }
       }
