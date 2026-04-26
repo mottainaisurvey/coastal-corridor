@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, BackHandler,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -23,6 +23,20 @@ export default function SignInScreen() {
   const [appleLoading, setAppleLoading] = useState(false);
   // Block the UI until any stale session has been fully cleared
   const [clearing, setClearing] = useState(true);
+
+  // ── Intercept Android back button: if the user is already signed in
+  //    and somehow lands here, send them to the tabs instead of letting
+  //    them stay on the sign-in screen.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isSignedIn) {
+        router.replace('/(tabs)/');
+        return true; // consumed
+      }
+      return false; // let default back behaviour happen
+    });
+    return () => sub.remove();
+  }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +77,6 @@ export default function SignInScreen() {
         result.status === 'needs_second_factor' ||
         result.status === 'needs_identifier'
       ) {
-        // Account may have been created via Google/Apple — no password set
         Alert.alert(
           'Sign in incomplete',
           'This account may use Google or Apple Sign-In. Please tap the relevant button instead, or reset your password.',
@@ -72,7 +85,6 @@ export default function SignInScreen() {
         Alert.alert('Sign in incomplete', 'Additional verification required. Please try again.');
       }
     } catch (err: unknown) {
-      // Detect Clerk error codes for OAuth-only accounts
       const clerkErr = err as { errors?: { code?: string; message?: string }[] };
       const code = clerkErr?.errors?.[0]?.code ?? '';
       const rawMsg = clerkErr?.errors?.[0]?.message ?? (err instanceof Error ? err.message : '');
@@ -101,11 +113,31 @@ export default function SignInScreen() {
     }
   };
 
+  /**
+   * Safely start an SSO flow, ensuring any lingering Clerk session is
+   * fully signed out first. This prevents the "You're already signed in"
+   * error that occurs when the user navigates back to the sign-in screen
+   * while a session is still technically active.
+   */
+  const safeStartSSO = async (strategy: 'oauth_google' | 'oauth_apple') => {
+    try {
+      // If a session is still active, sign it out before starting a new flow
+      if (isSignedIn) {
+        console.log(`[SignIn] ${strategy}: active session found — signing out first`);
+        await signOut();
+        console.log(`[SignIn] ${strategy}: sign-out complete, proceeding with SSO`);
+      }
+      return await startSSOFlow({ strategy });
+    } catch (err) {
+      throw err;
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
       console.log('[SignIn] starting Google SSO flow');
-      const result = await startSSOFlow({ strategy: 'oauth_google' });
+      const result = await safeStartSSO('oauth_google');
       console.log('[SignIn] Google SSO result:', JSON.stringify({
         createdSessionId: result.createdSessionId,
         hasSetActive: !!result.setActive,
@@ -135,7 +167,7 @@ export default function SignInScreen() {
     setAppleLoading(true);
     try {
       console.log('[SignIn] starting Apple SSO flow');
-      const result = await startSSOFlow({ strategy: 'oauth_apple' });
+      const result = await safeStartSSO('oauth_apple');
       console.log('[SignIn] Apple SSO result:', JSON.stringify({
         createdSessionId: result.createdSessionId,
         hasSetActive: !!result.setActive,

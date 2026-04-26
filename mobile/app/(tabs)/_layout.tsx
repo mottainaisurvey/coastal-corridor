@@ -1,7 +1,9 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
+  const router = useRouter();
+
   return (
     <Tabs
       screenOptions={{
@@ -36,6 +38,16 @@ export default function TabLayout() {
         options={{
           title: 'Properties',
           tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+        }}
+        listeners={{
+          // When the user taps the Properties tab icon directly, always reset
+          // to the base route (no destinationId / destinationName params).
+          // This prevents the tab from staying stuck on a destination-filtered
+          // view after navigating here from the Explore screen.
+          tabPress: (e) => {
+            e.preventDefault();
+            router.replace('/(tabs)/properties');
+          },
         }}
       />
       <Tabs.Screen

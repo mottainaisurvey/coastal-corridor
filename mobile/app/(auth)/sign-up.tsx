@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Alert, ScrollView,
+  ActivityIndicator, Alert, ScrollView, BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -28,6 +28,19 @@ export default function SignUpScreen() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   // Block the UI until any stale session has been fully cleared
   const [clearing, setClearing] = useState(true);
+
+  // Intercept Android back button: if user is already signed in and lands here,
+  // redirect to tabs instead of staying on the sign-up screen.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isSignedIn) {
+        router.replace('/(tabs)/');
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +116,20 @@ export default function SignUpScreen() {
     }
   };
 
+  /**
+   * Safely start an SSO flow, signing out any lingering session first.
+   * Prevents "You're already signed in" errors when the user navigates
+   * back to the sign-up screen while a session is still active.
+   */
+  const safeStartSSO = async (strategy: 'oauth_google' | 'oauth_apple') => {
+    if (isSignedIn) {
+      console.log(`[SignUp] ${strategy}: active session found — signing out first`);
+      await signOut();
+      console.log(`[SignUp] ${strategy}: sign-out complete, proceeding with SSO`);
+    }
+    return await startSSOFlow({ strategy });
+  };
+
   const handleGoogleSignUp = async () => {
     if (!agreedToTerms) {
       Alert.alert('Agreement required', 'Please agree to the Terms of Service and Privacy Policy to continue.');
@@ -111,7 +138,7 @@ export default function SignUpScreen() {
     setGoogleLoading(true);
     try {
       console.log('[SignUp] starting Google SSO flow');
-      const result = await startSSOFlow({ strategy: 'oauth_google' });
+      const result = await safeStartSSO('oauth_google');
       console.log('[SignUp] Google SSO result:', JSON.stringify({
         createdSessionId: result.createdSessionId,
         hasSetActive: !!result.setActive,
@@ -145,7 +172,7 @@ export default function SignUpScreen() {
     setAppleLoading(true);
     try {
       console.log('[SignUp] starting Apple SSO flow');
-      const result = await startSSOFlow({ strategy: 'oauth_apple' });
+      const result = await safeStartSSO('oauth_apple');
       console.log('[SignUp] Apple SSO result:', JSON.stringify({
         createdSessionId: result.createdSessionId,
         hasSetActive: !!result.setActive,
