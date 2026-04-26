@@ -38,6 +38,16 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
 
+    // Debug mode: expose runtime data shape
+    if (searchParams.get('_debug') === '1') {
+      return NextResponse.json({
+        propertiesCount: properties.length,
+        firstTitle: properties[0]?.title,
+        firstListingStatus: properties[0]?.listingStatus,
+        firstState: properties[0]?.state,
+      });
+    }
+
     if (!q || q.length < 2) {
       return NextResponse.json(
         { error: 'Search query must be at least 2 characters' },
