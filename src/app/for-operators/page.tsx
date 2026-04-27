@@ -429,18 +429,24 @@ export default function ForOperatorsPage() {
         <div className="absolute top-0 left-0 right-0 h-px"
           style={{ background: 'linear-gradient(90deg, #c96a3f 0%, #c96a3f 33%, #d4a24c 33%, #d4a24c 66%, #2d7d7d 66%, #2d7d7d 100%)' }} />
         <div className="max-w-[1280px] mx-auto">
-          <div className="grid md:grid-cols-2 gap-20 mb-16 items-end">
-            <h2 className="font-serif font-light text-[clamp(36px,5vw,60px)] leading-none tracking-[-0.02em]">
-              Commission that <em className="italic text-[#4a9595] font-normal">rewards early commitment.</em>
+          <div className="mb-16 max-w-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="font-serif text-[#c96a3f] text-base">§</span>
+              <span className="font-mono text-[11px] tracking-[0.18em] text-[#d4a24c] uppercase">What it costs to list</span>
+            </div>
+            <h2 className="font-serif font-light text-[clamp(32px,4.5vw,52px)] leading-tight tracking-[-0.02em]">
+              Transparent pricing. <em className="italic text-[#4a9595] font-normal">No surprises.</em>
             </h2>
-            <p className="font-serif font-light text-[19px] leading-relaxed text-[#faf8f3]/70">
-              Early-access partners lock their rate for twelve months. After that, the standard rate applies. Either way, you keep more per booking than any comparable platform in this market.
-            </p>
           </div>
-          <div className="grid md:grid-cols-2 border border-[#2a2f36]">
+
+          {/* Hosts commission */}
+          <div className="mb-2">
+            <p className="font-mono text-[11px] tracking-[0.18em] text-[#d4a24c] uppercase mb-6">Hosts</p>
+          </div>
+          <div className="grid md:grid-cols-2 border border-[#2a2f36] mb-8">
             {[
-              { label: 'Early-access rate', num: '8', strike: '12', detail: 'Locked for the first 12 months from launch. Available to cohort members only.' },
-              { label: 'Standard rate', num: '12', strike: null, detail: 'Applied after the early-access period. Still below Booking.com (15%), Airbnb (14–16%), and GetYourGuide (20–30%).' },
+              { label: 'Cohort rate', num: '12', strike: '15', detail: 'Locked for the first 12 months from launch. Available to early-access cohort members only.' },
+              { label: 'Standard rate', num: '15', strike: null, detail: 'Applied after the early-access period. Still below Booking.com (15–18%) and Airbnb (14–16%).' },
             ].map((item, i) => (
               <div key={i} className={`p-12 ${i === 0 ? 'border-b md:border-b-0 md:border-r border-[#2a2f36]' : ''}`}>
                 <p className="font-mono text-[11px] tracking-[0.18em] text-[#d4a24c] uppercase mb-6">{item.label}</p>
@@ -454,11 +460,34 @@ export default function ForOperatorsPage() {
               </div>
             ))}
           </div>
+
+          {/* Operators commission */}
+          <div className="mb-2">
+            <p className="font-mono text-[11px] tracking-[0.18em] text-[#d4a24c] uppercase mb-6">Operators</p>
+          </div>
+          <div className="grid md:grid-cols-2 border border-[#2a2f36] mb-8">
+            {[
+              { label: 'Cohort rate', num: '15', strike: '18', detail: 'Locked for the first 12 months from launch. Available to early-access cohort members only.' },
+              { label: 'Standard rate', num: '18', strike: null, detail: 'Applied after the early-access period. Still below GetYourGuide (20–30%) and Viator (20–25%).' },
+            ].map((item, i) => (
+              <div key={i} className={`p-12 ${i === 0 ? 'border-b md:border-b-0 md:border-r border-[#2a2f36]' : ''}`}>
+                <p className="font-mono text-[11px] tracking-[0.18em] text-[#d4a24c] uppercase mb-6">{item.label}</p>
+                <div className="flex items-baseline gap-4 mb-2">
+                  <span className="font-serif font-light text-[88px] leading-[0.9] tracking-[-0.04em]">{item.num}%</span>
+                  {item.strike && (
+                    <span className="font-serif text-[36px] text-[#6b7079] line-through decoration-[#c96a3f] decoration-2">{item.strike}%</span>
+                  )}
+                </div>
+                <p className="font-serif italic text-[16px] text-[#faf8f3]/60 leading-relaxed mt-4">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+
           <div className="grid md:grid-cols-3 border-t border-[#2a2f36]">
             {[
               { label: 'Payout schedule', value: 'Weekly', detail: "Every Monday for the prior week's completed bookings" },
               { label: 'Minimum booking value', value: 'None', detail: 'List at any price point. No floor, no ceiling.' },
-              { label: 'Accepted currencies', value: 'NGN · USD · GBP · EUR', detail: 'Guest pays in their currency. You receive in yours.' },
+              { label: 'Accepted currencies', value: 'NGN · USD · GBP', detail: 'Guest pays in their currency. You receive in yours.' },
             ].map((item, i) => (
               <div key={i} className={`p-8 ${i < 2 ? 'border-b md:border-b-0 md:border-r border-[#2a2f36]' : ''}`}>
                 <p className="font-mono text-[10px] tracking-[0.15em] text-[#d4a24c] uppercase mb-3">{item.label}</p>
