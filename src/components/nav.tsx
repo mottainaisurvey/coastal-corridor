@@ -175,7 +175,7 @@ export function Nav() {
           {isSignedIn ? (
             <UserButton afterSignOutUrl="/" />
           ) : (
-            <SignInButton mode="modal" signUpUrl="/sign-up">
+            <SignInButton mode="modal">
               <button className="btn-secondary !py-2 !px-4 flex items-center gap-2 text-sm font-medium">
                 SIGN IN
               </button>
@@ -217,7 +217,7 @@ export function Nav() {
                   Account
                 </Link>
               ) : (
-                <SignInButton mode="modal" signUpUrl="/sign-up">
+                <SignInButton mode="modal">
                   <button className="py-3 text-base font-medium text-ink/80 hover:text-ink w-full text-left">
                     Sign in
                   </button>
