@@ -595,6 +595,43 @@ model RegistryRecord {
 }
 
 // =========================================================
+// OPERATOR & HOST APPLICATIONS
+// =========================================================
+
+model OperatorApplication {
+  id                   String   @id @default(cuid())
+  path                 String   // "host" | "operator" | "both"
+  fullName             String
+  businessName         String?
+  email                String
+  phone                String
+  corridorLocation     String
+  countryOfResidence   String
+  // Host-specific
+  propertyType         String?
+  numberOfRooms        Int?
+  currentlyListedOn    String?
+  // Operator-specific
+  operationType        String?
+  yearsOperating       Int?
+  annualCustomers      String?
+  // Shared open-text
+  aboutOperation       String
+  whyCoastalCorridor   String?
+  additionalInfo       String?
+  // Status
+  status               String   @default("PENDING") // PENDING | REVIEWING | ACCEPTED | DECLINED
+  reviewedAt           DateTime?
+  reviewNotes          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([status])
+  @@index([email])
+  @@index([createdAt])
+}
+
+// =========================================================
 // AUDIT & SYSTEM
 // =========================================================
 
