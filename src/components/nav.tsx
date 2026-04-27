@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { Menu, X, Search } from 'lucide-react';
-import { SignInButton, SignUpButton, UserButton, useAuth } from '@clerk/nextjs';
+import { UserButton, useAuth } from '@clerk/nextjs';
 
 export function Nav() {
   const [open, setOpen] = useState(false);
@@ -175,11 +175,11 @@ export function Nav() {
           {isSignedIn ? (
             <UserButton afterSignOutUrl="/" />
           ) : (
-            <SignInButton mode="modal">
+            <Link href="/sign-in">
               <button className="btn-secondary !py-2 !px-4 flex items-center gap-2 text-sm font-medium">
                 SIGN IN
               </button>
-            </SignInButton>
+            </Link>
           )}
         </div>
 
@@ -217,11 +217,9 @@ export function Nav() {
                   Account
                 </Link>
               ) : (
-                <SignInButton mode="modal">
-                  <button className="py-3 text-base font-medium text-ink/80 hover:text-ink w-full text-left">
-                    Sign in
-                  </button>
-                </SignInButton>
+                <Link href="/sign-in" className="py-3 text-base font-medium text-ink/80 hover:text-ink block" onClick={() => setOpen(false)}>
+                  Sign in
+                </Link>
               )}
             </div>
           </nav>
