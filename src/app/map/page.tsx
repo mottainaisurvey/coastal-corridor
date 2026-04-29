@@ -853,62 +853,110 @@ export default function MapPage() {
         closeListingCard();
       }
 
-      // S1a: Express Fly — cinematic corridor flyover following the actual road trace
-      // Samples every ~8th road waypoint to create smooth camera hops along the highway
-      const FLY_CORRIDOR_STOPS: [number, number, number][] = [
-        // [lng, lat, altitude_m] — sampled from ROAD_COORDS at key points
-        [3.4216, 6.4281, 18000],   // Victoria Island start
-        [3.5812, 6.4389, 14000],   // Lekki
-        [3.8900, 6.5550, 14000],   // Ajah
-        [3.9833, 6.5833, 14000],   // Epe
-        [3.9333, 6.8167, 16000],   // Ijebu-Ode
-        [4.4500, 6.4000, 18000],   // Ore approach
-        [4.8124, 6.2489, 14000],   // Ore / Ondo coast
-        [5.3000, 5.7500, 14000],   // Igbokoda
-        [5.7520, 5.5167, 14000],   // Warri
-        [6.2642, 4.9247, 14000],   // Yenagoa
-        [7.0498, 4.8156, 14000],   // Port Harcourt
-        [7.9128, 5.0378, 14000],   // Uyo
-        [8.0000, 4.5000, 14000],   // Ibeno Beach
-        [8.3269, 4.9589, 16000],   // Calabar terminus
-      ];
+      // ============ DESTINATION OVERLAY (shown during FLY CORRIDOR) ============
+      function showDestOverlay(dest: any) {
+        let overlay = document.getElementById('destOverlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'destOverlay';
+          overlay.style.cssText = `
+            position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+            background:rgba(10,14,18,0.88); border:1px solid rgba(212,162,76,0.5);
+            border-radius:8px; padding:14px 28px; text-align:center;
+            font-family:'Inter Tight',sans-serif; color:#f5f0e8;
+            pointer-events:none; z-index:9999;
+            transition:opacity 0.4s ease;
+          `;
+          document.body.appendChild(overlay);
+        }
+        overlay.innerHTML = `
+          <div style="font-size:10px;letter-spacing:0.15em;color:#d4a24c;margin-bottom:4px">
+            ${dest.corridorKm === 0 ? 'CORRIDOR START' : `KM ${dest.corridorKm}`} · ${dest.state.toUpperCase()}
+          </div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:0.04em">${dest.name}</div>
+          <div style="font-size:11px;color:#8a9ba8;margin-top:4px;letter-spacing:0.1em">${dest.tag}</div>
+        `;
+        overlay.style.opacity = '1';
+      }
 
+      function hideDestOverlay() {
+        const overlay = document.getElementById('destOverlay');
+        if (overlay) overlay.style.opacity = '0';
+      }
+
+      // S1a: Express Fly — cinematic corridor flyover stopping at all 12 destinations
+      // Road-aligned headings computed from the actual highway bearing at each stop
       async function expressFly() {
-        if (flyAnimating) { flyAnimating = false; resetFlyBtn(); return; }
+        if (flyAnimating) { flyAnimating = false; resetFlyBtn(); hideDestOverlay(); return; }
         flyAnimating = true;
         closeListingCard();
         const btn = document.getElementById('flyBtn');
         if (btn) { btn.textContent = '⏹ STOP'; btn.classList.add('active'); }
 
+        // Road-aligned headings (degrees) at each destination along the highway
+        // Derived from the actual road bearing at each stop
+        const destHeadings: Record<string, number> = {
+          vi:       85,  // heading east out of Lagos
+          lekki:    88,  // Lekki-Epe Expressway, nearly due east
+          epe:      60,  // Epe — road curves north-east toward Ijebu
+          ijebu:    135, // Ijebu-Ode — road turns south-east toward Ondo
+          ondo:     110, // Ondo coast — south-east along the coast
+          warri:    95,  // Warri — east toward the Niger Delta
+          yenagoa:  90,  // Yenagoa — due east
+          ph:       85,  // Port Harcourt — east-north-east
+          uyo:      120, // Uyo — south-east toward Ibeno
+          ibeno:    55,  // Ibeno — north-east toward Calabar
+          tinapa:   80,  // Tinapa — east toward Calabar
+          calabar:  90   // Calabar terminus
+        };
+
         // First: lift to overview altitude above Lagos
         await new Promise(resolve => {
           viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(3.4216, 6.4281, 80000),
-            orientation: { heading: Cesium.Math.toRadians(75), pitch: Cesium.Math.toRadians(-35), roll: 0 },
-            duration: 2.5,
+            destination: Cesium.Cartesian3.fromDegrees(3.4216, 6.4281, 120000),
+            orientation: { heading: Cesium.Math.toRadians(75), pitch: Cesium.Math.toRadians(-40), roll: 0 },
+            duration: 3,
             complete: resolve, cancel: resolve
           });
         });
 
-        // Fly through each road stop in sequence
-        for (const [lng, lat, alt] of FLY_CORRIDOR_STOPS) {
+        // Fly through all 12 destinations in corridor order
+        for (const dest of DESTINATIONS) {
           if (!flyAnimating) break;
-          // Heading: roughly east (90°) with slight south tilt to follow the coastal road
-          const heading = Cesium.Math.toRadians(88);
-          const pitch = Cesium.Math.toRadians(-28);
+
+          const heading = Cesium.Math.toRadians(destHeadings[dest.id] ?? 90);
+          const pitch = Cesium.Math.toRadians(-30);
+          // Altitude: higher for first/last, lower for mid-corridor stops
+          const alt = (dest.corridorKm === 0 || dest.corridorKm >= 700) ? 22000 : 16000;
+
+          // Fly to the destination — 7 seconds to allow imagery to stream
           await new Promise(resolve => {
             viewer.camera.flyTo({
-              destination: Cesium.Cartesian3.fromDegrees(lng, lat + 0.08, alt),
+              destination: Cesium.Cartesian3.fromDegrees(dest.lng, dest.lat + 0.06, alt),
               orientation: { heading, pitch, roll: 0 },
-              duration: 3.5,
+              duration: 7,
               complete: resolve, cancel: resolve
             });
           });
+
+          if (!flyAnimating) break;
+
+          // Show destination overlay
+          showDestOverlay(dest);
+
+          // Pause at this destination for 4 seconds to let imagery render
+          await new Promise(r => setTimeout(r, 4000));
+
+          hideDestOverlay();
+
+          // Brief pause before moving to next destination
+          await new Promise(r => setTimeout(r, 500));
         }
 
         flyAnimating = false;
         resetFlyBtn();
-        if (flyAnimating === false) cameraOverview();
+        hideDestOverlay();
+        cameraOverview();
       }
 
       // S1b: Fly To — direct flight to any listing (also used from listing card button)
