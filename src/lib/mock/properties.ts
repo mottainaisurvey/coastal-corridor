@@ -31,7 +31,7 @@ export const properties: Property[] = [
       'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1600&q=80',
       'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1600&q=80'
     ],
-    virtualTourUrl: 'https://matterport.com/discover/space/example',
+    virtualTourUrl: 'https://my.matterport.com/show/?m=qX8svFDZvSy',
     priceKobo: 18500000000, // ₦185M
     pricePerSqmKobo: 130282000,
     currency: 'NGN',
@@ -107,7 +107,7 @@ export const properties: Property[] = [
       'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1600&q=80',
       'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1600&q=80'
     ],
-    virtualTourUrl: 'https://matterport.com/discover/space/example',
+    virtualTourUrl: 'https://my.matterport.com/show/?m=UHjb4BshXd1',
     priceKobo: 62000000000, // ₦620M
     pricePerSqmKobo: 69663000,
     currency: 'NGN',
