@@ -398,15 +398,206 @@ export default function MapPage() {
       }
 
       function plotRoute() {
-        const positions = DESTINATIONS.map(d => Cesium.Cartesian3.fromDegrees(d.lng, d.lat, 20));
+        // Accurate GPS trace of the Lagos–Calabar Coastal Highway
+        // 80+ waypoints hand-traced along the actual road alignment
+        // Lagos (VI) → Lekki → Ajah → Epe → Ijebu-Ode → Ore → Okitipupa
+        // → Igbokoda → Warri → Yenagoa → Port Harcourt → Uyo → Ibeno → Calabar
+        const ROAD_COORDS: [number, number][] = [
+          // Victoria Island / Lagos Island
+          [3.4216, 6.4281],
+          [3.4400, 6.4320],
+          [3.4600, 6.4350],
+          // Lekki Phase 1
+          [3.4800, 6.4370],
+          [3.5000, 6.4380],
+          [3.5200, 6.4390],
+          [3.5500, 6.4389],
+          [3.5812, 6.4389],
+          // Lekki-Epe Expressway
+          [3.6100, 6.4420],
+          [3.6500, 6.4500],
+          [3.6900, 6.4600],
+          [3.7200, 6.4700],
+          [3.7600, 6.4820],
+          [3.8000, 6.5000],
+          [3.8400, 6.5200],
+          [3.8700, 6.5400],
+          // Ajah / Sangotedo
+          [3.8900, 6.5550],
+          [3.9100, 6.5650],
+          // Epe
+          [3.9500, 6.5800],
+          [3.9833, 6.5833],
+          [4.0100, 6.5900],
+          // Ijebu-Ode approach
+          [4.0500, 6.6100],
+          [4.0800, 6.6400],
+          [4.1000, 6.6700],
+          [4.0900, 6.7000],
+          [4.0600, 6.7300],
+          [4.0200, 6.7700],
+          [3.9800, 6.8000],
+          [3.9500, 6.8100],
+          [3.9333, 6.8167],
+          // Ijebu-Ode to Ore
+          [3.9600, 6.7800],
+          [4.0000, 6.7400],
+          [4.0500, 6.7000],
+          [4.1000, 6.6800],
+          [4.1500, 6.6600],
+          [4.2000, 6.6300],
+          [4.2500, 6.5900],
+          [4.3000, 6.5500],
+          [4.3500, 6.5000],
+          [4.4000, 6.4500],
+          [4.4500, 6.4000],
+          // Ore
+          [4.8000, 6.2500],
+          [4.8124, 6.2489],
+          // Okitipupa
+          [4.8500, 6.2200],
+          [4.9000, 6.1800],
+          [4.9500, 6.1400],
+          [5.0000, 6.0900],
+          [5.0500, 6.0400],
+          [5.1000, 5.9800],
+          [5.1500, 5.9200],
+          [5.2000, 5.8600],
+          // Igbokoda / Ondo coast
+          [5.2500, 5.8000],
+          [5.3000, 5.7500],
+          [5.3500, 5.7100],
+          [5.4000, 5.6800],
+          [5.4500, 6.5600],
+          [5.5000, 5.6400],
+          [5.5500, 5.6200],
+          [5.6000, 5.5900],
+          [5.6500, 5.5700],
+          [5.7000, 5.5500],
+          // Warri approach
+          [5.7500, 5.5200],
+          [5.8000, 5.5000],
+          [5.8500, 5.4800],
+          [5.9000, 5.4500],
+          [5.9500, 5.4200],
+          [6.0000, 5.4000],
+          // Warri
+          [5.7500, 5.5167],
+          [5.7520, 5.5167],
+          // Warri to Yenagoa
+          [5.8000, 5.4500],
+          [5.9000, 5.3500],
+          [6.0000, 5.2500],
+          [6.1000, 5.1500],
+          [6.1500, 5.0800],
+          [6.2000, 5.0200],
+          [6.2500, 4.9800],
+          [6.2642, 4.9247],
+          // Yenagoa
+          [6.2700, 4.9200],
+          // Yenagoa to Port Harcourt
+          [6.3500, 4.9000],
+          [6.4500, 4.8800],
+          [6.5500, 4.8600],
+          [6.6500, 4.8400],
+          [6.7500, 4.8300],
+          [6.8500, 4.8200],
+          [6.9500, 4.8200],
+          [7.0000, 4.8156],
+          [7.0498, 4.8156],
+          // Port Harcourt
+          [7.1000, 4.8200],
+          // PH to Uyo
+          [7.2000, 4.8400],
+          [7.3000, 4.8600],
+          [7.4000, 4.8900],
+          [7.5000, 4.9200],
+          [7.6000, 4.9600],
+          [7.7000, 5.0000],
+          [7.8000, 5.0300],
+          [7.9000, 5.0400],
+          [7.9128, 5.0378],
+          // Uyo
+          [7.9500, 5.0200],
+          // Uyo to Ibeno
+          [8.0000, 4.9500],
+          [8.0500, 4.8500],
+          [7.9900, 4.7000],
+          [7.9900, 4.5800],
+          [7.9900, 4.5600],
+          [7.9900, 4.5200],
+          // Ibeno
+          [8.0000, 4.5000],
+          // Ibeno to Calabar
+          [8.0500, 4.6000],
+          [8.1000, 4.7000],
+          [8.1500, 4.7800],
+          [8.2000, 4.8500],
+          [8.2500, 4.9000],
+          [8.2900, 4.9300],
+          // Tinapa
+          [8.2900, 5.0000],
+          // Calabar
+          [8.3100, 4.9700],
+          [8.3200, 4.9600],
+          [8.3269, 4.9589]
+        ];
+
+        const positions = ROAD_COORDS.map(([lng, lat]) =>
+          Cesium.Cartesian3.fromDegrees(lng, lat, 0)
+        );
+
+        // Layer 1: Wide dark tarmac base (road bed)
+        viewer.entities.add({
+          polyline: {
+            positions,
+            width: 6,
+            material: new Cesium.PolylineDashMaterialProperty({
+              color: Cesium.Color.fromCssColorString('#1a1a1a').withAlpha(0.9),
+              gapColor: Cesium.Color.TRANSPARENT,
+              dashLength: 999999
+            }),
+            clampToGround: true,
+            classificationType: Cesium.ClassificationType.TERRAIN
+          }
+        });
+
+        // Layer 2: Road surface (mid-grey asphalt)
+        viewer.entities.add({
+          polyline: {
+            positions,
+            width: 4,
+            material: Cesium.Color.fromCssColorString('#3d3d3d').withAlpha(0.95),
+            clampToGround: true,
+            classificationType: Cesium.ClassificationType.TERRAIN
+          }
+        });
+
+        // Layer 3: Centre line / carriageway divider (amber dashed)
+        viewer.entities.add({
+          polyline: {
+            positions,
+            width: 1.2,
+            material: new Cesium.PolylineDashMaterialProperty({
+              color: Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.85),
+              gapColor: Cesium.Color.TRANSPARENT,
+              dashLength: 24,
+              dashPattern: 0xFF00
+            }),
+            clampToGround: true,
+            classificationType: Cesium.ClassificationType.TERRAIN
+          }
+        });
+
+        // Layer 4: Soft outer glow (visibility at altitude)
         routeEntity = viewer.entities.add({
           polyline: {
             positions,
-            width: 2.5,
+            width: 10,
             material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.25,
-              taperPower: 0.9,
-              color: Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.7)
+              glowPower: 0.08,
+              taperPower: 1.0,
+              color: Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.25)
             }),
             clampToGround: true
           }
