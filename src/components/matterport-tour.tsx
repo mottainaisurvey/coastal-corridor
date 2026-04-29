@@ -27,9 +27,10 @@ export function MatterportTour({ virtualTourUrl }: MatterportTourProps) {
   const [isOpen, setIsOpen] = useState(false);
   const spaceId = extractSpaceId(virtualTourUrl);
 
-  // Build the embed URL — use the space ID if extractable, otherwise fall back to the original URL
+  // Build the embed URL — applicationKey is only needed for the JS SDK; omitting it avoids
+  // domain-validation failures that cause the player to stall on "Connecting to the Matterport space".
   const embedUrl = spaceId
-    ? `https://my.matterport.com/show/?m=${spaceId}&play=1&qs=1&applicationKey=uc2wmpu1yurgst5thmkrgue2a`
+    ? `https://my.matterport.com/show/?m=${spaceId}&play=1`
     : `${virtualTourUrl}${virtualTourUrl.includes('?') ? '&' : '?'}play=1`;
 
   return (
