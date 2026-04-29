@@ -11,6 +11,7 @@ import { getAgentByName } from '@/lib/mock/agents';
 import { PropertyCard } from '@/components/property-card';
 import { InquiryForm } from '@/components/inquiry-form';
 import { GalleryViewer } from '@/components/gallery-viewer';
+import { MatterportTour } from '@/components/matterport-tour';
 import {
   formatKobo, formatArea, propertyTypeLabels, titleStatusLabels
 } from '@/lib/utils';
@@ -265,22 +266,7 @@ export default function PropertyDetailPage({ params }: { params: { slug: string 
 
             {/* Virtual tour */}
             {property.virtualTourUrl && (
-              <section>
-                <h2 className="eyebrow mb-4">§ Virtual tour</h2>
-                <div className="bg-ink text-paper border border-ink rounded-lg p-8 flex items-center justify-between">
-                  <div>
-                    <Camera className="h-6 w-6 mb-3 text-ocean-2" />
-                    <h3 className="font-serif text-[22px] font-medium mb-2">Walk the property in 3D</h3>
-                    <p className="text-[14px] text-paper/70 max-w-md">
-                      Matterport scan captured on-site. Available for VR headsets (Meta Quest, Vision Pro) or desktop browser.
-                    </p>
-                  </div>
-                  <button className="btn-primary">
-                    Launch tour
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </section>
+              <MatterportTour virtualTourUrl={property.virtualTourUrl} />
             )}
           </div>
 
