@@ -189,11 +189,11 @@ export default function MapPage() {
   }, [destinations, properties, showProperties]);
 
   return (
-    <div className="h-[calc(100vh-64px)] relative bg-ink">
+    <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 64px)', overflow: 'hidden', background: '#0a0e12' }}>
       {/* MapLibre CSS */}
       <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.css" />
 
-      <div ref={mapContainer} className="absolute inset-0" />
+      <div ref={mapContainer} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} />
 
       {/* Header */}
       <div className="absolute top-4 left-4 z-10 bg-ink/90 backdrop-blur border border-paper/10 rounded-lg px-4 py-3 text-paper">
