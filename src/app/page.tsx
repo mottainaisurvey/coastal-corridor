@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CesiumGlobeHero } from '@/components/cesium-globe-hero';
 import { ArrowRight, Shield, Users, Map, Zap, Search, MapPin } from 'lucide-react';
 import { destinations } from '@/lib/mock/destinations';
 import { properties } from '@/lib/mock/properties';
@@ -105,6 +106,9 @@ export default function HomePage() {
         {/* Bottom fade */}
         <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-paper to-transparent" />
       </section>
+
+      {/* ============= CESIUM GLOBE HERO ============= */}
+      <CesiumGlobeHero />
 
       {/* ============= VERIFICATION PROMISE ============= */}
       <section className="container-x py-24">
