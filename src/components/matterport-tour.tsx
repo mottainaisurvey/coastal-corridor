@@ -91,7 +91,7 @@ export function MatterportTour({ virtualTourUrl }: MatterportTourProps) {
             <iframe
               src={embedUrl}
               className="absolute inset-0 w-full h-full"
-              allow="xr-spatial-tracking; fullscreen"
+              allow="autoplay; fullscreen; web-share; xr-spatial-tracking"
               allowFullScreen
               title="Matterport 3D Virtual Tour"
               loading="lazy"
