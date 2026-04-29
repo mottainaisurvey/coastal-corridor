@@ -261,7 +261,7 @@ export default function MapPage() {
           plotListings();
           plotDestinations();
           plotRoute();
-          buildListingsSidebar();
+          buildDestinationsSidebar();
           buildFilterBar();
           startClock();
           wireClickHandler();
@@ -610,10 +610,11 @@ export default function MapPage() {
           const picked = viewer.scene.pick(movement.position);
           if (Cesium.defined(picked) && picked.id) {
             if (picked.id.listingData) {
+              // Listing pin tap → open listing card on right
               openListingCard(picked.id.listingData);
             } else if (picked.id.destData) {
-              // Destination tap: show context info, don't open full listing card
-              showDestinationToast(picked.id.destData);
+              // Destination marker tap → open destination detail on right
+              openDestinationPanel(picked.id.destData);
             }
           }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -704,11 +705,139 @@ export default function MapPage() {
         panel.classList.add('open');
       }
 
+      // ============ DESTINATION DETAIL PANEL (right panel) ============
+      let activeDestId: string | null = null;
+
       function closeListingCard() {
         const panel = document.getElementById('listingPanel');
         if (panel) panel.classList.remove('open');
         activeListingId = null;
-        document.querySelectorAll('.listing-item').forEach(el => el.classList.remove('active'));
+        activeDestId = null;
+        document.querySelectorAll('.dest-item').forEach(el => el.classList.remove('active'));
+        showAllListings();
+      }
+
+      function openDestinationPanel(d: any) {
+        activeDestId = d.id;
+
+        // Highlight active in sidebar
+        document.querySelectorAll('.dest-item').forEach(el => el.classList.remove('active'));
+        const activeEl = document.querySelector(`[data-dest-id="${d.id}"]`);
+        if (activeEl) activeEl.classList.add('active');
+
+        // Show listings for this destination on the globe
+        showListingsForDestination(d.id);
+
+        // Fly camera to destination — offset left so pin is centred in visible map area
+        const rightPanelOffset = 0.045; // degrees lat offset to account for 360px right panel
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(d.lng - 0.08, d.lat - rightPanelOffset, 18000),
+          orientation: { heading: Cesium.Math.toRadians(destHeadingsMap[d.id] ?? 90), pitch: Cesium.Math.toRadians(-32), roll: 0 },
+          duration: 3
+        });
+
+        const listings = LISTINGS.filter(p => p.destinationId === d.id);
+        const tagColor: Record<string, string> = {
+          'INFRASTRUCTURE': '#4db3b3',
+          'MIXED USE': '#d4a24c',
+          'REAL ESTATE': '#c96a3f',
+          'TOURISM': '#8aa876'
+        };
+        const tc = tagColor[d.tag] || '#d4a24c';
+
+        const listingRows = listings.length > 0
+          ? listings.map(p => {
+              const typeColor = TYPE_COLORS[p.type] || '#d4a24c';
+              return `
+                <div class="dest-listing-row" onclick="openListingFromDest('${p.id}')">
+                  <div class="dlr-img" style="background-image:url('${p.heroImage}')"></div>
+                  <div class="dlr-body">
+                    <div class="dlr-type" style="color:${typeColor}">${p.type.replace('_', ' ')}</div>
+                    <div class="dlr-title">${p.title}</div>
+                    <div class="dlr-price">${p.price} <span class="dlr-yoy">+${p.yoy}%</span></div>
+                  </div>
+                  <div class="dlr-arrow">›</div>
+                </div>
+              `;
+            }).join('')
+          : '<div style="padding:12px 0;font-size:11px;color:var(--text-muted)">No active listings at this destination yet.</div>';
+
+        const panel = document.getElementById('listingPanel');
+        if (!panel) return;
+
+        panel.innerHTML = `
+          <div class="lp-header" style="border-left: 3px solid ${tc}">
+            <div class="lp-close" onclick="closeListingCard()">×</div>
+            <div class="lp-type-chip" style="background:${tc}22;color:${tc}">${d.tag}</div>
+            <div class="lp-verified" style="color:var(--text-muted)">KM ${d.corridorKm}</div>
+          </div>
+          <div class="lp-hero" style="background:linear-gradient(135deg, ${tc}22 0%, rgba(10,14,18,0.9) 100%);display:flex;align-items:center;justify-content:center;">
+            <div style="text-align:center;padding:20px;">
+              <div style="font-size:11px;letter-spacing:0.14em;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px">${d.state} State</div>
+              <div style="font-size:22px;font-weight:800;color:var(--text);line-height:1.2">${d.name}</div>
+              <div style="margin-top:12px;display:inline-block;padding:4px 12px;border-radius:20px;background:${tc}33;color:${tc};font-size:10px;font-weight:700;letter-spacing:0.1em">${d.tag}</div>
+            </div>
+          </div>
+          <div class="lp-body">
+            <div class="lp-location">Lagos–Calabar Coastal Corridor · KM ${d.corridorKm}</div>
+            <div class="lp-stats-grid">
+              <div class="lp-stat"><div class="lp-stat-val">${listings.length}</div><div class="lp-stat-label">Active Listings</div></div>
+              <div class="lp-stat"><div class="lp-stat-val">${d.corridorKm} km</div><div class="lp-stat-label">From Lagos</div></div>
+              <div class="lp-stat"><div class="lp-stat-val">${(700.3 - d.corridorKm).toFixed(1)} km</div><div class="lp-stat-label">To Calabar</div></div>
+              <div class="lp-stat"><div class="lp-stat-val">${d.state}</div><div class="lp-stat-label">State</div></div>
+            </div>
+            <div style="font-size:10px;letter-spacing:0.1em;color:var(--text-muted);text-transform:uppercase;margin:14px 0 8px">Listings at this destination</div>
+            <div class="dest-listings-list">${listingRows}</div>
+            <div class="lp-actions" style="margin-top:16px">
+              <button class="lp-btn-primary" onclick="flyToDestination('${d.id}')">✈ FLY TO DESTINATION</button>
+              <button class="lp-btn-secondary" onclick="closeListingCard()">← BACK TO CORRIDOR</button>
+            </div>
+          </div>
+        `;
+        panel.classList.add('open');
+      }
+
+      // Heading map for destination camera alignment
+      const destHeadingsMap: Record<string, number> = {
+        vi: 75, lekki: 88, epe: 60, ijebu: 135, ondo: 110,
+        warri: 95, yenagoa: 90, ph: 85, uyo: 120, ibeno: 55,
+        tinapa: 80, calabar: 90
+      };
+
+      function flyToDestination(id: string) {
+        const d = DESTINATIONS.find(x => x.id === id);
+        if (!d) return;
+        const rightPanelOffset = 0.045;
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(d.lng - 0.08, d.lat - rightPanelOffset, 14000),
+          orientation: { heading: Cesium.Math.toRadians(destHeadingsMap[d.id] ?? 90), pitch: Cesium.Math.toRadians(-30), roll: 0 },
+          duration: 3.5
+        });
+      }
+
+      function openListingFromDest(id: string) {
+        const p = LISTINGS.find(x => x.id === id);
+        if (!p) return;
+        openListingCard(p);
+        // Offset camera so pin is centred in visible area (not behind right panel)
+        const rightPanelDegOffset = 0.04;
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(p.lng - 0.06, p.lat - rightPanelDegOffset, 6000),
+          orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
+          duration: 2.5
+        });
+      }
+
+      function showListingsForDestination(destId: string) {
+        // Show only listings for this destination; hide others
+        listingEntities.forEach(e => {
+          const p = e.listingData;
+          e.show = !p || p.destinationId === destId;
+        });
+      }
+
+      function showAllListings() {
+        listingEntities.forEach(e => { e.show = true; });
       }
 
       function expandMatterport(url: string, id: string) {
@@ -739,42 +868,45 @@ export default function MapPage() {
         }
       }
 
-      // ============ SIDEBAR (listings list) ============
-      function buildListingsSidebar() {
+      // ============ SIDEBAR (12 destinations) ============
+      function buildDestinationsSidebar() {
         const list = document.getElementById('listingsList');
         if (!list) return;
-        list.innerHTML = filteredListings.map(p => {
-          const typeColor = TYPE_COLORS[p.type] || '#d4a24c';
+        list.innerHTML = DESTINATIONS.map((d, i) => {
+          const tagColor: Record<string, string> = {
+            'INFRASTRUCTURE': '#4db3b3',
+            'MIXED USE': '#d4a24c',
+            'REAL ESTATE': '#c96a3f',
+            'TOURISM': '#8aa876'
+          };
+          const tc = tagColor[d.tag] || '#d4a24c';
+          const listingCount = LISTINGS.filter(p => p.destinationId === d.id).length;
           return `
-            <div class="listing-item" data-listing-id="${p.id}" onclick="sidebarClickListing('${p.id}')">
-              <div class="li-img" style="background-image:url('${p.heroImage}')"></div>
-              <div class="li-body">
-                <div class="li-type" style="color:${typeColor}">${p.type.replace('_', ' ')}</div>
-                <div class="li-title">${p.title}</div>
-                <div class="li-loc">${p.destinationName}</div>
-                <div class="li-price-row">
-                  <span class="li-price">${p.price}</span>
-                  ${p.yoy > 0 ? `<span class="li-yoy">+${p.yoy}%</span>` : ''}
-                </div>
+            <div class="dest-item" data-dest-id="${d.id}" onclick="sidebarClickDest('${d.id}')">
+              <div class="dest-num">${String(i + 1).padStart(2, '0')}</div>
+              <div class="dest-body">
+                <div class="dest-name">${d.name}</div>
+                <div class="dest-meta">${d.state} · KM ${d.corridorKm}</div>
               </div>
+              <div class="dest-tag" style="background:${tc}22;color:${tc}">${d.tag}</div>
+              ${listingCount > 0 ? `<div class="dest-badge">${listingCount}</div>` : ''}
             </div>
           `;
         }).join('');
-        updateListingCount();
       }
 
-      function sidebarClickListing(id: string) {
-        const p = LISTINGS.find(x => x.id === id);
-        if (!p) return;
-        openListingCard(p);
-        flyToListing(id, false);
+      function sidebarClickDest(id: string) {
+        const d = DESTINATIONS.find(x => x.id === id);
+        if (!d) return;
+        openDestinationPanel(d);
       }
 
       function flyToListing(id: string, fromButton = true) {
         const p = LISTINGS.find(x => x.id === id);
         if (!p) return;
+        // Offset camera left/down so pin is centred in visible map area (not behind right panel)
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(p.lng, p.lat - 0.04, 6000),
+          destination: Cesium.Cartesian3.fromDegrees(p.lng - 0.06, p.lat - 0.04, 6000),
           orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
           duration: fromButton ? 3.5 : 2.5
         });
@@ -823,7 +955,7 @@ export default function MapPage() {
           return true;
         });
         plotListings();
-        buildListingsSidebar();
+        buildDestinationsSidebar();
       }
 
       function setTypeFilter(type: string) {
@@ -1222,7 +1354,11 @@ export default function MapPage() {
       (window as any).toggleVR = toggleVR;
       (window as any).closeListingCard = closeListingCard;
       (window as any).flyToListing = flyToListing;
-      (window as any).sidebarClickListing = sidebarClickListing;
+      (window as any).sidebarClickDest = sidebarClickDest;
+      (window as any).openDestinationPanel = openDestinationPanel;
+      (window as any).flyToDestination = flyToDestination;
+      (window as any).openListingFromDest = openListingFromDest;
+      (window as any).showAllListings = showAllListings;
       (window as any).expandMatterport = expandMatterport;
       (window as any).closeMatterport = closeMatterport;
       (window as any).setTypeFilter = setTypeFilter;
@@ -1592,6 +1728,62 @@ export default function MapPage() {
         .loading-step { font-size: 10px; color: var(--text-muted); letter-spacing: 0.06em; }
         .loading-step::before { content: '· '; color: var(--ochre); }
 
+        /* ===== DESTINATION SIDEBAR ITEMS ===== */
+        .dest-item {
+          display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 16px;
+          cursor: pointer; border-bottom: 1px solid var(--line); transition: background 0.15s;
+        }
+        .dest-item:hover { background: rgba(255,255,255,0.04); }
+        .dest-item.active { background: rgba(212,162,76,0.1); border-left: 2px solid var(--ochre); }
+        .dest-num {
+          font-size: 10px; font-weight: 800; color: var(--text-muted); font-variant-numeric: tabular-nums;
+          min-width: 22px; flex-shrink: 0;
+        }
+        .dest-body { flex: 1; min-width: 0; }
+        .dest-name { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dest-meta { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+        .dest-tag {
+          padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 700;
+          letter-spacing: 0.08em; white-space: nowrap; flex-shrink: 0;
+        }
+        .dest-badge {
+          min-width: 18px; height: 18px; border-radius: 9px;
+          background: var(--ochre); color: var(--ink);
+          font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+          padding: 0 4px; flex-shrink: 0;
+        }
+
+        /* ===== DESTINATION DETAIL PANEL (right panel) ===== */
+        .lp-stats-grid {
+          display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0;
+        }
+        .lp-stat {
+          background: var(--ink-3); border-radius: 8px; padding: 10px 12px;
+          border: 1px solid var(--line);
+        }
+        .lp-stat-val { font-size: 15px; font-weight: 800; color: var(--text); line-height: 1.2; }
+        .lp-stat-label { font-size: 9px; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+
+        /* Listing rows inside destination detail panel */
+        .dest-listings-list { display: flex; flex-direction: column; gap: 0; }
+        .dest-listing-row {
+          display: flex; align-items: center; gap: 10px; padding: 10px 0;
+          border-bottom: 1px solid var(--line); cursor: pointer; transition: background 0.15s;
+        }
+        .dest-listing-row:hover { background: rgba(255,255,255,0.04); margin: 0 -16px; padding: 10px 16px; }
+        .dest-listing-row:last-child { border-bottom: none; }
+        .dlr-img {
+          width: 46px; height: 46px; border-radius: 6px; flex-shrink: 0;
+          background-size: cover; background-position: center;
+          border: 1px solid var(--line-2);
+        }
+        .dlr-body { flex: 1; min-width: 0; }
+        .dlr-type { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
+        .dlr-title { font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dlr-price { font-size: 11px; font-weight: 700; color: var(--text); margin-top: 2px; }
+        .dlr-yoy { font-size: 9px; color: var(--success); font-weight: 600; }
+        .dlr-arrow { font-size: 18px; color: var(--text-muted); flex-shrink: 0; }
+
         /* ===== LEGEND ===== */
         .cc-legend {
           position: fixed; bottom: 80px; right: 20px; z-index: 15;
@@ -1644,12 +1836,12 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Left sidebar — listings */}
+      {/* Left sidebar — destinations */}
       <div className="cc-sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-title">§01 · Active Listings</div>
-          <div className="sidebar-headline">Properties on the Corridor</div>
-          <div className="sidebar-sub"><span id="listingCount">12 listings visible</span></div>
+          <div className="sidebar-title">§01 · Corridor Destinations</div>
+          <div className="sidebar-headline">12 Stops · Lagos to Calabar</div>
+          <div className="sidebar-sub">Click a destination to explore</div>
         </div>
         <div className="listings-list" id="listingsList" />
       </div>
