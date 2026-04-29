@@ -288,34 +288,33 @@ export default function MapPage() {
           const color = TYPE_COLORS[p.type] || '#d4a24c';
           const typeLabel = TYPE_LABELS[p.type] || p.type;
 
-          // Main billboard pin
+          // Main billboard pin — use RELATIVE_TO_GROUND so pin renders before terrain tiles load
           const entity = viewer.entities.add({
             id: `listing-${p.id}`,
-            position: Cesium.Cartesian3.fromDegrees(p.lng, p.lat, 80),
+            position: Cesium.Cartesian3.fromDegrees(p.lng, p.lat, 200),
             billboard: {
               image: createPinCanvas(color, typeLabel),
               width: 52,
               height: 52,
               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
               scaleByDistance: new Cesium.NearFarScalar(5000, 1.4, 1500000, 0.6)
             },
             label: {
-              text: p.price,
+              text: p.title.split('·')[0].trim() + '\n' + p.price,
               font: '600 11px "Inter Tight", sans-serif',
               fillColor: Cesium.Color.WHITE,
               outlineColor: Cesium.Color.fromCssColorString('#0a0e12'),
               outlineWidth: 3,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              pixelOffset: new Cesium.Cartesian2(0, -58),
-              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              pixelOffset: new Cesium.Cartesian2(0, -64),
+              heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
               showBackground: true,
               backgroundColor: Cesium.Color.fromCssColorString('rgba(10,14,18,0.88)'),
               backgroundPadding: new Cesium.Cartesian2(6, 3),
-              // Zoom-dependent: only show price label when zoomed in
-              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 400000),
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 600000),
               show: labelsVisible
             },
             listingData: p
@@ -854,39 +853,62 @@ export default function MapPage() {
         closeListingCard();
       }
 
-      // S1a: Express Fly — non-stop cinematic corridor flyover
+      // S1a: Express Fly — cinematic corridor flyover following the actual road trace
+      // Samples every ~8th road waypoint to create smooth camera hops along the highway
+      const FLY_CORRIDOR_STOPS: [number, number, number][] = [
+        // [lng, lat, altitude_m] — sampled from ROAD_COORDS at key points
+        [3.4216, 6.4281, 18000],   // Victoria Island start
+        [3.5812, 6.4389, 14000],   // Lekki
+        [3.8900, 6.5550, 14000],   // Ajah
+        [3.9833, 6.5833, 14000],   // Epe
+        [3.9333, 6.8167, 16000],   // Ijebu-Ode
+        [4.4500, 6.4000, 18000],   // Ore approach
+        [4.8124, 6.2489, 14000],   // Ore / Ondo coast
+        [5.3000, 5.7500, 14000],   // Igbokoda
+        [5.7520, 5.5167, 14000],   // Warri
+        [6.2642, 4.9247, 14000],   // Yenagoa
+        [7.0498, 4.8156, 14000],   // Port Harcourt
+        [7.9128, 5.0378, 14000],   // Uyo
+        [8.0000, 4.5000, 14000],   // Ibeno Beach
+        [8.3269, 4.9589, 16000],   // Calabar terminus
+      ];
+
       async function expressFly() {
-        if (flyAnimating) { flyAnimating = false; return; }
+        if (flyAnimating) { flyAnimating = false; resetFlyBtn(); return; }
         flyAnimating = true;
         closeListingCard();
         const btn = document.getElementById('flyBtn');
         if (btn) { btn.textContent = '⏹ STOP'; btn.classList.add('active'); }
 
-        // Lift to high altitude and fly the corridor west→east
+        // First: lift to overview altitude above Lagos
         await new Promise(resolve => {
           viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(3.2, 5.5, 900000),
-            orientation: { heading: Cesium.Math.toRadians(85), pitch: Cesium.Math.toRadians(-32), roll: 0 },
-            duration: 3,
+            destination: Cesium.Cartesian3.fromDegrees(3.4216, 6.4281, 80000),
+            orientation: { heading: Cesium.Math.toRadians(75), pitch: Cesium.Math.toRadians(-35), roll: 0 },
+            duration: 2.5,
             complete: resolve, cancel: resolve
           });
         });
 
-        if (!flyAnimating) { resetFlyBtn(); return; }
-
-        // Sweep east along the corridor
-        await new Promise(resolve => {
-          viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(8.5, 4.8, 700000),
-            orientation: { heading: Cesium.Math.toRadians(95), pitch: Cesium.Math.toRadians(-28), roll: 0 },
-            duration: 12,
-            complete: resolve, cancel: resolve
+        // Fly through each road stop in sequence
+        for (const [lng, lat, alt] of FLY_CORRIDOR_STOPS) {
+          if (!flyAnimating) break;
+          // Heading: roughly east (90°) with slight south tilt to follow the coastal road
+          const heading = Cesium.Math.toRadians(88);
+          const pitch = Cesium.Math.toRadians(-28);
+          await new Promise(resolve => {
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(lng, lat + 0.08, alt),
+              orientation: { heading, pitch, roll: 0 },
+              duration: 3.5,
+              complete: resolve, cancel: resolve
+            });
           });
-        });
+        }
 
         flyAnimating = false;
         resetFlyBtn();
-        cameraOverview();
+        if (flyAnimating === false) cameraOverview();
       }
 
       // S1b: Fly To — direct flight to any listing (also used from listing card button)
