@@ -2,15 +2,192 @@
 
 import { useEffect } from 'react';
 
+// All 12 active properties from the platform inventory
+const LISTINGS = [
+  {
+    id: 'p-001', slug: 'ocean-pearl-lekki-2br', type: 'APARTMENT',
+    title: 'Ocean Pearl · 2-Bedroom at Pinnock Beach',
+    destinationId: 'lekki', destinationName: 'Lekki Peninsula', state: 'Lagos',
+    lat: 6.4389, lng: 3.5812,
+    price: '₦185M', pricePerSqm: '₦1.3M/sqm', bedrooms: 2, bathrooms: 3, areaSqm: 450,
+    yoy: 18, floodRisk: 22, disputeRisk: 8, titleStatus: 'VERIFIED',
+    agentName: 'Chiamaka Okafor', agentVerified: true, featured: true,
+    heroImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80',
+    virtualTourUrl: 'https://my.matterport.com/show/?m=qX8svFDZvSy',
+    amenities: ['Gym', 'Pool', 'Beach access', 'Concierge', '24/7 power']
+  },
+  {
+    id: 'p-002', slug: 'coastal-vista-epe-plot', type: 'LAND_ONLY',
+    title: 'Coastal Vista · 600sqm Beachfront Plot',
+    destinationId: 'epe', destinationName: 'Epe Coastal Extension', state: 'Lagos',
+    lat: 6.5872, lng: 3.984,
+    price: '₦24M', pricePerSqm: '₦40K/sqm', bedrooms: 0, bathrooms: 0, areaSqm: 600,
+    yoy: 34, floodRisk: 28, disputeRisk: 12, titleStatus: 'VERIFIED',
+    agentName: 'Adewale Johnson', agentVerified: true, featured: true,
+    heroImage: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Beach frontage', 'Perimeter wall', 'Interlocked roads']
+  },
+  {
+    id: 'p-003', slug: 'ikoyi-heritage-townhouse', type: 'HOUSE',
+    title: 'Ikoyi Heritage · 4BR Colonial Townhouse',
+    destinationId: 'vi', destinationName: 'Victoria Island Terminus', state: 'Lagos',
+    lat: 6.4502, lng: 3.4356,
+    price: '₦620M', pricePerSqm: '₦696K/sqm', bedrooms: 4, bathrooms: 4, areaSqm: 890,
+    yoy: 11, floodRisk: 18, disputeRisk: 5, titleStatus: 'VERIFIED',
+    agentName: 'Funmilayo Adebayo', agentVerified: true, featured: false,
+    heroImage: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80',
+    virtualTourUrl: 'https://my.matterport.com/show/?m=UHjb4BshXd1',
+    amenities: ['Garden', 'Servants quarters', 'Carport (4)', 'Generator']
+  },
+  {
+    id: 'p-004', slug: 'ondo-beach-resort-site', type: 'HOSPITALITY',
+    title: 'Ondo Beach · 2.4-Hectare Resort Development Site',
+    destinationId: 'ondo', destinationName: 'Ondo Coastal Belt', state: 'Ondo',
+    lat: 6.2489, lng: 4.8124,
+    price: '₦204M', pricePerSqm: '₦8.5K/sqm', bedrooms: 0, bathrooms: 0, areaSqm: 24000,
+    yoy: 28, floodRisk: 35, disputeRisk: 15, titleStatus: 'VERIFIED',
+    agentName: 'Olumide Odukoya', agentVerified: true, featured: true,
+    heroImage: 'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Private beach', 'Road access', 'Grid electricity at boundary']
+  },
+  {
+    id: 'p-005', slug: 'calabar-heritage-villa', type: 'HOUSE',
+    title: 'Calabar Heritage · 5BR Hillside Villa',
+    destinationId: 'calabar', destinationName: 'Calabar Terminus', state: 'Cross River',
+    lat: 4.9601, lng: 8.3201,
+    price: '₦48M', pricePerSqm: '₦40K/sqm', bedrooms: 5, bathrooms: 6, areaSqm: 1200,
+    yoy: 14, floodRisk: 15, disputeRisk: 7, titleStatus: 'VERIFIED',
+    agentName: 'Eyo Okon', agentVerified: true, featured: false,
+    heroImage: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Swimming pool', 'River view', 'Outdoor kitchen', 'Solar power']
+  },
+  {
+    id: 'p-006', slug: 'ph-waterfront-duplex', type: 'HOUSE',
+    title: 'Amadi Flats · 4BR Waterfront Duplex',
+    destinationId: 'ph', destinationName: 'Port Harcourt Bypass', state: 'Rivers',
+    lat: 4.8189, lng: 7.0534,
+    price: '₦180M', pricePerSqm: '₦250K/sqm', bedrooms: 4, bathrooms: 5, areaSqm: 720,
+    yoy: 9, floodRisk: 42, disputeRisk: 10, titleStatus: 'VERIFIED',
+    agentName: 'Ibifiri Briggs', agentVerified: true, featured: false,
+    heroImage: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Estate security', 'Central sewage', 'Fibre internet', 'Pool']
+  },
+  {
+    id: 'p-007', slug: 'lekki-commercial-plaza', type: 'COMMERCIAL',
+    title: 'Admiralty Way · Commercial Plaza Unit',
+    destinationId: 'lekki', destinationName: 'Lekki Peninsula', state: 'Lagos',
+    lat: 6.4412, lng: 3.4756,
+    price: '₦420M', pricePerSqm: '₦1.5M/sqm', bedrooms: 0, bathrooms: 0, areaSqm: 280,
+    yoy: 16, floodRisk: 30, disputeRisk: 6, titleStatus: 'VERIFIED',
+    agentName: 'Chiamaka Okafor', agentVerified: true, featured: false,
+    heroImage: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Parking (12 bays)', 'Generator', 'Loading bay', 'Shop front']
+  },
+  {
+    id: 'p-008', slug: 'uyo-new-estate-terrace', type: 'HOUSE',
+    title: 'Shelter Afrique Estate · 3BR Terrace',
+    destinationId: 'uyo', destinationName: 'Uyo Corridor Spur', state: 'Akwa Ibom',
+    lat: 5.041, lng: 7.918,
+    price: '₦65M', pricePerSqm: '₦186K/sqm', bedrooms: 3, bathrooms: 4, areaSqm: 350,
+    yoy: 12, floodRisk: 20, disputeRisk: 8, titleStatus: 'VERIFIED',
+    agentName: 'Enobong Essien', agentVerified: true, featured: false,
+    heroImage: 'https://images.unsplash.com/photo-1570213489059-0aac6626d401?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Estate security', 'Street lights', 'Tarred roads']
+  },
+  {
+    id: 'p-009', slug: 'tinapa-resort-apartments', type: 'APARTMENT',
+    title: 'Tinapa Residences · 1BR Service Apartment',
+    destinationId: 'tinapa', destinationName: 'Tinapa & Marina Resort', state: 'Cross River',
+    lat: 5.002, lng: 8.293,
+    price: '₦28M', pricePerSqm: '₦233K/sqm', bedrooms: 1, bathrooms: 1, areaSqm: 120,
+    yoy: 8, floodRisk: 25, disputeRisk: 10, titleStatus: 'VERIFIED',
+    agentName: 'Eyo Okon', agentVerified: true, featured: false,
+    heroImage: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Pool', 'Restaurant', 'Housekeeping', 'Resort access']
+  },
+  {
+    id: 'p-010', slug: 'ibeno-beachfront-acres', type: 'LAND_ONLY',
+    title: 'Ibeno Beach · 5 Acres Oceanfront',
+    destinationId: 'ibeno', destinationName: 'Ibeno Beach Zone', state: 'Akwa Ibom',
+    lat: 4.561, lng: 7.991,
+    price: '₦95M', pricePerSqm: '₦4.7K/sqm', bedrooms: 0, bathrooms: 0, areaSqm: 20234,
+    yoy: 38, floodRisk: 45, disputeRisk: 18, titleStatus: 'VERIFIED',
+    agentName: 'Enobong Essien', agentVerified: true, featured: true,
+    heroImage: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Private ocean frontage', 'Road access (2km from highway)']
+  },
+  {
+    id: 'p-011', slug: 'warri-waterfront-plot', type: 'LAND_ONLY',
+    title: 'Warri Waterfront · 1,000sqm Creek-Adjacent',
+    destinationId: 'warri', destinationName: 'Warri Delta Hub', state: 'Delta',
+    lat: 5.519, lng: 5.752,
+    price: '₦42M', pricePerSqm: '₦42K/sqm', bedrooms: 0, bathrooms: 0, areaSqm: 1000,
+    yoy: 15, floodRisk: 48, disputeRisk: 22, titleStatus: 'VERIFIED',
+    agentName: 'Oghenekaro Tsekpo', agentVerified: true, featured: false,
+    heroImage: 'https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['Creek frontage', 'Road access', 'Community consent documented']
+  },
+  {
+    id: 'p-012', slug: 'yenagoa-riverside-plot', type: 'LAND_ONLY',
+    title: 'Yenagoa Riverside · 800sqm Plot',
+    destinationId: 'yenagoa', destinationName: 'Yenagoa Waterfront', state: 'Bayelsa',
+    lat: 4.928, lng: 6.269,
+    price: '₦11.2M', pricePerSqm: '₦14K/sqm', bedrooms: 0, bathrooms: 0, areaSqm: 800,
+    yoy: 22, floodRisk: 55, disputeRisk: 18, titleStatus: 'PENDING',
+    agentName: 'Tari Perewarai', agentVerified: true, featured: false,
+    heroImage: 'https://images.unsplash.com/photo-1514214246283-d427a95c5d2f?w=800&q=80',
+    virtualTourUrl: null,
+    amenities: ['River adjacency', 'Master plan zone']
+  }
+];
+
+const DESTINATIONS = [
+  { id: 'vi', name: 'Victoria Island Terminus', state: 'Lagos', lat: 6.4281, lng: 3.4216, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3', corridorKm: 0 },
+  { id: 'lekki', name: 'Lekki Peninsula', state: 'Lagos', lat: 6.4698, lng: 3.5852, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c', corridorKm: 42.1 },
+  { id: 'epe', name: 'Epe Coastal Extension', state: 'Lagos', lat: 6.5833, lng: 3.9833, type: 'realestate', tag: 'REAL ESTATE', color: '#c96a3f', corridorKm: 98.4 },
+  { id: 'ijebu', name: 'Ijebu-Ode Junction', state: 'Ogun', lat: 6.8167, lng: 3.9333, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c', corridorKm: 142 },
+  { id: 'ondo', name: 'Ondo Coastal Belt', state: 'Ondo', lat: 6.25, lng: 4.8, type: 'tourism', tag: 'TOURISM', color: '#8aa876', corridorKm: 220 },
+  { id: 'warri', name: 'Warri Delta Hub', state: 'Delta', lat: 5.5167, lng: 5.75, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3', corridorKm: 312.5 },
+  { id: 'yenagoa', name: 'Yenagoa Waterfront', state: 'Bayelsa', lat: 4.9247, lng: 6.2642, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c', corridorKm: 380 },
+  { id: 'ph', name: 'Port Harcourt Bypass', state: 'Rivers', lat: 4.8156, lng: 7.0498, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3', corridorKm: 440 },
+  { id: 'uyo', name: 'Uyo Corridor Spur', state: 'Akwa Ibom', lat: 5.0378, lng: 7.9128, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c', corridorKm: 520 },
+  { id: 'ibeno', name: 'Ibeno Beach Zone', state: 'Akwa Ibom', lat: 4.56, lng: 7.99, type: 'tourism', tag: 'TOURISM', color: '#8aa876', corridorKm: 560 },
+  { id: 'tinapa', name: 'Tinapa & Marina Resort', state: 'Cross River', lat: 5.0, lng: 8.29, type: 'tourism', tag: 'TOURISM', color: '#8aa876', corridorKm: 640 },
+  { id: 'calabar', name: 'Calabar Terminus', state: 'Cross River', lat: 4.9589, lng: 8.3269, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3', corridorKm: 700.3 }
+];
+
+const TYPE_COLORS: Record<string, string> = {
+  APARTMENT: '#c96a3f',
+  HOUSE: '#d4a24c',
+  LAND_ONLY: '#8aa876',
+  COMMERCIAL: '#4db3b3',
+  HOSPITALITY: '#9b7fd4'
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  APARTMENT: 'APT',
+  HOUSE: 'HOUSE',
+  LAND_ONLY: 'LAND',
+  COMMERCIAL: 'COMM',
+  HOSPITALITY: 'HOSP'
+};
+
 export default function MapPage() {
   useEffect(() => {
-    // Dynamically inject Cesium CSS
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://cdn.jsdelivr.net/npm/cesium@1.118/Build/Cesium/Widgets/widgets.css';
     document.head.appendChild(link);
 
-    // Dynamically inject Cesium JS
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/cesium@1.118/Build/Cesium/Cesium.js';
     script.async = true;
@@ -19,163 +196,28 @@ export default function MapPage() {
 
     function initCesium() {
       const Cesium = (window as any).Cesium;
-
-      // ============ DESTINATIONS DATA ============
-      const destinations = [
-        {
-          id: 'vi', name: 'Victoria Island Terminus', state: 'Lagos',
-          lat: 6.4281, lng: 3.4216, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3',
-          desc: 'Western origin of the corridor. Dense commercial district and gateway to Lagos metropolis, with ferry terminals, business infrastructure and the primary urban real estate market in West Africa.',
-          stats: [
-            { label: 'Plot Availability', value: '~140', unit: 'listed' },
-            { label: 'Avg Land Value', value: '₦580M', unit: '/ plot' },
-            { label: 'Tourism POIs', value: '38', unit: 'sites' },
-            { label: 'Corridor KM', value: '0.0', unit: 'km' }
-          ],
-          features: ['3D building context from OSM + drone capture', 'Live marine traffic overlay (MarineTraffic API)', 'Real-time hotel availability for VI & Ikoyi', 'Enterprise GIS partner office integration']
-        },
-        {
-          id: 'lekki', name: 'Lekki Peninsula', state: 'Lagos',
-          lat: 6.4698, lng: 3.5852, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c',
-          desc: 'Fastest-growing real estate market on the corridor. Free Trade Zone, Deep Sea Port, and Dangote Refinery adjacency make this the primary investment thesis for the Lagos segment.',
-          stats: [
-            { label: 'Plot Inventory', value: '1,240', unit: 'listed' },
-            { label: 'Avg Price/sqm', value: '₦185K', unit: '' },
-            { label: 'YoY Growth', value: '+18%', unit: '' },
-            { label: 'Corridor KM', value: '42.1', unit: 'km' }
-          ],
-          features: ['Lekki FTZ proximity score per plot', 'Deep Sea Port impact radius overlay', 'Dangote Refinery workforce housing demand model', 'Diaspora fractional ownership pool (live)']
-        },
-        {
-          id: 'epe', name: 'Epe Coastal Extension', state: 'Lagos',
-          lat: 6.5833, lng: 3.9833, type: 'realestate', tag: 'REAL ESTATE', color: '#c96a3f',
-          desc: 'Emerging satellite town with significant undeveloped coastal land. Early land assembly opportunity before corridor construction reaches this segment — platform hosts 340 verified plots.',
-          stats: [
-            { label: 'Plot Inventory', value: '340', unit: 'listed' },
-            { label: 'Avg Price/sqm', value: '₦22K', unit: '' },
-            { label: 'Coastline', value: '28', unit: 'km' },
-            { label: 'Corridor KM', value: '98.4', unit: 'km' }
-          ],
-          features: ['Mangrove conservation zone boundary overlay', 'Aquaculture & fishing community impact model', 'Epe Resort Zone master plan integration', 'Title verification via Lagos Land Bureau API']
-        },
-        {
-          id: 'ijebu', name: 'Ijebu-Ode Junction', state: 'Ogun',
-          lat: 6.8167, lng: 3.9333, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c',
-          desc: 'Strategic inland junction where the coastal highway meets the Lagos-Ibadan expressway. Logistics hub with growing industrial and residential demand from Ogun State\'s manufacturing belt.',
-          stats: [
-            { label: 'Plot Inventory', value: '620', unit: 'listed' },
-            { label: 'Industrial Zone', value: 'Active', unit: '' },
-            { label: 'Avg Price/sqm', value: '₦12K', unit: '' },
-            { label: 'Corridor KM', value: '142.0', unit: 'km' }
-          ],
-          features: ['Logistics hub layer (truck parks, weighbridges)', 'Olumo Rock cultural VR experience', 'Live truck-park availability for Kobo360 / GIG', 'Industrial zoning compliance checker']
-        },
-        {
-          id: 'ondo', name: 'Ondo Coastal Belt', state: 'Ondo',
-          lat: 6.2500, lng: 4.8000, type: 'tourism', tag: 'TOURISM', color: '#8aa876',
-          desc: 'Undeveloped stretch of Atlantic coastline running east of Ondo town. Raw beachfront in pristine condition — critical window for early land assembly before price discovery begins.',
-          stats: [
-            { label: 'Coastline', value: '74', unit: 'km' },
-            { label: 'Developed', value: '<3%', unit: '' },
-            { label: 'Avg Price/sqm', value: '₦8.5K', unit: '' },
-            { label: 'Resort Potential', value: 'Tier-1', unit: '' }
-          ],
-          features: ['Sentinel-2 change detection (coastal erosion monitoring)', 'Drone photogrammetry captured Q1 2026', 'Film location scout catalogue (Nollywood)', 'Carbon credit MRV potential score']
-        },
-        {
-          id: 'warri', name: 'Warri Delta Hub', state: 'Delta',
-          lat: 5.5167, lng: 5.7500, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3',
-          desc: 'Oil & gas capital of the Niger Delta. Significant industrial and residential real estate demand, with major refinery rehabilitation driving workforce housing requirements.',
-          stats: [
-            { label: 'Plot Inventory', value: '890', unit: 'listed' },
-            { label: 'Avg Price/sqm', value: '₦38K', unit: '' },
-            { label: 'Refinery Status', value: 'Active', unit: '' },
-            { label: 'Corridor KM', value: '312.5', unit: 'km' }
-          ],
-          features: ['Refinery workforce housing demand model', 'Delta State flood risk mapping (annual/100yr)', 'Oil spill remediation zone exclusion layer', 'Marine logistics & barge terminal overlay']
-        },
-        {
-          id: 'yenagoa', name: 'Yenagoa Waterfront', state: 'Bayelsa',
-          lat: 4.9247, lng: 6.2642, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c',
-          desc: 'Bayelsa capital with significant riverfront and government-led redevelopment. Early-stage platform coverage — 180 plots live, growing rapidly as the corridor construction reaches this segment.',
-          stats: [
-            { label: 'Plot Inventory', value: '180', unit: 'listed' },
-            { label: 'Waterfront km', value: '12.4', unit: 'km' },
-            { label: 'Gov. Master Plan', value: 'Active', unit: '' },
-            { label: 'Avg Price/sqm', value: '₦14K', unit: '' }
-          ],
-          features: ['Government master plan overlay (state partnership)', 'Flood modelling (annual, seasonal, 100yr)', 'Riverfront development zoning', 'Community land-use consultation tracker']
-        },
-        {
-          id: 'ph', name: 'Port Harcourt Bypass', state: 'Rivers',
-          lat: 4.8156, lng: 7.0498, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3',
-          desc: 'Corridor bypasses PH proper but connects to the Eastern Niger Delta economic engine. Strategic interchange for freight, diaspora real estate, and the eastern tourism belt running into Akwa Ibom.',
-          stats: [
-            { label: 'Interchange Class', value: 'A+', unit: '' },
-            { label: 'Plot Inventory', value: '1,120', unit: 'listed' },
-            { label: 'Avg Price/sqm', value: '₦48K', unit: '' },
-            { label: 'Tourism Transit', value: 'High', unit: '' }
-          ],
-          features: ['Oil & Gas Free Zone adjacency analysis', 'Refined multi-family housing masterplans', 'Diaspora fractional investment pool', 'Corporate campus site selection tool']
-        },
-        {
-          id: 'uyo', name: 'Uyo Corridor Spur', state: 'Akwa Ibom',
-          lat: 5.0378, lng: 7.9128, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c',
-          desc: 'State capital with rapid infrastructure investment, new airport, and strong diaspora remittance flows. Ibom Deep Sea Port in planning stages — a secondary investment thesis on this segment.',
-          stats: [
-            { label: 'Plot Inventory', value: '760', unit: 'listed' },
-            { label: 'Airport Grade', value: 'Intl.', unit: '' },
-            { label: 'Avg Price/sqm', value: '₦22K', unit: '' },
-            { label: 'Remittance Rank', value: 'Top-5', unit: '' }
-          ],
-          features: ['Ibom Deep Sea Port impact modelling', 'Akwa Ibom diaspora investment community', 'Airport proximity zone analysis', 'State Land Bureau API integration']
-        },
-        {
-          id: 'ibeno', name: 'Ibeno Beach Zone', state: 'Akwa Ibom',
-          lat: 4.5600, lng: 7.9900, type: 'tourism', tag: 'TOURISM', color: '#8aa876',
-          desc: 'One of Africa\'s longest unbroken beaches. Massive underdeveloped tourism potential — platform hosts operator marketplace for guesthouses, boat tours and upcoming resort developments.',
-          stats: [
-            { label: 'Beach Length', value: '245', unit: 'km' },
-            { label: 'Operators Listed', value: '28', unit: '' },
-            { label: 'Resort Pipeline', value: '6', unit: 'projects' },
-            { label: 'VR Captures', value: '41', unit: 'sites' }
-          ],
-          features: ['360° immersive beach sessions (Insta360 Pro 2)', 'Local operator commission marketplace', 'Carbon credit mangrove MRV pilot zone', 'Multiplayer VR tour sessions for diaspora families']
-        },
-        {
-          id: 'tinapa', name: 'Tinapa & Marina Resort', state: 'Cross River',
-          lat: 5.0000, lng: 8.2900, type: 'tourism', tag: 'TOURISM', color: '#8aa876',
-          desc: 'Cross River\'s flagship tourism complex. Eastern gateway of the corridor with shopping, resort, marina and adjacency to the Calabar Carnival. Strong state government partnership opportunity.',
-          stats: [
-            { label: 'Visitor Capacity', value: '12K', unit: '/day' },
-            { label: 'Hotel Inventory', value: '2,400', unit: 'keys' },
-            { label: 'Marina Berths', value: '86', unit: 'slots' },
-            { label: 'Annual Carnival', value: 'Dec', unit: 'peak' }
-          ],
-          features: ['Calabar Carnival VR ticketing platform', 'State tourism board partnership dashboard', 'Marina slot booking integration', 'Cross-border shopping logistics tracker']
-        },
-        {
-          id: 'calabar', name: 'Calabar Terminus', state: 'Cross River',
-          lat: 4.9589, lng: 8.3269, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3',
-          desc: 'Eastern origin of the corridor. Historic port city and gateway to Obudu Mountain Resort, rainforest assets, and the Cross River tourism belt. Primary diaspora destination for Efik, Ibibio, and Cross River communities.',
-          stats: [
-            { label: 'Historic District', value: '412', unit: 'acres' },
-            { label: 'Tourism POIs', value: '62', unit: 'sites' },
-            { label: 'Plot Inventory', value: '540', unit: 'listed' },
-            { label: 'Corridor KM', value: '700.3', unit: 'km' }
-          ],
-          features: ['Obudu Mountain Resort VR side-quest module', 'Historic district heritage preservation layer', 'Cross-border tourism (Cameroon) routing', 'Efik / Ibibio diaspora investment community']
-        }
-      ];
-
-      // ============ CESIUM INIT ============
       Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwMWNhMWYyNi03YWJhLTRlZWEtYmEwNi0wMzFlZTFkNGEwYTMiLCJpZCI6NDIwMTg2LCJpYXQiOjE3NzY1ODU5OTl9.tm3bsS6OtVhDC9G96B6B-5mXkuZnnnUA1ATWavPZTr0';
 
-      let viewer: any, destEntities: any[] = [], routeEntity: any, plotEntities: any[] = [];
-      let activeDestId: string | null = null, flyAnimating = false;
+      let viewer: any;
+      let listingEntities: any[] = [];
+      let destEntities: any[] = [];
+      let routeEntity: any;
       let buildingsTileset: any = null;
+      let googleTileset: any = null;
+      let vrMode = false;
+      let flyAnimating = false;
+      let journeyMode = false;
+      let activeListingId: string | null = null;
+      let labelsVisible = true;
+      let filteredListings = [...LISTINGS];
       const times = ['Dawn', 'Midday', 'Dusk', 'Night'];
       let timeIdx = 1;
+
+      // ============ FILTER STATE ============
+      let filterType = 'ALL';
+      let filterState = 'ALL';
+      let filterVerified = false;
+      let filterFeatured = false;
 
       async function init() {
         try {
@@ -190,24 +232,19 @@ export default function MapPage() {
             fullscreenButton: false,
             selectionIndicator: false,
             infoBox: false,
-            terrain: Cesium.Terrain.fromWorldTerrain({
-              requestVertexNormals: true,
-              requestWaterMask: true
-            }),
+            terrain: Cesium.Terrain.fromWorldTerrain({ requestVertexNormals: true, requestWaterMask: true }),
             skyBox: false,
             skyAtmosphere: new Cesium.SkyAtmosphere()
           });
 
-          // Load Bing aerial imagery
           try {
             const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(2);
             viewer.imageryLayers.removeAll();
             viewer.imageryLayers.addImageryProvider(imageryProvider);
           } catch (e: any) {
-            console.warn('Bing imagery unavailable, falling back:', e.message);
+            console.warn('Bing imagery unavailable:', e.message);
           }
 
-          // Atmosphere tuning
           viewer.scene.globe.enableLighting = false;
           viewer.scene.fog.enabled = true;
           viewer.scene.fog.density = 0.00012;
@@ -216,279 +253,547 @@ export default function MapPage() {
           viewer.scene.skyAtmosphere.brightnessShift = -0.1;
           viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0e12');
 
-          // Initial camera
           viewer.camera.setView({
             destination: Cesium.Cartesian3.fromDegrees(5.8, 4.2, 1100000),
-            orientation: {
-              heading: Cesium.Math.toRadians(0),
-              pitch: Cesium.Math.toRadians(-55),
-              roll: 0
-            }
+            orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-55), roll: 0 }
           });
 
+          plotListings();
           plotDestinations();
           plotRoute();
-          buildDestList();
+          buildListingsSidebar();
+          buildFilterBar();
           startClock();
+          wireClickHandler();
 
           setTimeout(() => {
             const loading = document.getElementById('cesium-loading');
             if (loading) loading.classList.add('hide');
             setTimeout(() => cameraOverview(), 400);
-          }, 2000);
+          }, 2200);
 
         } catch (err) {
           console.error('Cesium init failed:', err);
           const loading = document.getElementById('cesium-loading');
-          if (loading) loading.innerHTML = '<div class="loading-text">Unable to load terrain</div><div class="loading-sub">Check network · Verify token at cesium.com</div>';
+          if (loading) loading.innerHTML = '<div class="loading-text">Unable to load terrain</div><div class="loading-sub">Check network · Verify token</div>';
         }
       }
 
-      function plotDestinations() {
-        destinations.forEach(d => {
+      // ============ LISTING PINS (A1 + A2) ============
+      function plotListings() {
+        listingEntities.forEach(e => viewer.entities.remove(e));
+        listingEntities = [];
+
+        filteredListings.forEach(p => {
+          const color = TYPE_COLORS[p.type] || '#d4a24c';
+          const typeLabel = TYPE_LABELS[p.type] || p.type;
+
+          // Main billboard pin
           const entity = viewer.entities.add({
-            id: `dest-${d.id}`,
-            position: Cesium.Cartesian3.fromDegrees(d.lng, d.lat, 50),
-            point: {
-              pixelSize: 14,
-              color: Cesium.Color.fromCssColorString(d.color),
-              outlineColor: Cesium.Color.WHITE,
-              outlineWidth: 2,
+            id: `listing-${p.id}`,
+            position: Cesium.Cartesian3.fromDegrees(p.lng, p.lat, 80),
+            billboard: {
+              image: createPinCanvas(color, typeLabel),
+              width: 52,
+              height: 52,
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
               heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-              disableDepthTestDistance: Number.POSITIVE_INFINITY
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              scaleByDistance: new Cesium.NearFarScalar(5000, 1.4, 1500000, 0.6)
             },
             label: {
-              text: d.name,
-              font: '12px "Inter Tight", sans-serif',
+              text: p.price,
+              font: '600 11px "Inter Tight", sans-serif',
               fillColor: Cesium.Color.WHITE,
               outlineColor: Cesium.Color.fromCssColorString('#0a0e12'),
               outlineWidth: 3,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              pixelOffset: new Cesium.Cartesian2(0, -26),
+              pixelOffset: new Cesium.Cartesian2(0, -58),
               heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
               showBackground: true,
-              backgroundColor: Cesium.Color.fromCssColorString('rgba(10,14,18,0.85)'),
-              backgroundPadding: new Cesium.Cartesian2(7, 4),
-              scaleByDistance: new Cesium.NearFarScalar(100000, 1.0, 3000000, 0.5)
+              backgroundColor: Cesium.Color.fromCssColorString('rgba(10,14,18,0.88)'),
+              backgroundPadding: new Cesium.Cartesian2(6, 3),
+              // Zoom-dependent: only show price label when zoomed in
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 400000),
+              show: labelsVisible
+            },
+            listingData: p
+          });
+          listingEntities.push(entity);
+        });
+
+        updateListingCount();
+      }
+
+      function createPinCanvas(color: string, label: string): HTMLCanvasElement {
+        const canvas = document.createElement('canvas');
+        canvas.width = 52;
+        canvas.height = 52;
+        const ctx = canvas.getContext('2d')!;
+
+        // Outer glow ring
+        ctx.beginPath();
+        ctx.arc(26, 26, 24, 0, Math.PI * 2);
+        ctx.fillStyle = color + '33';
+        ctx.fill();
+
+        // Main circle
+        ctx.beginPath();
+        ctx.arc(26, 26, 18, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // White border
+        ctx.beginPath();
+        ctx.arc(26, 26, 18, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Type label text
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${label.length > 4 ? '7' : '8'}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, 26, 26);
+
+        return canvas;
+      }
+
+      // ============ DESTINATION AMBIENT MARKERS (A5) ============
+      function plotDestinations() {
+        DESTINATIONS.forEach(d => {
+          const entity = viewer.entities.add({
+            id: `dest-${d.id}`,
+            position: Cesium.Cartesian3.fromDegrees(d.lng, d.lat, 30),
+            point: {
+              pixelSize: 8,
+              color: Cesium.Color.fromCssColorString(d.color).withAlpha(0.5),
+              outlineColor: Cesium.Color.WHITE.withAlpha(0.3),
+              outlineWidth: 1,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              // Only visible at high altitude (ambient context)
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(200000, Number.POSITIVE_INFINITY)
+            },
+            label: {
+              text: d.name,
+              font: '10px "Inter Tight", sans-serif',
+              fillColor: Cesium.Color.WHITE.withAlpha(0.6),
+              outlineColor: Cesium.Color.fromCssColorString('#0a0e12'),
+              outlineWidth: 2,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              pixelOffset: new Cesium.Cartesian2(0, -18),
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              // Only show destination labels at very high altitude
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(400000, Number.POSITIVE_INFINITY),
+              scaleByDistance: new Cesium.NearFarScalar(400000, 0.8, 2000000, 0.4)
             },
             destData: d
           });
           destEntities.push(entity);
         });
-
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        handler.setInputAction((movement: any) => {
-          const picked = viewer.scene.pick(movement.position);
-          if (Cesium.defined(picked) && picked.id) {
-            if (picked.id.destData) {
-              focusDestination(picked.id.destData);
-            } else if (picked.id.plotData) {
-              showPlotInfo(picked.id.plotData);
-            }
-          }
-        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
       }
 
       function plotRoute() {
-        const positions = destinations.map(d => Cesium.Cartesian3.fromDegrees(d.lng, d.lat, 20));
+        const positions = DESTINATIONS.map(d => Cesium.Cartesian3.fromDegrees(d.lng, d.lat, 20));
         routeEntity = viewer.entities.add({
           polyline: {
             positions,
-            width: 3,
+            width: 2.5,
             material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.3,
+              glowPower: 0.25,
               taperPower: 0.9,
-              color: Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.9)
+              color: Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.7)
             }),
             clampToGround: true
           }
         });
       }
 
-      function loadPlotLayer(dest: any) {
-        clearPlotLayer();
-        const cols = 6, rows = 4;
-        const spacing = 0.004;
-        const startLng = dest.lng - (cols * spacing) / 2;
-        const startLat = dest.lat - (rows * spacing) / 2;
-        let plotNum = 1;
-        for (let i = 0; i < rows; i++) {
-          for (let j = 0; j < cols; j++) {
-            const lng = startLng + j * spacing;
-            const lat = startLat + i * spacing;
-            const w = spacing * 0.82;
-            const isVerified = Math.random() > 0.22;
-            const priceBase = parseInt((dest.stats[1]?.value || '50').replace(/[^0-9]/g, '')) || 50;
-            const price = (priceBase * (0.8 + Math.random() * 0.4)).toFixed(0);
-            const plotData = {
-              num: plotNum++,
-              dest: dest.name,
-              lat: lat + w / 2,
-              lng: lng + w / 2,
-              size: `${(450 + Math.floor(Math.random() * 550))} sqm`,
-              price: `₦${price}K/sqm`,
-              verified: isVerified,
-              status: isVerified ? 'Verified · Available' : 'Pending verification'
-            };
-            const color = isVerified
-              ? Cesium.Color.fromCssColorString('#c96a3f').withAlpha(0.55)
-              : Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.35);
-            const entity = viewer.entities.add({
-              polygon: {
-                hierarchy: Cesium.Cartesian3.fromDegreesArray([
-                  lng, lat, lng + w, lat, lng + w, lat + w, lng, lat + w
-                ]),
-                material: color,
-                outline: true,
-                outlineColor: isVerified
-                  ? Cesium.Color.fromCssColorString('#e08660').withAlpha(0.9)
-                  : Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.6),
-                outlineWidth: 1,
-                height: 0,
-                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
-              },
-              plotData
-            });
-            plotEntities.push(entity);
+      // ============ CLICK HANDLER ============
+      function wireClickHandler() {
+        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        handler.setInputAction((movement: any) => {
+          const picked = viewer.scene.pick(movement.position);
+          if (Cesium.defined(picked) && picked.id) {
+            if (picked.id.listingData) {
+              openListingCard(picked.id.listingData);
+            } else if (picked.id.destData) {
+              // Destination tap: show context info, don't open full listing card
+              showDestinationToast(picked.id.destData);
+            }
           }
-        }
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
       }
 
-      function clearPlotLayer() {
-        plotEntities.forEach(e => viewer.entities.remove(e));
-        plotEntities = [];
-      }
+      // ============ LISTING CARD PANEL (A3 + A4 + A7) ============
+      function openListingCard(p: any) {
+        activeListingId = p.id;
 
-      function showPlotInfo(plot: any) {
-        const toast = document.getElementById('plotToast');
-        const toastLabel = document.getElementById('toastLabel');
-        const toastTitle = document.getElementById('toastTitle');
-        if (toast && toastLabel && toastTitle) {
-          toastLabel.textContent = `Plot #${plot.num} · ${plot.size} · ${plot.price} · ${plot.status}`;
-          toastTitle.textContent = `${plot.dest} · ${plot.lat.toFixed(4)}°N, ${plot.lng.toFixed(4)}°E`;
-          toast.classList.add('show');
-          clearTimeout((window as any)._plotTimer);
-          (window as any)._plotTimer = setTimeout(() => toast.classList.remove('show'), 4500);
-        }
-      }
-
-      function focusDestination(d: any) {
-        activeDestId = d.id;
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(d.lng, d.lat - 0.05, 8000),
-          orientation: {
-            heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-42),
-            roll: 0
-          },
-          duration: 2.5
-        });
-        openDetail(d);
-        document.querySelectorAll('.dest-item').forEach(el => el.classList.remove('active'));
-        const activeEl = document.querySelector(`[data-id="${d.id}"]`);
+        // Highlight active in sidebar
+        document.querySelectorAll('.listing-item').forEach(el => el.classList.remove('active'));
+        const activeEl = document.querySelector(`[data-listing-id="${p.id}"]`);
         if (activeEl) activeEl.classList.add('active');
-        const plotsToggle = document.querySelectorAll('.layer-toggle')[2]?.querySelector('.toggle');
-        if (plotsToggle?.classList.contains('on')) loadPlotLayer(d);
-      }
 
-      function openDetail(d: any) {
-        const panel = document.getElementById('detailPanel');
-        const detailState = document.getElementById('detailState');
-        const detailName = document.getElementById('detailName');
-        const detailDesc = document.getElementById('detailDesc');
-        const detailStats = document.getElementById('detailStats');
-        const detailFeatures = document.getElementById('detailFeatures');
-        const detailCoords = document.getElementById('detailCoords');
-        const detailHero = document.getElementById('detailHero');
+        const panel = document.getElementById('listingPanel');
         if (!panel) return;
-        if (detailState) detailState.textContent = `${d.state} State · ${d.tag}`;
-        if (detailName) detailName.textContent = d.name;
-        if (detailDesc) detailDesc.textContent = d.desc;
-        if (detailCoords) detailCoords.textContent = `${d.lat.toFixed(4)}°N, ${d.lng.toFixed(4)}°E`;
-        if (detailHero) detailHero.style.background = `linear-gradient(135deg, ${d.color}22 0%, #11161c 100%)`;
-        if (detailStats) {
-          detailStats.innerHTML = d.stats.map((s: any) => `
-            <div class="stat-cell">
-              <div class="stat-label">${s.label}</div>
-              <div class="stat-value">${s.value}<span class="unit">${s.unit}</span></div>
+
+        const typeColor = TYPE_COLORS[p.type] || '#d4a24c';
+        const hasVirtualTour = !!p.virtualTourUrl;
+        const bedroomsBath = p.bedrooms > 0
+          ? `<span class="spec-item">🛏 ${p.bedrooms} bed</span><span class="spec-item">🚿 ${p.bathrooms} bath</span>`
+          : '';
+        const areaSpec = `<span class="spec-item">📐 ${p.areaSqm.toLocaleString()} sqm</span>`;
+
+        const riskColor = (score: number) => score < 25 ? '#6fae7a' : score < 45 ? '#d4a24c' : '#e85a4f';
+
+        const matterportPreview = hasVirtualTour ? `
+          <div class="matterport-preview" id="mpPreview-${p.id}">
+            <div class="mp-thumb" onclick="expandMatterport('${p.virtualTourUrl}', '${p.id}')">
+              <iframe
+                src="${p.virtualTourUrl}&play=1&autoplay=1&mute=1"
+                allow="autoplay; fullscreen; web-share; xr-spatial-tracking"
+                style="width:100%;height:100%;border:0;pointer-events:none;"
+                loading="lazy"
+              ></iframe>
+              <div class="mp-overlay">
+                <div class="mp-play-btn">▶ LAUNCH 3D TOUR</div>
+              </div>
             </div>
-          `).join('');
-        }
-        if (detailFeatures) {
-          detailFeatures.innerHTML = d.features.map((f: string) => `<li>${f}</li>`).join('');
-        }
+          </div>
+        ` : '';
+
+        panel.innerHTML = `
+          <div class="lp-header" style="border-left: 3px solid ${typeColor}">
+            <div class="lp-close" onclick="closeListingCard()">×</div>
+            <div class="lp-type-chip" style="background:${typeColor}22;color:${typeColor}">${p.type.replace('_', ' ')}</div>
+            ${p.titleStatus === 'VERIFIED' ? '<div class="lp-verified">✓ VERIFIED TITLE</div>' : '<div class="lp-pending">⏳ TITLE PENDING</div>'}
+            ${p.featured ? '<div class="lp-featured">★ FEATURED</div>' : ''}
+          </div>
+          <div class="lp-hero" style="background-image:url('${p.heroImage}')">
+            <div class="lp-hero-overlay"></div>
+            <div class="lp-yoy">+${p.yoy}% YoY</div>
+          </div>
+          <div class="lp-body">
+            <div class="lp-location">${p.destinationName} · ${p.state} State</div>
+            <div class="lp-title">${p.title}</div>
+            <div class="lp-specs">${bedroomsBath}${areaSpec}</div>
+            <div class="lp-price-row">
+              <div class="lp-price">${p.price}</div>
+              <div class="lp-price-sqm">${p.pricePerSqm}</div>
+            </div>
+            <div class="lp-risk-row">
+              <div class="risk-item">
+                <div class="risk-label">Flood Risk</div>
+                <div class="risk-bar"><div class="risk-fill" style="width:${p.floodRisk}%;background:${riskColor(p.floodRisk)}"></div></div>
+                <div class="risk-score" style="color:${riskColor(p.floodRisk)}">${p.floodRisk}/100</div>
+              </div>
+              <div class="risk-item">
+                <div class="risk-label">Dispute Risk</div>
+                <div class="risk-bar"><div class="risk-fill" style="width:${p.disputeRisk}%;background:${riskColor(p.disputeRisk)}"></div></div>
+                <div class="risk-score" style="color:${riskColor(p.disputeRisk)}">${p.disputeRisk}/100</div>
+              </div>
+            </div>
+            <div class="lp-agent">
+              <div class="agent-avatar">${p.agentName.split(' ').map((n: string) => n[0]).join('')}</div>
+              <div class="agent-info">
+                <div class="agent-name">${p.agentName}</div>
+                <div class="agent-badge">${p.agentVerified ? '✓ Verified Agent' : 'Agent'}</div>
+              </div>
+            </div>
+            ${matterportPreview}
+            <div class="lp-actions">
+              <button class="lp-btn-primary" onclick="flyToListing('${p.id}')">✈ FLY TO THIS LISTING</button>
+              <a href="/properties/${p.slug}" class="lp-btn-secondary" target="_blank">VIEW FULL LISTING →</a>
+            </div>
+          </div>
+        `;
         panel.classList.add('open');
       }
 
-      function buildDestList() {
-        const list = document.getElementById('destList');
-        if (!list) return;
-        list.innerHTML = destinations.map((d, i) => `
-          <div class="dest-item" data-id="${d.id}" data-index="${i}">
-            <div class="dest-num">${String(i + 1).padStart(2, '0')}</div>
-            <div class="dest-info">
-              <div class="dest-name">${d.name}</div>
-              <div class="dest-state">${d.state}</div>
-            </div>
-            <div class="dest-tag tag-${d.type}">${d.tag}</div>
-          </div>
-        `).join('');
-        list.querySelectorAll('.dest-item').forEach(el => {
-          el.addEventListener('click', () => {
-            const idx = parseInt((el as HTMLElement).dataset.index || '0');
-            focusDestination(destinations[idx]);
-          });
-        });
-        const destCount = document.getElementById('destCount');
-        if (destCount) destCount.textContent = String(destinations.length);
+      function closeListingCard() {
+        const panel = document.getElementById('listingPanel');
+        if (panel) panel.classList.remove('open');
+        activeListingId = null;
+        document.querySelectorAll('.listing-item').forEach(el => el.classList.remove('active'));
       }
 
+      function expandMatterport(url: string, id: string) {
+        const overlay = document.getElementById('matterportOverlay');
+        const iframe = document.getElementById('matterportIframe') as HTMLIFrameElement;
+        if (overlay && iframe) {
+          iframe.src = `${url}&play=1`;
+          overlay.classList.add('open');
+        }
+      }
+
+      function closeMatterport() {
+        const overlay = document.getElementById('matterportOverlay');
+        const iframe = document.getElementById('matterportIframe') as HTMLIFrameElement;
+        if (overlay) overlay.classList.remove('open');
+        if (iframe) iframe.src = '';
+      }
+
+      function showDestinationToast(d: any) {
+        const toast = document.getElementById('destToast');
+        const toastText = document.getElementById('destToastText');
+        if (toast && toastText) {
+          const count = LISTINGS.filter(p => p.destinationId === d.id).length;
+          toastText.textContent = `${d.name} · ${d.state} · ${count} listing${count !== 1 ? 's' : ''} · ${d.corridorKm}km along corridor`;
+          toast.classList.add('show');
+          clearTimeout((window as any)._destTimer);
+          (window as any)._destTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+        }
+      }
+
+      // ============ SIDEBAR (listings list) ============
+      function buildListingsSidebar() {
+        const list = document.getElementById('listingsList');
+        if (!list) return;
+        list.innerHTML = filteredListings.map(p => {
+          const typeColor = TYPE_COLORS[p.type] || '#d4a24c';
+          return `
+            <div class="listing-item" data-listing-id="${p.id}" onclick="sidebarClickListing('${p.id}')">
+              <div class="li-img" style="background-image:url('${p.heroImage}')"></div>
+              <div class="li-body">
+                <div class="li-type" style="color:${typeColor}">${p.type.replace('_', ' ')}</div>
+                <div class="li-title">${p.title}</div>
+                <div class="li-loc">${p.destinationName}</div>
+                <div class="li-price-row">
+                  <span class="li-price">${p.price}</span>
+                  ${p.yoy > 0 ? `<span class="li-yoy">+${p.yoy}%</span>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        updateListingCount();
+      }
+
+      function sidebarClickListing(id: string) {
+        const p = LISTINGS.find(x => x.id === id);
+        if (!p) return;
+        openListingCard(p);
+        flyToListing(id, false);
+      }
+
+      function flyToListing(id: string, fromButton = true) {
+        const p = LISTINGS.find(x => x.id === id);
+        if (!p) return;
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(p.lng, p.lat - 0.04, 6000),
+          orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
+          duration: fromButton ? 3.5 : 2.5
+        });
+      }
+
+      // ============ FILTER BAR (A6) ============
+      function buildFilterBar() {
+        const bar = document.getElementById('filterBar');
+        if (!bar) return;
+
+        const states = ['ALL', ...Array.from(new Set(LISTINGS.map(p => p.state))).sort()];
+        const types = ['ALL', 'APARTMENT', 'HOUSE', 'LAND_ONLY', 'COMMERCIAL', 'HOSPITALITY'];
+
+        bar.innerHTML = `
+          <div class="filter-group">
+            <label class="filter-label">TYPE</label>
+            <div class="filter-pills" id="typePills">
+              ${types.map(t => `<button class="filter-pill ${t === 'ALL' ? 'active' : ''}" onclick="setTypeFilter('${t}')">${t === 'ALL' ? 'All' : t.replace('_', ' ')}</button>`).join('')}
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">STATE</label>
+            <select class="filter-select" onchange="setStateFilter(this.value)">
+              ${states.map(s => `<option value="${s}">${s === 'ALL' ? 'All States' : s}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group filter-toggles">
+            <label class="filter-toggle-item">
+              <input type="checkbox" id="verifiedFilter" onchange="setVerifiedFilter(this.checked)">
+              <span>Verified Title Only</span>
+            </label>
+            <label class="filter-toggle-item">
+              <input type="checkbox" id="featuredFilter" onchange="setFeaturedFilter(this.checked)">
+              <span>Featured Only</span>
+            </label>
+          </div>
+        `;
+      }
+
+      function applyFilters() {
+        filteredListings = LISTINGS.filter(p => {
+          if (filterType !== 'ALL' && p.type !== filterType) return false;
+          if (filterState !== 'ALL' && p.state !== filterState) return false;
+          if (filterVerified && p.titleStatus !== 'VERIFIED') return false;
+          if (filterFeatured && !p.featured) return false;
+          return true;
+        });
+        plotListings();
+        buildListingsSidebar();
+      }
+
+      function setTypeFilter(type: string) {
+        filterType = type;
+        document.querySelectorAll('#typePills .filter-pill').forEach(el => {
+          el.classList.toggle('active', (el as HTMLElement).textContent?.replace(' ', '_').toUpperCase() === type || (type === 'ALL' && (el as HTMLElement).textContent === 'All'));
+        });
+        applyFilters();
+      }
+
+      function setStateFilter(state: string) { filterState = state; applyFilters(); }
+      function setVerifiedFilter(val: boolean) { filterVerified = val; applyFilters(); }
+      function setFeaturedFilter(val: boolean) { filterFeatured = val; applyFilters(); }
+
+      function updateListingCount() {
+        const el = document.getElementById('listingCount');
+        if (el) el.textContent = `${filteredListings.length} listing${filteredListings.length !== 1 ? 's' : ''} visible`;
+      }
+
+      // ============ FLYTHROUGH MODES (S1a, S1b, S1c) ============
       function cameraOverview() {
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(5.8, 4.2, 1000000),
-          orientation: {
-            heading: Cesium.Math.toRadians(10),
-            pitch: Cesium.Math.toRadians(-48),
-            roll: 0
-          },
+          orientation: { heading: Cesium.Math.toRadians(10), pitch: Cesium.Math.toRadians(-48), roll: 0 },
           duration: 3
         });
-        closeDetail();
+        closeListingCard();
       }
 
-      async function flyCorridor() {
-        if (flyAnimating) {
-          flyAnimating = false;
-          return;
-        }
+      // S1a: Express Fly — non-stop cinematic corridor flyover
+      async function expressFly() {
+        if (flyAnimating) { flyAnimating = false; return; }
         flyAnimating = true;
+        closeListingCard();
         const btn = document.getElementById('flyBtn');
-        if (btn) btn.classList.add('active');
-        for (let i = 0; i < destinations.length; i++) {
-          if (!flyAnimating) break;
-          const d = destinations[i];
-          await new Promise(resolve => {
-            viewer.camera.flyTo({
-              destination: Cesium.Cartesian3.fromDegrees(d.lng, d.lat - 0.08, 14000),
-              orientation: {
-                heading: Cesium.Math.toRadians(75),
-                pitch: Cesium.Math.toRadians(-28),
-                roll: 0
-              },
-              duration: 3.2,
-              complete: resolve,
-              cancel: resolve
-            });
+        if (btn) { btn.textContent = '⏹ STOP'; btn.classList.add('active'); }
+
+        // Lift to high altitude and fly the corridor west→east
+        await new Promise(resolve => {
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(3.2, 5.5, 900000),
+            orientation: { heading: Cesium.Math.toRadians(85), pitch: Cesium.Math.toRadians(-32), roll: 0 },
+            duration: 3,
+            complete: resolve, cancel: resolve
           });
-          if (!flyAnimating) break;
-          await new Promise(r => setTimeout(r, 700));
-        }
+        });
+
+        if (!flyAnimating) { resetFlyBtn(); return; }
+
+        // Sweep east along the corridor
+        await new Promise(resolve => {
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(8.5, 4.8, 700000),
+            orientation: { heading: Cesium.Math.toRadians(95), pitch: Cesium.Math.toRadians(-28), roll: 0 },
+            duration: 12,
+            complete: resolve, cancel: resolve
+          });
+        });
+
         flyAnimating = false;
-        if (btn) btn.classList.remove('active');
+        resetFlyBtn();
         cameraOverview();
       }
 
+      // S1b: Fly To — direct flight to any listing (also used from listing card button)
+      // Already implemented above as flyToListing()
+
+      // S1c: Journey Mode — pick departure + destination, fly coastal route
+      function openJourneyPlanner() {
+        const panel = document.getElementById('journeyPanel');
+        if (panel) panel.classList.toggle('open');
+      }
+
+      function startJourney() {
+        const fromEl = document.getElementById('journeyFrom') as HTMLSelectElement;
+        const toEl = document.getElementById('journeyTo') as HTMLSelectElement;
+        if (!fromEl || !toEl) return;
+
+        const fromId = fromEl.value;
+        const toId = toEl.value;
+        if (!fromId || !toId || fromId === toId) return;
+
+        const panel = document.getElementById('journeyPanel');
+        if (panel) panel.classList.remove('open');
+
+        // Find departure destination
+        const fromDest = DESTINATIONS.find(d => d.id === fromId);
+        const toListing = LISTINGS.find(p => p.id === toId);
+        if (!fromDest || !toListing) return;
+
+        // Find listings along the route between from and to
+        const fromKm = fromDest.corridorKm;
+        const toDest = DESTINATIONS.find(d => d.id === toListing.destinationId);
+        const toKm = toDest?.corridorKm ?? 700;
+        const minKm = Math.min(fromKm, toKm);
+        const maxKm = Math.max(fromKm, toKm);
+
+        const waypoints = LISTINGS.filter(p => {
+          const destKm = DESTINATIONS.find(d => d.id === p.destinationId)?.corridorKm ?? 0;
+          return destKm >= minKm && destKm <= maxKm && p.id !== toListing.id;
+        });
+
+        runJourneyFlight(fromDest, waypoints, toListing);
+      }
+
+      async function runJourneyFlight(from: any, waypoints: any[], destination: any) {
+        if (flyAnimating) return;
+        flyAnimating = true;
+        journeyMode = true;
+        closeListingCard();
+
+        // Start from departure destination
+        await new Promise(resolve => {
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(from.lng, from.lat - 0.06, 12000),
+            orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-35), roll: 0 },
+            duration: 2.5,
+            complete: resolve, cancel: resolve
+          });
+        });
+
+        // Pause at each waypoint listing along the route
+        for (const p of waypoints) {
+          if (!flyAnimating) break;
+          await new Promise(resolve => {
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(p.lng, p.lat - 0.04, 8000),
+              orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
+              duration: 3,
+              complete: resolve, cancel: resolve
+            });
+          });
+          if (!flyAnimating) break;
+          openListingCard(p);
+          await new Promise(r => setTimeout(r, 2500));
+        }
+
+        // Arrive at destination listing
+        if (flyAnimating) {
+          await new Promise(resolve => {
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(destination.lng, destination.lat - 0.04, 5000),
+              orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
+              duration: 3.5,
+              complete: resolve, cancel: resolve
+            });
+          });
+          openListingCard(destination);
+        }
+
+        flyAnimating = false;
+        journeyMode = false;
+      }
+
+      function resetFlyBtn() {
+        const btn = document.getElementById('flyBtn');
+        if (btn) { btn.textContent = '✈ FLY CORRIDOR'; btn.classList.remove('active'); }
+      }
+
+      // ============ LAYERS ============
       function toggleLayersPanel() {
         const p = document.getElementById('layersPanel');
         const b = document.getElementById('layerBtn');
@@ -496,27 +801,106 @@ export default function MapPage() {
         if (b) b.classList.toggle('active');
       }
 
-      function toggleLayer(el: HTMLElement, layer: string) {
-        const toggle = el.querySelector('.toggle');
-        if (!toggle) return;
-        toggle.classList.toggle('on');
-        const isOn = toggle.classList.contains('on');
-        if (layer === 'destinations') {
-          destEntities.forEach(e => { e.show = isOn; });
-        } else if (layer === 'route') {
-          if (routeEntity) routeEntity.show = isOn;
-        } else if (layer === 'labels') {
-          destEntities.forEach(e => { if (e.label) e.label.show = isOn; });
-        } else if (layer === 'plots') {
-          if (isOn) {
-            const d = activeDestId ? destinations.find(x => x.id === activeDestId) : destinations[1];
-            if (d) { loadPlotLayer(d); if (!activeDestId) focusDestination(d); }
-          } else {
-            clearPlotLayer();
+      function toggleListingPins(isOn: boolean) {
+        listingEntities.forEach(e => { e.show = isOn; });
+      }
+
+      function toggleRoute(isOn: boolean) {
+        if (routeEntity) routeEntity.show = isOn;
+      }
+
+      function toggleDestMarkers(isOn: boolean) {
+        destEntities.forEach(e => { e.show = isOn; });
+      }
+
+      function toggleLabels(isOn: boolean) {
+        labelsVisible = isOn;
+        listingEntities.forEach(e => { if (e.label) e.label.show = isOn; });
+        destEntities.forEach(e => { if (e.label) e.label.show = isOn; });
+      }
+
+      // ============ VR MODE (S2b + S2c) ============
+      async function toggleVR() {
+        const btn = document.getElementById('vrBtn');
+        if (vrMode) {
+          // Exit VR: remove Google tiles, restore Bing imagery
+          if (googleTileset) {
+            viewer.scene.primitives.remove(googleTileset);
+            googleTileset = null;
+          }
+          try {
+            const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(2);
+            viewer.imageryLayers.removeAll();
+            viewer.imageryLayers.addImageryProvider(imageryProvider);
+          } catch (e) { /* fallback */ }
+          vrMode = false;
+          if (btn) { btn.textContent = 'VR'; btn.classList.remove('active'); }
+          showToast('Aerial view restored');
+        } else {
+          // Enter VR: load Google Photorealistic 3D Tiles
+          try {
+            if (btn) btn.classList.add('active');
+            googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
+            viewer.scene.primitives.add(googleTileset);
+            viewer.imageryLayers.removeAll();
+            vrMode = true;
+            if (btn) btn.textContent = '↩ EXIT VR';
+            showToast('Google Photorealistic 3D Tiles active · Zoom in for ground-level view');
+            // Drop camera to ground level at current listing or overview
+            if (activeListingId) {
+              const p = LISTINGS.find(x => x.id === activeListingId);
+              if (p) {
+                viewer.camera.flyTo({
+                  destination: Cesium.Cartesian3.fromDegrees(p.lng, p.lat - 0.001, 120),
+                  orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-15), roll: 0 },
+                  duration: 3
+                });
+              }
+            }
+          } catch (e: any) {
+            console.error('Google 3D Tiles failed:', e);
+            vrMode = false;
+            if (btn) btn.classList.remove('active');
+            showToast('VR mode unavailable · Google 3D Tiles API key required');
           }
         }
       }
 
+      // ============ BUILDINGS (OSM + Labels) ============
+      async function toggleBuildings() {
+        const btn = document.getElementById('bldgBtn');
+        if (buildingsTileset) {
+          viewer.scene.primitives.remove(buildingsTileset);
+          buildingsTileset = null;
+          if (btn) btn.classList.remove('active');
+          return;
+        }
+        try {
+          if (btn) btn.classList.add('active');
+          buildingsTileset = await Cesium.createOsmBuildingsAsync();
+          // Style buildings with name labels visible on zoom
+          buildingsTileset.style = new Cesium.Cesium3DTileStyle({
+            labelText: "${feature['name']}",
+            labelFont: '"10px Inter Tight, sans-serif"',
+            labelColor: 'color("white", 0.85)',
+            labelOutlineColor: 'color("black", 0.9)',
+            labelOutlineWidth: 2,
+            labelStyle: Cesium.LabelStyle ? '2' : '2',
+            labelPixelOffset: 'vec2(0, -20)',
+            labelBackgroundColor: 'color("#0a0e12", 0.8)',
+            labelBackgroundPadding: 'vec2(5, 3)',
+            show: true,
+            color: 'color("#1a2029", 0.85)'
+          });
+          viewer.scene.primitives.add(buildingsTileset);
+          showToast('3D Buildings active · Business & estate labels visible when zoomed in');
+        } catch (e) {
+          console.error('OSM Buildings failed:', e);
+          if (btn) btn.classList.remove('active');
+        }
+      }
+
+      // ============ TIME OF DAY ============
       function cycleTime() {
         timeIdx = (timeIdx + 1) % times.length;
         const timeLabel = document.getElementById('timeLabel');
@@ -538,46 +922,7 @@ export default function MapPage() {
         }
       }
 
-      async function toggleBuildings() {
-        const btn = document.getElementById('bldgBtn');
-        if (buildingsTileset) {
-          viewer.scene.primitives.remove(buildingsTileset);
-          buildingsTileset = null;
-          if (btn) btn.classList.remove('active');
-          return;
-        }
-        try {
-          if (btn) btn.classList.add('active');
-          buildingsTileset = await Cesium.createOsmBuildingsAsync();
-          viewer.scene.primitives.add(buildingsTileset);
-        } catch (e) {
-          console.error('OSM Buildings load failed:', e);
-          if (btn) btn.classList.remove('active');
-        }
-      }
-
-      function showPlotsHere() {
-        const plotsToggle = document.querySelectorAll('.layer-toggle')[2]?.querySelector('.toggle');
-        if (plotsToggle) plotsToggle.classList.add('on');
-        const d = activeDestId ? destinations.find(x => x.id === activeDestId) : destinations[1];
-        if (d) loadPlotLayer(d);
-        const toast = document.getElementById('plotToast');
-        const toastLabel = document.getElementById('toastLabel');
-        const toastTitle = document.getElementById('toastTitle');
-        if (toast && toastLabel && toastTitle && d) {
-          toastLabel.textContent = `Cadastral layer · 24 plots loaded · ${d.name}`;
-          toastTitle.textContent = 'Click any plot footprint on the globe';
-          toast.classList.add('show');
-          clearTimeout((window as any)._plotTimer);
-          (window as any)._plotTimer = setTimeout(() => toast.classList.remove('show'), 4500);
-        }
-      }
-
-      function closeDetail() {
-        const panel = document.getElementById('detailPanel');
-        if (panel) panel.classList.remove('open');
-      }
-
+      // ============ CLOCK ============
       function startClock() {
         const clock = document.getElementById('cesium-clock');
         setInterval(() => {
@@ -589,33 +934,61 @@ export default function MapPage() {
         }, 1000);
       }
 
-      // Expose functions to window for inline onclick handlers
+      // ============ TOAST ============
+      function showToast(msg: string) {
+        const toast = document.getElementById('destToast');
+        const toastText = document.getElementById('destToastText');
+        if (toast && toastText) {
+          toastText.textContent = msg;
+          toast.classList.add('show');
+          clearTimeout((window as any)._toastTimer);
+          (window as any)._toastTimer = setTimeout(() => toast.classList.remove('show'), 4500);
+        }
+      }
+
+      // ============ EXPOSE TO WINDOW ============
       (window as any).cameraOverview = cameraOverview;
-      (window as any).flyCorridor = flyCorridor;
+      (window as any).expressFly = expressFly;
+      (window as any).openJourneyPlanner = openJourneyPlanner;
+      (window as any).startJourney = startJourney;
       (window as any).toggleLayersPanel = toggleLayersPanel;
-      (window as any).toggleLayer = toggleLayer;
+      (window as any).toggleListingPins = toggleListingPins;
+      (window as any).toggleRoute = toggleRoute;
+      (window as any).toggleDestMarkers = toggleDestMarkers;
+      (window as any).toggleLabels = toggleLabels;
       (window as any).cycleTime = cycleTime;
       (window as any).toggleBuildings = toggleBuildings;
-      (window as any).showPlotsHere = showPlotsHere;
-      (window as any).closeDetail = closeDetail;
+      (window as any).toggleVR = toggleVR;
+      (window as any).closeListingCard = closeListingCard;
+      (window as any).flyToListing = flyToListing;
+      (window as any).sidebarClickListing = sidebarClickListing;
+      (window as any).expandMatterport = expandMatterport;
+      (window as any).closeMatterport = closeMatterport;
+      (window as any).setTypeFilter = setTypeFilter;
+      (window as any).setStateFilter = setStateFilter;
+      (window as any).setVerifiedFilter = setVerifiedFilter;
+      (window as any).setFeaturedFilter = setFeaturedFilter;
 
       init();
     }
 
     return () => {
-      // Cleanup on unmount
-      const cesiumViewer = (window as any).__cesiumViewer;
-      if (cesiumViewer) cesiumViewer.destroy();
+      const v = (window as any).__cesiumViewer;
+      if (v) v.destroy();
     };
   }, []);
+
+  // Build journey panel options
+  const destOptions = DESTINATIONS.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+  const listingOptions = LISTINGS.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
 
   return (
     <>
       <style>{`
-        /* ============ RESET FOR MAP PAGE ============ */
         body { overflow: hidden !important; }
         main { overflow: hidden !important; }
         footer { display: none !important; }
+        nav { display: none !important; }
 
         :root {
           --ink: #0a0e12;
@@ -637,415 +1010,472 @@ export default function MapPage() {
           --success: #6fae7a;
         }
 
-        #cesium {
-          position: fixed;
-          inset: 0;
-          z-index: 1;
-        }
+        #cesium { position: fixed; inset: 0; z-index: 1; }
 
         .cesium-viewer-bottom, .cesium-viewer-toolbar, .cesium-viewer-animationContainer,
         .cesium-viewer-timelineContainer, .cesium-viewer-fullscreenContainer,
         .cesium-viewer-geocoderContainer, .cesium-viewer-vrContainer, .cesium-widget-credits,
-        .cesium-viewer-selectionIndicatorContainer, .cesium-viewer-infoBoxContainer {
-          display: none !important;
-        }
+        .cesium-viewer-selectionIndicatorContainer, .cesium-viewer-infoBoxContainer { display: none !important; }
         .cesium-widget canvas { outline: none; }
 
         .vignette {
-          position: fixed;
-          inset: 0;
-          pointer-events: none;
-          z-index: 2;
-          background: radial-gradient(ellipse at center, transparent 40%, rgba(10,14,18,0.4) 100%);
+          position: fixed; inset: 0; pointer-events: none; z-index: 2;
+          background: radial-gradient(ellipse at center, transparent 40%, rgba(10,14,18,0.35) 100%);
         }
 
-        /* ============ TOP BAR ============ */
+        /* ===== TOPBAR ===== */
         .cc-topbar {
-          position: fixed;
-          top: 0; left: 0; right: 0;
-          z-index: 10;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 18px 28px;
-          background: linear-gradient(180deg, rgba(10,14,18,0.95) 0%, rgba(10,14,18,0.7) 70%, rgba(10,14,18,0) 100%);
+          position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 14px 24px;
+          background: linear-gradient(180deg, rgba(10,14,18,0.96) 0%, rgba(10,14,18,0.6) 80%, transparent 100%);
           pointer-events: none;
         }
-        .cc-brand {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          pointer-events: auto;
-        }
-        .cc-brand-mark { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
-        .cc-brand-mark svg { width: 100%; height: 100%; }
-        .cc-brand-text { display: flex; flex-direction: column; line-height: 1; }
-        .cc-brand-text .cc-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: 20px; letter-spacing: -0.01em; color: #e8eaed; }
-        .cc-brand-text .cc-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--text-muted); margin-top: 4px; }
-        .cc-top-meta { display: flex; align-items: center; gap: 24px; pointer-events: auto; }
-        .cc-meta-item { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
-        .cc-meta-item .cc-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--text-muted); margin-bottom: 3px; }
-        .cc-meta-item .cc-value { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); font-weight: 500; }
-        .cc-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); display: inline-block; margin-right: 6px; box-shadow: 0 0 8px var(--success); animation: cc-pulse 2s infinite; }
-        @keyframes cc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .cc-brand { display: flex; flex-direction: column; }
+        .cc-brand-name { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; color: var(--text); }
+        .cc-brand-sub { font-size: 10px; letter-spacing: 0.12em; color: var(--text-muted); text-transform: uppercase; }
+        .cc-meta { display: flex; gap: 28px; align-items: center; }
+        .cc-meta-item { text-align: right; }
+        .cc-meta-value { font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: 0.03em; }
+        .cc-meta-label { font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); text-transform: uppercase; }
+        #cesium-clock { font-size: 13px; font-weight: 600; color: var(--ochre); font-variant-numeric: tabular-nums; }
 
-        /* ============ LEFT PANEL ============ */
-        .cc-left-panel {
-          position: fixed;
-          top: 96px; left: 24px;
-          width: 320px;
-          max-height: calc(100vh - 180px);
-          background: rgba(17, 22, 28, 0.92);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--line);
-          border-radius: 6px;
-          z-index: 5;
-          display: flex;
-          flex-direction: column;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        /* ===== LEFT SIDEBAR ===== */
+        .cc-sidebar {
+          position: fixed; top: 0; left: 0; bottom: 0; z-index: 15;
+          width: 280px;
+          background: linear-gradient(180deg, rgba(10,14,18,0.97) 0%, rgba(10,14,18,0.93) 100%);
+          border-right: 1px solid var(--line);
+          display: flex; flex-direction: column;
+          padding-top: 70px;
+          backdrop-filter: blur(12px);
         }
-        .cc-panel-header { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
-        .cc-panel-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--ochre); margin-bottom: 6px; }
-        .cc-panel-title { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 400; letter-spacing: -0.01em; line-height: 1.1; color: var(--text); }
-        .cc-panel-subtitle { font-size: 12px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
-        .cc-dest-list { overflow-y: auto; padding: 8px 0; flex: 1; min-height: 0; }
-        .cc-dest-list::-webkit-scrollbar { width: 4px; }
-        .cc-dest-list::-webkit-scrollbar-track { background: transparent; }
-        .cc-dest-list::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 2px; }
-        .dest-item { display: flex; align-items: center; gap: 14px; padding: 12px 20px; cursor: pointer; border-left: 2px solid transparent; transition: all 0.2s ease; }
-        .dest-item:hover { background: rgba(255,255,255,0.03); border-left-color: var(--ocean); }
-        .dest-item.active { background: rgba(45,125,125,0.12); border-left-color: var(--ocean-2); }
-        .dest-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); min-width: 28px; letter-spacing: 0.05em; }
-        .dest-info { flex: 1; min-width: 0; }
-        .dest-name { font-size: 13px; font-weight: 500; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-        .dest-state { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
-        .dest-tag { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: 0.12em; padding: 3px 6px; border-radius: 2px; white-space: nowrap; }
-        .tag-infra { background: rgba(77,179,179,0.15); color: #4db3b3; }
-        .tag-mixed { background: rgba(212,162,76,0.15); color: #d4a24c; }
-        .tag-tourism { background: rgba(138,168,118,0.15); color: #8aa876; }
-        .tag-realestate { background: rgba(201,106,63,0.15); color: #c96a3f; }
+        .sidebar-header { padding: 16px 20px 10px; border-bottom: 1px solid var(--line); }
+        .sidebar-title { font-size: 9px; letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .sidebar-headline { font-size: 16px; font-weight: 700; color: var(--text); }
+        .sidebar-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+        #listingCount { color: var(--ochre); font-weight: 600; }
 
-        /* ============ DETAIL PANEL ============ */
-        .cc-detail-panel {
-          position: fixed;
-          top: 96px; right: 24px;
-          width: 340px;
-          max-height: calc(100vh - 180px);
-          background: rgba(17, 22, 28, 0.95);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--line);
-          border-radius: 6px;
-          z-index: 5;
-          display: flex;
-          flex-direction: column;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-          transform: translateX(380px);
-          transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        .listings-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+        .listings-list::-webkit-scrollbar { width: 3px; }
+        .listings-list::-webkit-scrollbar-track { background: transparent; }
+        .listings-list::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 2px; }
+
+        .listing-item {
+          display: flex; gap: 10px; padding: 10px 16px; cursor: pointer;
+          border-bottom: 1px solid var(--line); transition: background 0.15s;
         }
-        .cc-detail-panel.open { transform: translateX(0); }
-        .detail-hero { height: 80px; position: relative; border-radius: 6px 6px 0 0; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg, rgba(45,125,125,0.2) 0%, #11161c 100%); }
-        .detail-hero-pattern { position: absolute; inset: 0; opacity: 0.15; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 1px, transparent 1px, transparent 8px); }
-        .detail-close { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.4); border: 1px solid var(--line-2); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; }
-        .detail-close:hover { background: rgba(0,0,0,0.7); border-color: var(--text); }
-        .detail-coords { position: absolute; bottom: 14px; left: 18px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.7); letter-spacing: 0.08em; }
-        .detail-body { padding: 20px; overflow-y: auto; flex: 1; }
-        .detail-body::-webkit-scrollbar { width: 4px; }
-        .detail-body::-webkit-scrollbar-track { background: transparent; }
-        .detail-body::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 2px; }
-        .detail-state { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ochre); text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 6px; }
-        .detail-name { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 400; line-height: 1.15; letter-spacing: -0.015em; margin-bottom: 14px; color: var(--text); }
-        .detail-desc { font-size: 13px; line-height: 1.6; color: var(--text-dim); margin-bottom: 20px; }
-        .detail-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-bottom: 20px; }
-        .stat-cell { background: var(--ink-2); padding: 12px 14px; }
-        .stat-label { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-bottom: 4px; }
-        .stat-value { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 500; color: var(--text); }
-        .stat-value .unit { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 400; color: var(--text-muted); margin-left: 3px; }
-        .detail-section { margin-bottom: 18px; }
-        .section-head { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--text-muted); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-        .feature-list { list-style: none; }
-        .feature-list li { font-size: 12.5px; padding: 5px 0; color: var(--text-dim); display: flex; align-items: flex-start; gap: 8px; }
-        .feature-list li::before { content: ''; width: 4px; height: 4px; background: var(--ocean-2); border-radius: 50%; margin-top: 7px; flex-shrink: 0; }
-        .action-row { display: flex; gap: 8px; margin-top: 20px; }
-        .btn { flex: 1; padding: 10px 14px; border-radius: 3px; font-family: 'Inter Tight', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; text-transform: uppercase; letter-spacing: 0.08em; }
-        .btn-primary { background: var(--laterite); color: var(--text); }
-        .btn-primary:hover { background: var(--laterite-2); }
-        .btn-secondary { background: transparent; border-color: var(--line-2); color: var(--text); }
-        .btn-secondary:hover { background: var(--ink-3); border-color: var(--text); }
-
-        /* ============ CONTROL BAR ============ */
-        .cc-control-bar {
-          position: fixed;
-          bottom: 24px; left: 50%;
-          transform: translateX(-50%);
-          z-index: 5;
-          background: rgba(17, 22, 28, 0.92);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--line);
-          border-radius: 50px;
-          padding: 8px;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        .listing-item:hover { background: rgba(255,255,255,0.04); }
+        .listing-item.active { background: rgba(212,162,76,0.1); border-left: 2px solid var(--ochre); }
+        .li-img {
+          width: 52px; height: 52px; border-radius: 6px; flex-shrink: 0;
+          background-size: cover; background-position: center;
+          border: 1px solid var(--line-2);
         }
-        .ctrl-btn { background: transparent; border: none; color: var(--text-dim); padding: 10px 18px; font-family: 'Inter Tight', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 40px; display: flex; align-items: center; gap: 8px; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.06em; }
-        .ctrl-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-        .ctrl-btn.active { color: var(--text); background: var(--ocean); }
-        .ctrl-divider { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
-        .ctrl-btn svg { width: 14px; height: 14px; }
+        .li-body { flex: 1; min-width: 0; }
+        .li-type { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
+        .li-title { font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .li-loc { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+        .li-price-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+        .li-price { font-size: 11px; font-weight: 700; color: var(--text); }
+        .li-yoy { font-size: 9px; color: var(--success); font-weight: 600; }
 
-        /* ============ LAYERS PANEL ============ */
-        .cc-layers-panel {
-          position: fixed;
-          bottom: 96px; left: 50%;
-          transform: translateX(-50%);
-          width: 240px;
-          background: rgba(17, 22, 28, 0.92);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--line);
-          border-radius: 6px;
-          z-index: 5;
-          padding: 14px 16px;
+        /* ===== FILTER BAR ===== */
+        .cc-filter-bar {
+          position: fixed; top: 70px; left: 280px; right: 0; z-index: 15;
+          padding: 10px 20px;
+          background: linear-gradient(180deg, rgba(10,14,18,0.9) 0%, rgba(10,14,18,0.0) 100%);
+          display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+          pointer-events: all;
+        }
+        .filter-group { display: flex; align-items: center; gap: 8px; }
+        .filter-label { font-size: 9px; letter-spacing: 0.12em; color: var(--text-muted); text-transform: uppercase; white-space: nowrap; }
+        .filter-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+        .filter-pill {
+          padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 600;
+          border: 1px solid var(--line-2); background: rgba(255,255,255,0.04);
+          color: var(--text-dim); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        .filter-pill:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+        .filter-pill.active { background: var(--ochre); color: var(--ink); border-color: var(--ochre); }
+        .filter-select {
+          padding: 3px 8px; border-radius: 6px; font-size: 10px;
+          background: rgba(255,255,255,0.06); border: 1px solid var(--line-2);
+          color: var(--text); cursor: pointer;
+        }
+        .filter-toggles { display: flex; gap: 12px; }
+        .filter-toggle-item { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+        .filter-toggle-item input { accent-color: var(--ochre); }
+
+        /* ===== LISTING CARD PANEL ===== */
+        .listing-panel {
+          position: fixed; top: 0; right: -380px; bottom: 0; z-index: 25;
+          width: 360px;
+          background: rgba(10,14,18,0.97);
+          border-left: 1px solid var(--line-2);
+          backdrop-filter: blur(16px);
+          overflow-y: auto;
+          transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .listing-panel.open { right: 0; }
+        .listing-panel::-webkit-scrollbar { width: 3px; }
+        .listing-panel::-webkit-scrollbar-thumb { background: var(--ink-4); }
+
+        .lp-header {
+          display: flex; align-items: center; gap: 8px; padding: 14px 16px;
+          border-bottom: 1px solid var(--line); flex-wrap: wrap;
+        }
+        .lp-close {
+          margin-left: auto; width: 28px; height: 28px; border-radius: 50%;
+          background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center;
+          cursor: pointer; font-size: 16px; color: var(--text-dim); transition: background 0.15s;
+        }
+        .lp-close:hover { background: rgba(255,255,255,0.14); }
+        .lp-type-chip { padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.1em; }
+        .lp-verified { font-size: 9px; color: var(--success); font-weight: 700; letter-spacing: 0.08em; }
+        .lp-pending { font-size: 9px; color: var(--ochre); font-weight: 700; letter-spacing: 0.08em; }
+        .lp-featured { font-size: 9px; color: var(--ochre); font-weight: 700; }
+
+        .lp-hero {
+          height: 180px; background-size: cover; background-position: center; position: relative;
+        }
+        .lp-hero-overlay {
+          position: absolute; inset: 0;
+          background: linear-gradient(to bottom, transparent 40%, rgba(10,14,18,0.9) 100%);
+        }
+        .lp-yoy {
+          position: absolute; top: 12px; right: 12px;
+          background: var(--success); color: var(--ink); padding: 3px 8px;
+          border-radius: 4px; font-size: 11px; font-weight: 700;
+        }
+
+        .lp-body { padding: 16px; }
+        .lp-location { font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .lp-title { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3; margin-bottom: 8px; }
+        .lp-specs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .spec-item { font-size: 11px; color: var(--text-dim); }
+        .lp-price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+        .lp-price { font-size: 22px; font-weight: 800; color: var(--text); }
+        .lp-price-sqm { font-size: 11px; color: var(--text-muted); }
+
+        .lp-risk-row { display: flex; gap: 12px; margin-bottom: 14px; }
+        .risk-item { flex: 1; }
+        .risk-label { font-size: 9px; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+        .risk-bar { height: 4px; background: var(--ink-4); border-radius: 2px; overflow: hidden; margin-bottom: 2px; }
+        .risk-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+        .risk-score { font-size: 10px; font-weight: 700; }
+
+        .lp-agent { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+        .agent-avatar {
+          width: 34px; height: 34px; border-radius: 50%;
+          background: var(--ink-3); display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 700; color: var(--ochre); border: 1px solid var(--line-2);
+        }
+        .agent-name { font-size: 12px; font-weight: 600; color: var(--text); }
+        .agent-badge { font-size: 10px; color: var(--success); }
+
+        /* Matterport preview */
+        .matterport-preview { margin-bottom: 14px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line-2); }
+        .mp-thumb { position: relative; height: 130px; cursor: pointer; }
+        .mp-thumb iframe { pointer-events: none; }
+        .mp-overlay {
+          position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+          background: rgba(10,14,18,0.4); transition: background 0.2s;
+        }
+        .mp-thumb:hover .mp-overlay { background: rgba(10,14,18,0.2); }
+        .mp-play-btn {
+          padding: 8px 16px; background: var(--ochre); color: var(--ink);
+          border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+        }
+
+        .lp-actions { display: flex; flex-direction: column; gap: 8px; }
+        .lp-btn-primary {
+          width: 100%; padding: 12px; border-radius: 8px;
+          background: var(--ochre); color: var(--ink);
+          font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+          border: none; cursor: pointer; transition: opacity 0.15s;
+        }
+        .lp-btn-primary:hover { opacity: 0.88; }
+        .lp-btn-secondary {
+          width: 100%; padding: 11px; border-radius: 8px;
+          background: transparent; color: var(--text);
+          font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+          border: 1px solid var(--line-2); cursor: pointer; text-align: center;
+          text-decoration: none; display: block; transition: background 0.15s;
+        }
+        .lp-btn-secondary:hover { background: rgba(255,255,255,0.06); }
+
+        /* ===== MATTERPORT FULL OVERLAY ===== */
+        .matterport-overlay {
+          position: fixed; inset: 0; z-index: 100;
+          background: rgba(10,14,18,0.96);
+          display: none; flex-direction: column;
+        }
+        .matterport-overlay.open { display: flex; }
+        .mp-overlay-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 16px 24px; border-bottom: 1px solid var(--line);
+        }
+        .mp-overlay-title { font-size: 14px; font-weight: 700; color: var(--text); }
+        .mp-overlay-close {
+          padding: 8px 16px; background: rgba(255,255,255,0.08);
+          border: 1px solid var(--line-2); border-radius: 6px;
+          color: var(--text); font-size: 12px; cursor: pointer;
+        }
+        .mp-overlay-iframe { flex: 1; border: none; }
+
+        /* ===== BOTTOM TOOLBAR ===== */
+        .cc-toolbar {
+          position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+          z-index: 20; display: flex; gap: 6px; align-items: center;
+          background: rgba(10,14,18,0.92); border: 1px solid var(--line-2);
+          border-radius: 40px; padding: 8px 16px;
+          backdrop-filter: blur(16px);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .toolbar-btn {
+          padding: 8px 14px; border-radius: 24px; font-size: 11px; font-weight: 700;
+          letter-spacing: 0.08em; border: none; cursor: pointer;
+          background: transparent; color: var(--text-dim);
+          transition: all 0.15s; white-space: nowrap;
+        }
+        .toolbar-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+        .toolbar-btn.active { background: var(--ochre); color: var(--ink); }
+        .toolbar-sep { width: 1px; height: 20px; background: var(--line-2); }
+
+        /* ===== LAYERS PANEL ===== */
+        .layers-panel {
+          position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+          z-index: 20; min-width: 260px;
+          background: rgba(10,14,18,0.96); border: 1px solid var(--line-2);
+          border-radius: 12px; padding: 16px;
+          backdrop-filter: blur(16px);
           display: none;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
         }
-        .cc-layers-panel.open { display: block; }
-        .layers-head { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--text-muted); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-        .layer-toggle { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; cursor: pointer; font-size: 12.5px; color: var(--text-dim); }
-        .layer-toggle:hover { color: var(--text); }
-        .toggle { width: 30px; height: 16px; border-radius: 10px; background: var(--ink-4); position: relative; transition: all 0.2s; }
-        .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: var(--text-dim); border-radius: 50%; transition: all 0.2s; }
-        .toggle.on { background: var(--ocean); }
-        .toggle.on::after { left: 16px; background: var(--text); }
+        .layers-panel.open { display: block; }
+        .layers-title { font-size: 9px; letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; }
+        .layer-toggle {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 8px 0; border-bottom: 1px solid var(--line); cursor: pointer;
+        }
+        .layer-toggle:last-child { border-bottom: none; }
+        .layer-name { font-size: 12px; color: var(--text); }
+        .toggle {
+          width: 36px; height: 20px; border-radius: 10px; background: var(--ink-4);
+          position: relative; transition: background 0.2s;
+        }
+        .toggle::after {
+          content: ''; position: absolute; top: 3px; left: 3px;
+          width: 14px; height: 14px; border-radius: 50%; background: var(--text-muted);
+          transition: all 0.2s;
+        }
+        .toggle.on { background: var(--ochre); }
+        .toggle.on::after { left: 19px; background: var(--ink); }
 
-        /* ============ LEGEND ============ */
+        /* ===== JOURNEY PANEL ===== */
+        .journey-panel {
+          position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+          z-index: 21; min-width: 320px;
+          background: rgba(10,14,18,0.97); border: 1px solid var(--line-2);
+          border-radius: 12px; padding: 20px;
+          backdrop-filter: blur(16px);
+          display: none;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+        }
+        .journey-panel.open { display: block; }
+        .journey-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+        .journey-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 16px; }
+        .journey-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .journey-label { font-size: 9px; letter-spacing: 0.12em; color: var(--text-muted); text-transform: uppercase; }
+        .journey-select {
+          width: 100%; padding: 8px 10px; border-radius: 8px;
+          background: var(--ink-3); border: 1px solid var(--line-2);
+          color: var(--text); font-size: 12px; cursor: pointer;
+        }
+        .journey-btn {
+          width: 100%; padding: 12px; border-radius: 8px;
+          background: var(--ochre); color: var(--ink);
+          font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+          border: none; cursor: pointer; margin-top: 4px;
+        }
+
+        /* ===== TOAST ===== */
+        .dest-toast {
+          position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+          z-index: 30; background: rgba(10,14,18,0.95); border: 1px solid var(--line-2);
+          border-radius: 8px; padding: 10px 18px;
+          opacity: 0; transition: all 0.3s; pointer-events: none;
+          backdrop-filter: blur(12px); white-space: nowrap;
+        }
+        .dest-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .dest-toast-text { font-size: 12px; color: var(--text); }
+
+        /* ===== LOADING SCREEN ===== */
+        .cesium-loading {
+          position: fixed; inset: 0; z-index: 50;
+          background: var(--ink); display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 16px;
+          transition: opacity 0.6s;
+        }
+        .cesium-loading.hide { opacity: 0; pointer-events: none; }
+        .loading-logo { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: 0.04em; }
+        .loading-sub-brand { font-size: 10px; letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase; margin-top: -10px; }
+        .loading-spinner {
+          width: 36px; height: 36px; border: 2px solid var(--ink-4);
+          border-top-color: var(--ochre); border-radius: 50%;
+          animation: spin 0.9s linear infinite; margin: 8px 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { font-size: 12px; color: var(--text-dim); letter-spacing: 0.08em; }
+        .loading-steps { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+        .loading-step { font-size: 10px; color: var(--text-muted); letter-spacing: 0.06em; }
+        .loading-step::before { content: '· '; color: var(--ochre); }
+
+        /* ===== LEGEND ===== */
         .cc-legend {
-          position: fixed;
-          bottom: 96px; right: 24px;
-          background: rgba(17, 22, 28, 0.92);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--line);
-          border-radius: 6px;
-          z-index: 5;
-          padding: 12px 14px;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+          position: fixed; bottom: 80px; right: 20px; z-index: 15;
+          background: rgba(10,14,18,0.88); border: 1px solid var(--line);
+          border-radius: 8px; padding: 10px 14px;
+          backdrop-filter: blur(10px);
         }
-        .legend-title { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--text-muted); margin-bottom: 8px; }
-        .legend-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 11px; color: var(--text-dim); }
-        .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
-
-        /* ============ LOADING ============ */
-        .cc-loading {
-          position: fixed;
-          inset: 0;
-          background: var(--ink);
-          z-index: 100;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 20px;
-          transition: opacity 0.6s ease;
-        }
-        .cc-loading.hide { opacity: 0; pointer-events: none; }
-        .loading-mark { width: 60px; height: 60px; animation: cc-spin 2s linear infinite; }
-        @keyframes cc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .loading-text { font-family: 'Fraunces', serif; font-size: 18px; color: var(--text); letter-spacing: -0.01em; }
-        .loading-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.2em; }
-
-        /* ============ PLOT TOAST ============ */
-        .cc-plot-toast {
-          position: fixed;
-          top: 96px; left: 50%;
-          transform: translateX(-50%) translateY(-30px);
-          background: rgba(17, 22, 28, 0.95);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--laterite);
-          border-radius: 4px;
-          padding: 14px 20px;
-          z-index: 8;
-          display: flex;
-          align-items: center;
-          gap: 20px;
-          opacity: 0;
-          pointer-events: none;
-          transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        }
-        .cc-plot-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .plot-toast-icon { width: 32px; height: 32px; background: var(--laterite); border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .plot-toast-content { display: flex; flex-direction: column; }
-        .plot-toast-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--laterite-2); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 3px; }
-        .plot-toast-title { font-family: 'Fraunces', serif; font-size: 15px; color: var(--text); }
-
-        /* ============ RESPONSIVE ============ */
-        @media (max-width: 900px) {
-          .cc-left-panel { width: 260px; top: 88px; left: 12px; max-height: 40vh; }
-          .cc-detail-panel { width: calc(100vw - 24px); right: 12px; top: auto; bottom: 90px; max-height: 45vh; }
-          .cc-legend { display: none; }
-          .cc-layers-panel { left: 12px; bottom: 86px; transform: none; }
-          .cc-topbar { padding: 14px 18px; }
-          .cc-brand-text .cc-title { font-size: 16px; }
-          .cc-top-meta { gap: 14px; }
-        }
+        .legend-title { font-size: 8px; letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+        .legend-item { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .legend-label { font-size: 10px; color: var(--text-dim); }
       `}</style>
 
-      {/* Loading screen */}
-      <div className="cc-loading" id="cesium-loading">
-        <svg className="loading-mark" viewBox="0 0 60 60" fill="none">
-          <circle cx="30" cy="30" r="26" stroke="#2d7d7d" strokeWidth="1" opacity="0.3" />
-          <circle cx="30" cy="30" r="26" stroke="#4db3b3" strokeWidth="2" strokeDasharray="40 163" strokeLinecap="round" />
-          <circle cx="30" cy="8" r="3" fill="#d4a24c" />
-          <circle cx="52" cy="30" r="3" fill="#c96a3f" />
-        </svg>
-        <div className="loading-text">Loading corridor geometry</div>
-        <div className="loading-sub">Streaming satellite imagery · Nigeria</div>
-      </div>
-
-      {/* Cesium viewer container */}
+      {/* Cesium globe */}
       <div id="cesium" />
       <div className="vignette" />
+
+      {/* Loading screen */}
+      <div className="cesium-loading" id="cesium-loading">
+        <div className="loading-logo">Coastal Corridor</div>
+        <div className="loading-sub-brand">Lagos → Calabar · Discovery Globe</div>
+        <div className="loading-spinner" />
+        <div className="loading-text">Initialising 3D terrain</div>
+        <div className="loading-steps">
+          <div className="loading-step">Loading Cesium World Terrain</div>
+          <div className="loading-step">Streaming satellite imagery</div>
+          <div className="loading-step">Placing 12 active listings</div>
+          <div className="loading-step">Rendering corridor route</div>
+        </div>
+      </div>
 
       {/* Top bar */}
       <div className="cc-topbar">
         <div className="cc-brand">
-          <div className="cc-brand-mark">
-            <svg viewBox="0 0 40 40" fill="none">
-              <path d="M4 28 Q 10 22, 16 26 T 28 24 T 36 20" stroke="#4db3b3" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M4 32 Q 12 28, 20 30 T 36 26" stroke="#c96a3f" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7" />
-              <circle cx="6" cy="28" r="2.5" fill="#d4a24c" />
-              <circle cx="36" cy="20" r="2.5" fill="#d4a24c" />
-              <circle cx="20" cy="27" r="1.8" fill="#e8eaed" />
-            </svg>
-          </div>
-          <div className="cc-brand-text">
-            <div className="cc-title">Coastal Corridor</div>
-            <div className="cc-subtitle">Lagos ⟶ Calabar · 3D Terrain v0.3</div>
-          </div>
+          <div className="cc-brand-name">Coastal Corridor</div>
+          <div className="cc-brand-sub">Lagos → Calabar · Discovery Globe</div>
         </div>
-        <div className="cc-top-meta">
+        <div className="cc-meta">
           <div className="cc-meta-item">
-            <div className="cc-label"><span className="cc-live-dot" />Session</div>
-            <div className="cc-value" id="cesium-clock">—</div>
+            <div className="cc-meta-value" id="cesium-clock">--:--:-- WAT</div>
           </div>
           <div className="cc-meta-item">
-            <div className="cc-label">Corridor Length</div>
-            <div className="cc-value">700.3 km</div>
+            <div className="cc-meta-value">700.3 km</div>
+            <div className="cc-meta-label">Corridor Length</div>
           </div>
           <div className="cc-meta-item">
-            <div className="cc-label">Destinations</div>
-            <div className="cc-value" id="destCount">12</div>
+            <div className="cc-meta-value" id="destCount">12</div>
+            <div className="cc-meta-label">Destinations</div>
           </div>
         </div>
       </div>
 
-      {/* Left panel */}
-      <div className="cc-left-panel">
-        <div className="cc-panel-header">
-          <div className="cc-panel-eyebrow">§01 · Navigation</div>
-          <div className="cc-panel-title">Destinations along corridor</div>
-          <div className="cc-panel-subtitle">Click a destination to focus the camera, inspect the site, and preview the real estate overlay on real satellite terrain.</div>
+      {/* Left sidebar — listings */}
+      <div className="cc-sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-title">§01 · Active Listings</div>
+          <div className="sidebar-headline">Properties on the Corridor</div>
+          <div className="sidebar-sub"><span id="listingCount">12 listings visible</span></div>
         </div>
-        <div className="cc-dest-list" id="destList" />
+        <div className="listings-list" id="listingsList" />
       </div>
 
-      {/* Detail panel */}
-      <div className="cc-detail-panel" id="detailPanel">
-        <div className="detail-hero" id="detailHero">
-          <div className="detail-hero-pattern" />
-          <button className="detail-close" onClick={() => (window as any).closeDetail()}>×</button>
-          <div className="detail-coords" id="detailCoords">—</div>
+      {/* Filter bar */}
+      <div className="cc-filter-bar" id="filterBar" />
+
+      {/* Listing card panel */}
+      <div className="listing-panel" id="listingPanel" />
+
+      {/* Matterport full-screen overlay */}
+      <div className="matterport-overlay" id="matterportOverlay">
+        <div className="mp-overlay-header">
+          <div className="mp-overlay-title">3D Virtual Tour</div>
+          <button className="mp-overlay-close" onClick={() => (window as any).closeMatterport?.()}>✕ CLOSE TOUR</button>
         </div>
-        <div className="detail-body">
-          <div className="detail-state" id="detailState">—</div>
-          <div className="detail-name" id="detailName">—</div>
-          <div className="detail-desc" id="detailDesc">—</div>
-          <div className="detail-stats" id="detailStats" />
-          <div className="detail-section">
-            <div className="section-head">Platform Features Active</div>
-            <ul className="feature-list" id="detailFeatures" />
-          </div>
-          <div className="action-row">
-            <button className="btn btn-primary" onClick={() => (window as any).showPlotsHere()}>Inspect Plots</button>
-            <button className="btn btn-secondary" onClick={() => (window as any).closeDetail()}>Close</button>
-          </div>
+        <iframe
+          id="matterportIframe"
+          className="mp-overlay-iframe"
+          allow="autoplay; fullscreen; web-share; xr-spatial-tracking"
+          src=""
+        />
+      </div>
+
+      {/* Bottom toolbar */}
+      <div className="cc-toolbar">
+        <button className="toolbar-btn" onClick={() => (window as any).cameraOverview?.()}>⊕ OVERVIEW</button>
+        <div className="toolbar-sep" />
+        <button className="toolbar-btn" id="flyBtn" onClick={() => (window as any).expressFly?.()}>✈ FLY CORRIDOR</button>
+        <button className="toolbar-btn" onClick={() => (window as any).openJourneyPlanner?.()}>🗺 PLAN JOURNEY</button>
+        <div className="toolbar-sep" />
+        <button className="toolbar-btn" id="layerBtn" onClick={() => (window as any).toggleLayersPanel?.()}>⊞ LAYERS</button>
+        <button className="toolbar-btn" id="timeBtn" onClick={() => (window as any).cycleTime?.()}>☀ <span id="timeLabel">MIDDAY</span></button>
+        <button className="toolbar-btn" id="bldgBtn" onClick={() => (window as any).toggleBuildings?.()}>🏢 BUILDINGS</button>
+        <button className="toolbar-btn" id="vrBtn" onClick={() => (window as any).toggleVR?.()}>VR</button>
+      </div>
+
+      {/* Layers panel */}
+      <div className="layers-panel" id="layersPanel">
+        <div className="layers-title">Layer Control</div>
+        <div className="layer-toggle" onClick={(e) => { const t = (e.currentTarget as HTMLElement).querySelector('.toggle'); t?.classList.toggle('on'); (window as any).toggleListingPins?.(t?.classList.contains('on') ?? true); }}>
+          <span className="layer-name">Listing Pins</span>
+          <div className="toggle on" />
         </div>
+        <div className="layer-toggle" onClick={(e) => { const t = (e.currentTarget as HTMLElement).querySelector('.toggle'); t?.classList.toggle('on'); (window as any).toggleRoute?.(t?.classList.contains('on') ?? true); }}>
+          <span className="layer-name">Highway Route</span>
+          <div className="toggle on" />
+        </div>
+        <div className="layer-toggle" onClick={(e) => { const t = (e.currentTarget as HTMLElement).querySelector('.toggle'); t?.classList.toggle('on'); (window as any).toggleDestMarkers?.(t?.classList.contains('on') ?? true); }}>
+          <span className="layer-name">Destination Markers</span>
+          <div className="toggle on" />
+        </div>
+        <div className="layer-toggle" onClick={(e) => { const t = (e.currentTarget as HTMLElement).querySelector('.toggle'); t?.classList.toggle('on'); (window as any).toggleLabels?.(t?.classList.contains('on') ?? true); }}>
+          <span className="layer-name">Price Labels</span>
+          <div className="toggle on" />
+        </div>
+      </div>
+
+      {/* Journey planner panel */}
+      <div className="journey-panel" id="journeyPanel">
+        <div className="journey-title">Plan Your Journey</div>
+        <div className="journey-sub">Choose a departure point and a destination listing. The camera will fly the coastal route, pausing at listings along the way.</div>
+        <div className="journey-row">
+          <div className="journey-label">Depart from</div>
+          <select className="journey-select" id="journeyFrom" dangerouslySetInnerHTML={{ __html: destOptions }} />
+        </div>
+        <div className="journey-row">
+          <div className="journey-label">Fly to listing</div>
+          <select className="journey-select" id="journeyTo" dangerouslySetInnerHTML={{ __html: listingOptions }} />
+        </div>
+        <button className="journey-btn" onClick={() => (window as any).startJourney?.()}>✈ BEGIN JOURNEY</button>
+      </div>
+
+      {/* Destination context toast */}
+      <div className="dest-toast" id="destToast">
+        <div className="dest-toast-text" id="destToastText" />
       </div>
 
       {/* Legend */}
       <div className="cc-legend">
-        <div className="legend-title">Legend</div>
-        <div className="legend-row"><div className="legend-dot" style={{ background: '#8aa876' }} />Tourism Asset</div>
-        <div className="legend-row"><div className="legend-dot" style={{ background: '#c96a3f' }} />Real Estate Zone</div>
-        <div className="legend-row"><div className="legend-dot" style={{ background: '#d4a24c' }} />Mixed Use</div>
-        <div className="legend-row"><div className="legend-dot" style={{ background: '#4db3b3' }} />Infrastructure</div>
-      </div>
-
-      {/* Layers panel */}
-      <div className="cc-layers-panel" id="layersPanel">
-        <div className="layers-head">Layer Control</div>
-        <div className="layer-toggle" onClick={(e) => (window as any).toggleLayer(e.currentTarget, 'destinations')}>
-          <span>Destinations</span>
-          <div className="toggle on" />
-        </div>
-        <div className="layer-toggle" onClick={(e) => (window as any).toggleLayer(e.currentTarget, 'route')}>
-          <span>Highway Route</span>
-          <div className="toggle on" />
-        </div>
-        <div className="layer-toggle" onClick={(e) => (window as any).toggleLayer(e.currentTarget, 'plots')}>
-          <span>Real Estate Plots</span>
-          <div className="toggle" />
-        </div>
-        <div className="layer-toggle" onClick={(e) => (window as any).toggleLayer(e.currentTarget, 'labels')}>
-          <span>Place Labels</span>
-          <div className="toggle on" />
-        </div>
-      </div>
-
-      {/* Control bar */}
-      <div className="cc-control-bar">
-        <button className="ctrl-btn" onClick={() => (window as any).cameraOverview()}>
-          <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" /><path d="M1 7 L13 7 M7 1 L7 13" stroke="currentColor" strokeWidth="1" /></svg>
-          Overview
-        </button>
-        <button className="ctrl-btn" id="flyBtn" onClick={() => (window as any).flyCorridor()}>
-          <svg viewBox="0 0 14 14" fill="none"><path d="M2 7 L12 2 L10 7 L12 12 Z" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinejoin="round" /></svg>
-          Fly Corridor
-        </button>
-        <div className="ctrl-divider" />
-        <button className="ctrl-btn" id="layerBtn" onClick={() => (window as any).toggleLayersPanel()}>
-          <svg viewBox="0 0 14 14" fill="none"><path d="M7 1 L13 4 L7 7 L1 4 Z M1 7 L7 10 L13 7 M1 10 L7 13 L13 10" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinejoin="round" /></svg>
-          Layers
-        </button>
-        <button className="ctrl-btn" id="timeBtn" onClick={() => (window as any).cycleTime()}>
-          <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3" /><path d="M7 3.5 L7 7 L9.5 8.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
-          <span id="timeLabel">Midday</span>
-        </button>
-        <button className="ctrl-btn" id="bldgBtn" onClick={() => (window as any).toggleBuildings()}>
-          <svg viewBox="0 0 14 14" fill="none"><rect x="2" y="6" width="3" height="7" stroke="currentColor" strokeWidth="1.3" fill="none" /><rect x="6" y="3" width="3" height="10" stroke="currentColor" strokeWidth="1.3" fill="none" /><rect x="10" y="8" width="3" height="5" stroke="currentColor" strokeWidth="1.3" fill="none" /></svg>
-          Buildings
-        </button>
-      </div>
-
-      {/* Plot toast */}
-      <div className="cc-plot-toast" id="plotToast">
-        <div className="plot-toast-icon">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <rect x="2" y="2" width="12" height="12" stroke="white" strokeWidth="1.5" fill="none" />
-            <line x1="2" y1="8" x2="14" y2="8" stroke="white" strokeWidth="1" />
-            <line x1="8" y1="2" x2="8" y2="14" stroke="white" strokeWidth="1" />
-          </svg>
-        </div>
-        <div className="plot-toast-content">
-          <div className="plot-toast-label" id="toastLabel">Cadastral layer · 24 plots loaded</div>
-          <div className="plot-toast-title" id="toastTitle">Click any plot footprint on the globe</div>
-        </div>
+        <div className="legend-title">Listing Type</div>
+        {Object.entries(TYPE_COLORS).map(([type, color]) => (
+          <div key={type} className="legend-item">
+            <div className="legend-dot" style={{ background: color }} />
+            <div className="legend-label">{type.replace('_', ' ')}</div>
+          </div>
+        ))}
       </div>
     </>
   );
