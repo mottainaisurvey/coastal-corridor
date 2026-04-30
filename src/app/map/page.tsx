@@ -1030,7 +1030,13 @@ export default function MapPage() {
 
       // S1a: Express Fly — cinematic corridor flyover
       async function expressFly() {
-        if (flyAnimating) { flyAnimating = false; resetFlyBtn(); hideDestOverlay(); return; }
+        if (flyAnimating) {
+          flyAnimating = false;
+          resetFlyBtn();
+          hideDestOverlay();
+          stopFlightHud();
+          return;
+        }
         flyAnimating = true;
         closeListingCard();
         const btn = document.getElementById('flyBtn');
@@ -1041,6 +1047,9 @@ export default function MapPage() {
           warri: 95, yenagoa: 90, ph: 85, uyo: 120, ibeno: 55,
           tinapa: 80, calabar: 90
         };
+
+        // Start HUD
+        startFlightHud();
 
         await new Promise(resolve => {
           viewer.camera.flyTo({
@@ -1056,6 +1065,9 @@ export default function MapPage() {
           const heading = Cesium.Math.toRadians(destHeadings[dest.id] ?? 90);
           const pitch = Cesium.Math.toRadians(-30);
           const alt = (dest.corridorKm === 0 || dest.corridorKm >= 700) ? 22000 : 16000;
+
+          // Update HUD destination label
+          updateHudDest(dest.name, dest.corridorKm);
 
           await new Promise(resolve => {
             viewer.camera.flyTo({
@@ -1085,10 +1097,75 @@ export default function MapPage() {
         flyAnimating = false;
         resetFlyBtn();
         hideDestOverlay();
+        stopFlightHud();
         // Tier 2: FLY CORRIDOR stop sync — clear sidebar highlight and KM bar on completion
         document.querySelectorAll('.dest-item').forEach(el => el.classList.remove('active'));
         updateKmProgressBar(null);
         cameraOverview();
+      }
+
+      // ============ FLIGHT HUD ============
+      let hudInterval: ReturnType<typeof setInterval> | null = null;
+      let hudStartTime = 0;
+      let hudPrevPos: Cesium.Cartesian3 | null = null;
+      let hudPrevTime = 0;
+
+      function startFlightHud() {
+        const hud = document.getElementById('flightHud');
+        if (hud) hud.classList.add('active');
+        hudStartTime = Date.now();
+        hudPrevPos = null;
+        hudPrevTime = 0;
+        if (hudInterval) clearInterval(hudInterval);
+        hudInterval = setInterval(() => {
+          if (!viewer) return;
+          try {
+            const cam = viewer.camera;
+            const pos = cam.position;
+            const cartographic = Cesium.Cartographic.fromCartesian(pos);
+            const altM = Math.max(0, cartographic.height);
+
+            // Speed: distance between frames / time delta
+            const now = Date.now();
+            let speedKmh = 0;
+            if (hudPrevPos && hudPrevTime) {
+              const dist = Cesium.Cartesian3.distance(pos, hudPrevPos); // metres
+              const dt = (now - hudPrevTime) / 1000; // seconds
+              speedKmh = dt > 0 ? (dist / dt) * 3.6 : 0;
+            }
+            hudPrevPos = pos.clone();
+            hudPrevTime = now;
+
+            // Corridor KM: interpolate from longitude (3.4° Lagos → 8.33° Calabar)
+            const lng = Cesium.Math.toDegrees(cartographic.longitude);
+            const corridorKm = Math.max(0, Math.min(700.3, ((lng - 3.4) / (8.33 - 3.4)) * 700.3));
+
+            // Elapsed time
+            const elapsed = Math.floor((now - hudStartTime) / 1000);
+            const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const ss = String(elapsed % 60).padStart(2, '0');
+
+            const elSpeed = document.getElementById('hudSpeed');
+            const elAlt = document.getElementById('hudAlt');
+            const elKm = document.getElementById('hudKm');
+            const elTime = document.getElementById('hudTime');
+            if (elSpeed) elSpeed.textContent = speedKmh > 9999 ? '---' : Math.round(speedKmh).toLocaleString();
+            if (elAlt) elAlt.textContent = Math.round(altM).toLocaleString();
+            if (elKm) elKm.textContent = corridorKm.toFixed(1);
+            if (elTime) elTime.textContent = `${mm}:${ss}`;
+          } catch (e) { /* ignore */ }
+        }, 250);
+      }
+
+      function stopFlightHud() {
+        if (hudInterval) { clearInterval(hudInterval); hudInterval = null; }
+        const hud = document.getElementById('flightHud');
+        if (hud) hud.classList.remove('active');
+      }
+
+      function updateHudDest(name: string, km: number) {
+        const el = document.getElementById('hudDest');
+        if (el) el.textContent = `▶ ${name.toUpperCase()} · KM ${km}`;
       }
 
       function openJourneyPlanner() {
@@ -1376,7 +1453,7 @@ export default function MapPage() {
             <div class="km-bar-fill" id="kmBarFill" style="width:0%"></div>
             ${DESTINATIONS.map(d => {
               const pct = (d.corridorKm / 700.3) * 100;
-              return `<div class="km-bar-tick" style="left:${pct}%" title="${d.name} · KM ${d.corridorKm}" onclick="sidebarClickDest('${d.id}')"></div>`;
+              return `<div class="km-bar-tick" data-km="${d.corridorKm}" style="left:${pct}%" title="${d.name} · KM ${d.corridorKm}" onclick="sidebarClickDest('${d.id}')"></div>`;
             }).join('')}
           </div>
           <div class="km-bar-labels">
@@ -1391,6 +1468,8 @@ export default function MapPage() {
         const fill = document.getElementById('kmBarFill');
         const label = document.getElementById('kmBarLabel');
         if (!fill || !label) return;
+        // Clear all active ticks
+        document.querySelectorAll('.km-bar-tick').forEach(t => t.classList.remove('active-tick'));
         if (km === null) {
           fill.style.width = '0%';
           label.textContent = '';
@@ -1399,6 +1478,9 @@ export default function MapPage() {
           fill.style.width = `${pct}%`;
           const dest = DESTINATIONS.find(d => d.corridorKm === km);
           label.textContent = dest ? `${dest.name} · KM ${km}` : `KM ${km}`;
+          // Highlight the matching tick
+          const activeTick = document.querySelector(`.km-bar-tick[data-km="${km}"]`);
+          if (activeTick) activeTick.classList.add('active-tick');
         }
       }
 
@@ -1910,23 +1992,27 @@ export default function MapPage() {
           pointer-events: all;
         }
         .km-bar-track {
-          position: relative; height: 3px;
-          background: rgba(255,255,255,0.1); border-radius: 2px;
+          position: relative; height: 6px;
+          background: rgba(255,255,255,0.08); border-radius: 3px;
+          overflow: visible;
         }
         .km-bar-fill {
-          height: 100%; background: var(--ochre); border-radius: 2px;
+          height: 100%; background: linear-gradient(90deg, var(--ochre), #f0c060); border-radius: 3px;
           transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative; z-index: 1;
         }
         .km-bar-tick {
-          position: absolute; top: -4px; width: 3px; height: 11px;
-          background: rgba(255,255,255,0.25); border-radius: 1px;
-          transform: translateX(-50%); cursor: pointer;
-          transition: background 0.15s;
+          position: absolute; top: 50%; transform: translate(-50%, -50%);
+          width: 2px; height: 10px;
+          background: rgba(255,255,255,0.3); border-radius: 1px;
+          cursor: pointer; transition: background 0.15s, height 0.15s;
+          z-index: 2;
         }
-        .km-bar-tick:hover { background: var(--ochre); }
+        .km-bar-tick:hover { background: var(--ochre); height: 14px; }
+        .km-bar-tick.active-tick { background: var(--ochre); height: 14px; }
         .km-bar-labels {
           display: flex; justify-content: space-between; align-items: center;
-          margin-top: 5px;
+          margin-top: 6px;
         }
         .km-bar-label-start, .km-bar-label-end {
           font-size: 9px; color: var(--text-muted); letter-spacing: 0.08em;
@@ -1934,6 +2020,37 @@ export default function MapPage() {
         .km-bar-label-active {
           font-size: 9px; color: var(--ochre); font-weight: 700; letter-spacing: 0.08em;
           text-align: center; flex: 1; padding: 0 8px;
+        }
+
+        /* ===== FLIGHT HUD ===== */
+        .flight-hud {
+          position: fixed; bottom: 108px; right: 24px; z-index: 20;
+          display: none; flex-direction: column; gap: 2px;
+          background: rgba(10,10,10,0.82); border: 1px solid rgba(212,162,76,0.35);
+          border-radius: 8px; padding: 10px 14px; min-width: 180px;
+          backdrop-filter: blur(8px);
+          font-family: 'JetBrains Mono', 'Courier New', monospace;
+        }
+        .flight-hud.active { display: flex; }
+        .hud-row {
+          display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+        }
+        .hud-label {
+          font-size: 8px; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase;
+        }
+        .hud-value {
+          font-size: 14px; color: var(--ochre); font-weight: 700; letter-spacing: 0.04em;
+          font-variant-numeric: tabular-nums;
+        }
+        .hud-unit {
+          font-size: 8px; color: var(--text-muted); margin-left: 2px;
+        }
+        .hud-divider {
+          height: 1px; background: rgba(255,255,255,0.08); margin: 4px 0;
+        }
+        .hud-dest {
+          font-size: 9px; color: rgba(255,255,255,0.6); letter-spacing: 0.06em;
+          text-align: right; margin-top: 2px;
         }
 
         /* ===== LEGEND ===== */
@@ -2096,6 +2213,29 @@ export default function MapPage() {
 
       {/* Tier 3: KM Progress Bar */}
       <div className="km-progress-bar" id="kmProgressBar" />
+
+      {/* Flight HUD — speed / time / KM counter */}
+      <div className="flight-hud" id="flightHud">
+        <div className="hud-row">
+          <span className="hud-label">Speed</span>
+          <span><span className="hud-value" id="hudSpeed">0</span><span className="hud-unit">km/h</span></span>
+        </div>
+        <div className="hud-row">
+          <span className="hud-label">Altitude</span>
+          <span><span className="hud-value" id="hudAlt">0</span><span className="hud-unit">m</span></span>
+        </div>
+        <div className="hud-divider" />
+        <div className="hud-row">
+          <span className="hud-label">Corridor KM</span>
+          <span><span className="hud-value" id="hudKm">0.0</span><span className="hud-unit">km</span></span>
+        </div>
+        <div className="hud-row">
+          <span className="hud-label">Elapsed</span>
+          <span><span className="hud-value" id="hudTime">00:00</span></span>
+        </div>
+        <div className="hud-divider" />
+        <div className="hud-dest" id="hudDest">— CORRIDOR START —</div>
+      </div>
 
       {/* Bottom toolbar */}
       <div className="cc-toolbar">
