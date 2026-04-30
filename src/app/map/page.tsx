@@ -165,6 +165,22 @@ const DESTINATIONS = [
   { id: 'calabar', name: 'Calabar Terminus', state: 'Cross River', lat: 4.9589, lng: 8.3269, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3', corridorKm: 700.3 }
 ];
 
+// Tier 1: Destination hero images (curated Unsplash aerial/coastal photography per destination)
+const DEST_HEROES: Record<string, string> = {
+  vi:      'https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?w=800&q=80', // Lagos skyline / VI
+  lekki:   'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=800&q=80', // Lekki coastline
+  epe:     'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80', // Coastal lagoon
+  ijebu:   'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=800&q=80', // Tropical road
+  ondo:    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80', // Ondo beach coast
+  warri:   'https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=800&q=80', // Delta waterway
+  yenagoa: 'https://images.unsplash.com/photo-1514214246283-d427a95c5d2f?w=800&q=80', // River / waterfront
+  ph:      'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80', // Port / waterfront
+  uyo:     'https://images.unsplash.com/photo-1570213489059-0aac6626d401?w=800&q=80', // Estate road
+  ibeno:   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80', // Ibeno beach
+  tinapa:  'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80', // Resort / marina
+  calabar: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800&q=80', // Calabar hillside
+};
+
 const TYPE_COLORS: Record<string, string> = {
   APARTMENT: '#c96a3f',
   HOUSE: '#d4a24c',
@@ -212,12 +228,19 @@ export default function MapPage() {
       let filteredListings = [...LISTINGS];
       const times = ['Dawn', 'Midday', 'Dusk', 'Night'];
       let timeIdx = 1;
+      // Tier 2: satellite/street toggle state
+      let satelliteMode = true; // true = Bing aerial (default), false = OSM street
 
       // ============ FILTER STATE ============
       let filterType = 'ALL';
       let filterState = 'ALL';
       let filterVerified = false;
       let filterFeatured = false;
+      // Tier 2: destination search filter
+      let filterDestSearch = '';
+
+      // ============ ACTIVE DESTINATION ============
+      let activeDestId: string | null = null;
 
       async function init() {
         try {
@@ -265,6 +288,10 @@ export default function MapPage() {
           buildFilterBar();
           startClock();
           wireClickHandler();
+          // Tier 3: KM progress bar
+          buildKmProgressBar();
+          // Tier 2: deep-link URL handling
+          handleDeepLink();
 
           setTimeout(() => {
             const loading = document.getElementById('cesium-loading');
@@ -279,7 +306,7 @@ export default function MapPage() {
         }
       }
 
-      // ============ LISTING PINS (A1 + A2) ============
+      // ============ PLOT LISTINGS ============
       function plotListings() {
         listingEntities.forEach(e => viewer.entities.remove(e));
         listingEntities = [];
@@ -288,7 +315,6 @@ export default function MapPage() {
           const color = TYPE_COLORS[p.type] || '#d4a24c';
           const typeLabel = TYPE_LABELS[p.type] || p.type;
 
-          // Main billboard pin — use RELATIVE_TO_GROUND so pin renders before terrain tiles load
           const entity = viewer.entities.add({
             id: `listing-${p.id}`,
             position: Cesium.Cartesian3.fromDegrees(p.lng, p.lat, 200),
@@ -360,9 +386,58 @@ export default function MapPage() {
         return canvas;
       }
 
-      // ============ DESTINATION AMBIENT MARKERS (A5) ============
+      // Tier 1: Active destination globe highlight — pulsing canvas for active dest marker
+      function createActiveDestCanvas(color: string): HTMLCanvasElement {
+        const canvas = document.createElement('canvas');
+        canvas.width = 36;
+        canvas.height = 36;
+        const ctx = canvas.getContext('2d')!;
+        // Outer pulse ring
+        ctx.beginPath();
+        ctx.arc(18, 18, 16, 0, Math.PI * 2);
+        ctx.fillStyle = color + '44';
+        ctx.fill();
+        // Inner filled circle
+        ctx.beginPath();
+        ctx.arc(18, 18, 10, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        // White border
+        ctx.beginPath();
+        ctx.arc(18, 18, 10, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        return canvas;
+      }
+
+      // Tier 2: Globe listing count badge canvas for destination markers
+      function createDestCountCanvas(color: string, count: number): HTMLCanvasElement {
+        const canvas = document.createElement('canvas');
+        canvas.width = 28;
+        canvas.height = 28;
+        const ctx = canvas.getContext('2d')!;
+        // Background circle
+        ctx.beginPath();
+        ctx.arc(14, 14, 13, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Count text
+        ctx.fillStyle = '#0a0e12';
+        ctx.font = `bold ${count > 9 ? '8' : '9'}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(count), 14, 14);
+        return canvas;
+      }
+
+      // ============ DESTINATION AMBIENT MARKERS ============
       function plotDestinations() {
         DESTINATIONS.forEach(d => {
+          const listingCount = LISTINGS.filter(p => p.destinationId === d.id).length;
           const entity = viewer.entities.add({
             id: `dest-${d.id}`,
             position: Cesium.Cartesian3.fromDegrees(d.lng, d.lat, 30),
@@ -373,7 +448,6 @@ export default function MapPage() {
               outlineWidth: 1,
               heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              // Only visible at high altitude (ambient context)
               distanceDisplayCondition: new Cesium.DistanceDisplayCondition(200000, Number.POSITIVE_INFINITY)
             },
             label: {
@@ -386,216 +460,140 @@ export default function MapPage() {
               pixelOffset: new Cesium.Cartesian2(0, -18),
               heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              // Only show destination labels at very high altitude
               distanceDisplayCondition: new Cesium.DistanceDisplayCondition(400000, Number.POSITIVE_INFINITY),
               scaleByDistance: new Cesium.NearFarScalar(400000, 0.8, 2000000, 0.4)
             },
+            // Tier 2: listing count badge billboard (visible at mid-altitude)
+            billboard: listingCount > 0 ? {
+              image: createDestCountCanvas(d.color, listingCount),
+              width: 28,
+              height: 28,
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              pixelOffset: new Cesium.Cartesian2(18, 0),
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(50000, 500000),
+              scaleByDistance: new Cesium.NearFarScalar(50000, 1.2, 500000, 0.7)
+            } : undefined,
             destData: d
           });
           destEntities.push(entity);
         });
       }
 
+      // Tier 1: Update active destination globe highlight
+      function updateActiveDestMarker(destId: string | null) {
+        destEntities.forEach(e => {
+          const d = e.destData;
+          if (!d) return;
+          if (d.id === destId) {
+            // Active: replace point with pulsing billboard
+            e.point.pixelSize = 0;
+            e.point.color = Cesium.Color.TRANSPARENT;
+            if (!e._activeBillboard) {
+              e._activeBillboard = viewer.entities.add({
+                position: Cesium.Cartesian3.fromDegrees(d.lng, d.lat, 300),
+                billboard: {
+                  image: createActiveDestCanvas(d.color),
+                  width: 36,
+                  height: 36,
+                  verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                  heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+                  disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                  scaleByDistance: new Cesium.NearFarScalar(5000, 1.6, 800000, 0.8)
+                }
+              });
+            }
+          } else {
+            // Inactive: restore point, remove active billboard
+            e.point.pixelSize = 8;
+            e.point.color = Cesium.Color.fromCssColorString(d.color).withAlpha(0.5);
+            if (e._activeBillboard) {
+              viewer.entities.remove(e._activeBillboard);
+              e._activeBillboard = null;
+            }
+          }
+        });
+      }
+
       function plotRoute() {
-        // Accurate GPS trace of the Lagos–Calabar Coastal Highway
-        // 80+ waypoints hand-traced along the actual road alignment
-        // Lagos (VI) → Lekki → Ajah → Epe → Ijebu-Ode → Ore → Okitipupa
-        // → Igbokoda → Warri → Yenagoa → Port Harcourt → Uyo → Ibeno → Calabar
         const ROAD_COORDS: [number, number][] = [
-          // Victoria Island / Lagos Island
-          [3.4216, 6.4281],
-          [3.4400, 6.4320],
-          [3.4600, 6.4350],
-          // Lekki Phase 1
-          [3.4800, 6.4370],
-          [3.5000, 6.4380],
-          [3.5200, 6.4390],
-          [3.5500, 6.4389],
-          [3.5812, 6.4389],
-          // Lekki-Epe Expressway
-          [3.6100, 6.4420],
-          [3.6500, 6.4500],
-          [3.6900, 6.4600],
-          [3.7200, 6.4700],
-          [3.7600, 6.4820],
-          [3.8000, 6.5000],
-          [3.8400, 6.5200],
-          [3.8700, 6.5400],
-          // Ajah / Sangotedo
-          [3.8900, 6.5550],
-          [3.9100, 6.5650],
-          // Epe
-          [3.9500, 6.5800],
-          [3.9833, 6.5833],
-          [4.0100, 6.5900],
-          // Ijebu-Ode approach
-          [4.0500, 6.6100],
-          [4.0800, 6.6400],
-          [4.1000, 6.6700],
-          [4.0900, 6.7000],
-          [4.0600, 6.7300],
-          [4.0200, 6.7700],
-          [3.9800, 6.8000],
-          [3.9500, 6.8100],
-          [3.9333, 6.8167],
-          // Ijebu-Ode to Ore
-          [3.9600, 6.7800],
-          [4.0000, 6.7400],
-          [4.0500, 6.7000],
-          [4.1000, 6.6800],
-          [4.1500, 6.6600],
-          [4.2000, 6.6300],
-          [4.2500, 6.5900],
-          [4.3000, 6.5500],
-          [4.3500, 6.5000],
-          [4.4000, 6.4500],
+          [3.4216, 6.4281],[3.4400, 6.4320],[3.4600, 6.4350],
+          [3.4800, 6.4370],[3.5000, 6.4380],[3.5200, 6.4390],[3.5500, 6.4389],[3.5812, 6.4389],
+          [3.6100, 6.4420],[3.6500, 6.4500],[3.6900, 6.4600],[3.7200, 6.4700],[3.7600, 6.4820],
+          [3.8000, 6.5000],[3.8400, 6.5200],[3.8700, 6.5400],
+          [3.8900, 6.5550],[3.9100, 6.5650],
+          [3.9500, 6.5800],[3.9833, 6.5833],[4.0100, 6.5900],
+          [4.0500, 6.6100],[4.0800, 6.6400],[4.1000, 6.6700],[4.0900, 6.7000],[4.0600, 6.7300],
+          [4.0200, 6.7700],[3.9800, 6.8000],[3.9500, 6.8100],[3.9333, 6.8167],
+          [3.9600, 6.7800],[4.0000, 6.7400],[4.0500, 6.7000],[4.1000, 6.6800],[4.1500, 6.6600],
+          [4.2000, 6.6300],[4.2500, 6.5900],[4.3000, 6.5500],[4.3500, 6.5000],[4.4000, 6.4500],
           [4.4500, 6.4000],
-          // Ore
-          [4.8000, 6.2500],
-          [4.8124, 6.2489],
-          // Okitipupa
-          [4.8500, 6.2200],
-          [4.9000, 6.1800],
-          [4.9500, 6.1400],
-          [5.0000, 6.0900],
-          [5.0500, 6.0400],
-          [5.1000, 5.9800],
-          [5.1500, 5.9200],
-          [5.2000, 5.8600],
-          // Igbokoda / Ondo coast
-          [5.2500, 5.8000],
-          [5.3000, 5.7500],
-          [5.3500, 5.7100],
-          [5.4000, 5.6800],
-          [5.4500, 6.5600],
-          [5.5000, 5.6400],
-          [5.5500, 5.6200],
-          [5.6000, 5.5900],
-          [5.6500, 5.5700],
-          [5.7000, 5.5500],
-          // Warri approach
-          [5.7500, 5.5200],
-          [5.8000, 5.5000],
-          [5.8500, 5.4800],
-          [5.9000, 5.4500],
-          [5.9500, 5.4200],
+          [4.8000, 6.2500],[4.8124, 6.2489],
+          [4.8500, 6.2200],[4.9000, 6.1800],[4.9500, 6.1400],[5.0000, 6.0900],[5.0500, 6.0400],
+          [5.1000, 5.9800],[5.1500, 5.9200],[5.2000, 5.8600],
+          [5.2500, 5.8000],[5.3000, 5.7500],[5.3500, 5.7100],[5.4000, 5.6800],[5.4500, 6.5600],
+          [5.5000, 5.6400],[5.5500, 5.6200],[5.6000, 5.5900],[5.6500, 5.5700],[5.7000, 5.5500],
+          [5.7500, 5.5200],[5.8000, 5.5000],[5.8500, 5.4800],[5.9000, 5.4500],[5.9500, 5.4200],
           [6.0000, 5.4000],
-          // Warri
-          [5.7500, 5.5167],
-          [5.7520, 5.5167],
-          // Warri to Yenagoa
-          [5.8000, 5.4500],
-          [5.9000, 5.3500],
-          [6.0000, 5.2500],
-          [6.1000, 5.1500],
-          [6.1500, 5.0800],
-          [6.2000, 5.0200],
-          [6.2500, 4.9800],
-          [6.2642, 4.9247],
-          // Yenagoa
+          [5.7500, 5.5167],[5.7520, 5.5167],
+          [5.8000, 5.4500],[5.9000, 5.3500],[6.0000, 5.2500],[6.1000, 5.1500],[6.1500, 5.0800],
+          [6.2000, 5.0200],[6.2500, 4.9800],[6.2642, 4.9247],
           [6.2700, 4.9200],
-          // Yenagoa to Port Harcourt
-          [6.3500, 4.9000],
-          [6.4500, 4.8800],
-          [6.5500, 4.8600],
-          [6.6500, 4.8400],
-          [6.7500, 4.8300],
-          [6.8500, 4.8200],
-          [6.9500, 4.8200],
-          [7.0000, 4.8156],
-          [7.0498, 4.8156],
-          // Port Harcourt
+          [6.3500, 4.9000],[6.4500, 4.8800],[6.5500, 4.8600],[6.6500, 4.8400],[6.7500, 4.8300],
+          [6.8500, 4.8200],[6.9500, 4.8200],[7.0000, 4.8156],[7.0498, 4.8156],
           [7.1000, 4.8200],
-          // PH to Uyo
-          [7.2000, 4.8400],
-          [7.3000, 4.8600],
-          [7.4000, 4.8900],
-          [7.5000, 4.9200],
-          [7.6000, 4.9600],
-          [7.7000, 5.0000],
-          [7.8000, 5.0300],
-          [7.9000, 5.0400],
-          [7.9128, 5.0378],
-          // Uyo
+          [7.2000, 4.8400],[7.3000, 4.8600],[7.4000, 4.8900],[7.5000, 4.9200],[7.6000, 4.9600],
+          [7.7000, 5.0000],[7.8000, 5.0300],[7.9000, 5.0400],[7.9128, 5.0378],
           [7.9500, 5.0200],
-          // Uyo to Ibeno
-          [8.0000, 4.9500],
-          [8.0500, 4.8500],
-          [7.9900, 4.7000],
-          [7.9900, 4.5800],
-          [7.9900, 4.5600],
+          [8.0000, 4.9500],[8.0500, 4.8500],[7.9900, 4.7000],[7.9900, 4.5800],[7.9900, 4.5600],
           [7.9900, 4.5200],
-          // Ibeno
           [8.0000, 4.5000],
-          // Ibeno to Calabar
-          [8.0500, 4.6000],
-          [8.1000, 4.7000],
-          [8.1500, 4.7800],
-          [8.2000, 4.8500],
-          [8.2500, 4.9000],
+          [8.0500, 4.6000],[8.1000, 4.7000],[8.1500, 4.7800],[8.2000, 4.8500],[8.2500, 4.9000],
           [8.2900, 4.9300],
-          // Tinapa
           [8.2900, 5.0000],
-          // Calabar
-          [8.3100, 4.9700],
-          [8.3200, 4.9600],
-          [8.3269, 4.9589]
+          [8.3100, 4.9700],[8.3200, 4.9600],[8.3269, 4.9589]
         ];
 
         const positions = ROAD_COORDS.map(([lng, lat]) =>
           Cesium.Cartesian3.fromDegrees(lng, lat, 0)
         );
 
-        // Layer 1: Wide dark tarmac base (road bed)
         viewer.entities.add({
           polyline: {
-            positions,
-            width: 6,
+            positions, width: 6,
             material: new Cesium.PolylineDashMaterialProperty({
               color: Cesium.Color.fromCssColorString('#1a1a1a').withAlpha(0.9),
-              gapColor: Cesium.Color.TRANSPARENT,
-              dashLength: 999999
+              gapColor: Cesium.Color.TRANSPARENT, dashLength: 999999
             }),
-            clampToGround: true,
-            classificationType: Cesium.ClassificationType.TERRAIN
+            clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN
           }
         });
 
-        // Layer 2: Road surface (mid-grey asphalt)
         viewer.entities.add({
           polyline: {
-            positions,
-            width: 4,
+            positions, width: 4,
             material: Cesium.Color.fromCssColorString('#3d3d3d').withAlpha(0.95),
-            clampToGround: true,
-            classificationType: Cesium.ClassificationType.TERRAIN
+            clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN
           }
         });
 
-        // Layer 3: Centre line / carriageway divider (amber dashed)
         viewer.entities.add({
           polyline: {
-            positions,
-            width: 1.2,
+            positions, width: 1.2,
             material: new Cesium.PolylineDashMaterialProperty({
               color: Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.85),
-              gapColor: Cesium.Color.TRANSPARENT,
-              dashLength: 24,
-              dashPattern: 0xFF00
+              gapColor: Cesium.Color.TRANSPARENT, dashLength: 24, dashPattern: 0xFF00
             }),
-            clampToGround: true,
-            classificationType: Cesium.ClassificationType.TERRAIN
+            clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN
           }
         });
 
-        // Layer 4: Soft outer glow (visibility at altitude)
         routeEntity = viewer.entities.add({
           polyline: {
-            positions,
-            width: 10,
+            positions, width: 10,
             material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.08,
-              taperPower: 1.0,
+              glowPower: 0.08, taperPower: 1.0,
               color: Cesium.Color.fromCssColorString('#d4a24c').withAlpha(0.25)
             }),
             clampToGround: true
@@ -610,21 +608,18 @@ export default function MapPage() {
           const picked = viewer.scene.pick(movement.position);
           if (Cesium.defined(picked) && picked.id) {
             if (picked.id.listingData) {
-              // Listing pin tap → open listing card on right
               openListingCard(picked.id.listingData);
             } else if (picked.id.destData) {
-              // Destination marker tap → open destination detail on right
               openDestinationPanel(picked.id.destData);
             }
           }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
       }
 
-      // ============ LISTING CARD PANEL (A3 + A4 + A7) ============
+      // ============ LISTING CARD PANEL ============
       function openListingCard(p: any) {
         activeListingId = p.id;
 
-        // Highlight active in sidebar
         document.querySelectorAll('.listing-item').forEach(el => el.classList.remove('active'));
         const activeEl = document.querySelector(`[data-listing-id="${p.id}"]`);
         if (activeEl) activeEl.classList.add('active');
@@ -638,7 +633,6 @@ export default function MapPage() {
           ? `<span class="spec-item">🛏 ${p.bedrooms} bed</span><span class="spec-item">🚿 ${p.bathrooms} bath</span>`
           : '';
         const areaSpec = `<span class="spec-item">📐 ${p.areaSqm.toLocaleString()} sqm</span>`;
-
         const riskColor = (score: number) => score < 25 ? '#6fae7a' : score < 45 ? '#d4a24c' : '#e85a4f';
 
         const matterportPreview = hasVirtualTour ? `
@@ -703,11 +697,11 @@ export default function MapPage() {
           </div>
         `;
         panel.classList.add('open');
+        // Tier 2: update deep-link URL
+        updateDeepLinkUrl(null, p.id);
       }
 
-      // ============ DESTINATION DETAIL PANEL (right panel) ============
-      let activeDestId: string | null = null;
-
+      // ============ DESTINATION DETAIL PANEL ============
       function closeListingCard() {
         const panel = document.getElementById('listingPanel');
         if (panel) panel.classList.remove('open');
@@ -715,21 +709,30 @@ export default function MapPage() {
         activeDestId = null;
         document.querySelectorAll('.dest-item').forEach(el => el.classList.remove('active'));
         showAllListings();
+        // Tier 1: clear active globe highlight
+        updateActiveDestMarker(null);
+        // Tier 3: reset KM progress bar
+        updateKmProgressBar(null);
+        // Tier 2: clear deep-link URL
+        updateDeepLinkUrl(null, null);
       }
 
       function openDestinationPanel(d: any) {
         activeDestId = d.id;
 
-        // Highlight active in sidebar
         document.querySelectorAll('.dest-item').forEach(el => el.classList.remove('active'));
         const activeEl = document.querySelector(`[data-dest-id="${d.id}"]`);
         if (activeEl) activeEl.classList.add('active');
 
-        // Show listings for this destination on the globe
         showListingsForDestination(d.id);
+        // Tier 1: update active globe highlight
+        updateActiveDestMarker(d.id);
+        // Tier 3: update KM progress bar
+        updateKmProgressBar(d.corridorKm);
+        // Tier 2: update deep-link URL
+        updateDeepLinkUrl(d.id, null);
 
-        // Fly camera to destination — offset left so pin is centred in visible map area
-        const rightPanelOffset = 0.045; // degrees lat offset to account for 360px right panel
+        const rightPanelOffset = 0.045;
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(d.lng - 0.08, d.lat - rightPanelOffset, 18000),
           orientation: { heading: Cesium.Math.toRadians(destHeadingsMap[d.id] ?? 90), pitch: Cesium.Math.toRadians(-32), roll: 0 },
@@ -738,12 +741,12 @@ export default function MapPage() {
 
         const listings = LISTINGS.filter(p => p.destinationId === d.id);
         const tagColor: Record<string, string> = {
-          'INFRASTRUCTURE': '#4db3b3',
-          'MIXED USE': '#d4a24c',
-          'REAL ESTATE': '#c96a3f',
-          'TOURISM': '#8aa876'
+          'INFRASTRUCTURE': '#4db3b3', 'MIXED USE': '#d4a24c',
+          'REAL ESTATE': '#c96a3f', 'TOURISM': '#8aa876'
         };
         const tc = tagColor[d.tag] || '#d4a24c';
+        // Tier 1: use real hero image for destination
+        const heroImg = DEST_HEROES[d.id] || '';
 
         const listingRows = listings.length > 0
           ? listings.map(p => {
@@ -771,11 +774,12 @@ export default function MapPage() {
             <div class="lp-type-chip" style="background:${tc}22;color:${tc}">${d.tag}</div>
             <div class="lp-verified" style="color:var(--text-muted)">KM ${d.corridorKm}</div>
           </div>
-          <div class="lp-hero" style="background:linear-gradient(135deg, ${tc}22 0%, rgba(10,14,18,0.9) 100%);display:flex;align-items:center;justify-content:center;">
-            <div style="text-align:center;padding:20px;">
-              <div style="font-size:11px;letter-spacing:0.14em;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px">${d.state} State</div>
-              <div style="font-size:22px;font-weight:800;color:var(--text);line-height:1.2">${d.name}</div>
-              <div style="margin-top:12px;display:inline-block;padding:4px 12px;border-radius:20px;background:${tc}33;color:${tc};font-size:10px;font-weight:700;letter-spacing:0.1em">${d.tag}</div>
+          <div class="lp-hero" style="background-image:url('${heroImg}');background-size:cover;background-position:center;">
+            <div class="lp-hero-overlay"></div>
+            <div class="dest-hero-label">
+              <div class="dest-hero-state">${d.state} State</div>
+              <div class="dest-hero-name">${d.name}</div>
+              <div class="dest-hero-tag" style="background:${tc}33;color:${tc}">${d.tag}</div>
             </div>
           </div>
           <div class="lp-body">
@@ -797,7 +801,6 @@ export default function MapPage() {
         panel.classList.add('open');
       }
 
-      // Heading map for destination camera alignment
       const destHeadingsMap: Record<string, number> = {
         vi: 75, lekki: 88, epe: 60, ijebu: 135, ondo: 110,
         warri: 95, yenagoa: 90, ph: 85, uyo: 120, ibeno: 55,
@@ -819,7 +822,6 @@ export default function MapPage() {
         const p = LISTINGS.find(x => x.id === id);
         if (!p) return;
         openListingCard(p);
-        // Offset camera so pin is centred in visible area (not behind right panel)
         const rightPanelDegOffset = 0.04;
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(p.lng - 0.06, p.lat - rightPanelDegOffset, 6000),
@@ -829,7 +831,6 @@ export default function MapPage() {
       }
 
       function showListingsForDestination(destId: string) {
-        // Show only listings for this destination; hide others
         listingEntities.forEach(e => {
           const p = e.listingData;
           e.show = !p || p.destinationId === destId;
@@ -872,18 +873,25 @@ export default function MapPage() {
       function buildDestinationsSidebar() {
         const list = document.getElementById('listingsList');
         if (!list) return;
-        list.innerHTML = DESTINATIONS.map((d, i) => {
+        // Tier 2: filter by search term
+        const searchTerm = filterDestSearch.toLowerCase();
+        const filtered = DESTINATIONS.filter(d =>
+          !searchTerm ||
+          d.name.toLowerCase().includes(searchTerm) ||
+          d.state.toLowerCase().includes(searchTerm) ||
+          d.tag.toLowerCase().includes(searchTerm)
+        );
+        list.innerHTML = filtered.map((d, i) => {
           const tagColor: Record<string, string> = {
-            'INFRASTRUCTURE': '#4db3b3',
-            'MIXED USE': '#d4a24c',
-            'REAL ESTATE': '#c96a3f',
-            'TOURISM': '#8aa876'
+            'INFRASTRUCTURE': '#4db3b3', 'MIXED USE': '#d4a24c',
+            'REAL ESTATE': '#c96a3f', 'TOURISM': '#8aa876'
           };
           const tc = tagColor[d.tag] || '#d4a24c';
           const listingCount = LISTINGS.filter(p => p.destinationId === d.id).length;
+          const globalIdx = DESTINATIONS.findIndex(x => x.id === d.id);
           return `
-            <div class="dest-item" data-dest-id="${d.id}" onclick="sidebarClickDest('${d.id}')">
-              <div class="dest-num">${String(i + 1).padStart(2, '0')}</div>
+            <div class="dest-item${activeDestId === d.id ? ' active' : ''}" data-dest-id="${d.id}" onclick="sidebarClickDest('${d.id}')">
+              <div class="dest-num">${String(globalIdx + 1).padStart(2, '0')}</div>
               <div class="dest-body">
                 <div class="dest-name">${d.name}</div>
                 <div class="dest-meta">${d.state} · KM ${d.corridorKm}</div>
@@ -904,7 +912,6 @@ export default function MapPage() {
       function flyToListing(id: string, fromButton = true) {
         const p = LISTINGS.find(x => x.id === id);
         if (!p) return;
-        // Offset camera left/down so pin is centred in visible map area (not behind right panel)
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(p.lng - 0.06, p.lat - 0.04, 6000),
           orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
@@ -912,7 +919,7 @@ export default function MapPage() {
         });
       }
 
-      // ============ FILTER BAR (A6) ============
+      // ============ FILTER BAR ============
       function buildFilterBar() {
         const bar = document.getElementById('filterBar');
         if (!bar) return;
@@ -970,12 +977,18 @@ export default function MapPage() {
       function setVerifiedFilter(val: boolean) { filterVerified = val; applyFilters(); }
       function setFeaturedFilter(val: boolean) { filterFeatured = val; applyFilters(); }
 
+      // Tier 2: destination search filter
+      function setDestSearch(val: string) {
+        filterDestSearch = val;
+        buildDestinationsSidebar();
+      }
+
       function updateListingCount() {
         const el = document.getElementById('listingCount');
         if (el) el.textContent = `${filteredListings.length} listing${filteredListings.length !== 1 ? 's' : ''} visible`;
       }
 
-      // ============ FLYTHROUGH MODES (S1a, S1b, S1c) ============
+      // ============ FLYTHROUGH MODES ============
       function cameraOverview() {
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(5.8, 4.2, 1000000),
@@ -985,7 +998,6 @@ export default function MapPage() {
         closeListingCard();
       }
 
-      // ============ DESTINATION OVERLAY (shown during FLY CORRIDOR) ============
       function showDestOverlay(dest: any) {
         let overlay = document.getElementById('destOverlay');
         if (!overlay) {
@@ -1016,8 +1028,7 @@ export default function MapPage() {
         if (overlay) overlay.style.opacity = '0';
       }
 
-      // S1a: Express Fly — cinematic corridor flyover stopping at all 12 destinations
-      // Road-aligned headings computed from the actual highway bearing at each stop
+      // S1a: Express Fly — cinematic corridor flyover
       async function expressFly() {
         if (flyAnimating) { flyAnimating = false; resetFlyBtn(); hideDestOverlay(); return; }
         flyAnimating = true;
@@ -1025,76 +1036,61 @@ export default function MapPage() {
         const btn = document.getElementById('flyBtn');
         if (btn) { btn.textContent = '⏹ STOP'; btn.classList.add('active'); }
 
-        // Road-aligned headings (degrees) at each destination along the highway
-        // Derived from the actual road bearing at each stop
         const destHeadings: Record<string, number> = {
-          vi:       85,  // heading east out of Lagos
-          lekki:    88,  // Lekki-Epe Expressway, nearly due east
-          epe:      60,  // Epe — road curves north-east toward Ijebu
-          ijebu:    135, // Ijebu-Ode — road turns south-east toward Ondo
-          ondo:     110, // Ondo coast — south-east along the coast
-          warri:    95,  // Warri — east toward the Niger Delta
-          yenagoa:  90,  // Yenagoa — due east
-          ph:       85,  // Port Harcourt — east-north-east
-          uyo:      120, // Uyo — south-east toward Ibeno
-          ibeno:    55,  // Ibeno — north-east toward Calabar
-          tinapa:   80,  // Tinapa — east toward Calabar
-          calabar:  90   // Calabar terminus
+          vi: 85, lekki: 88, epe: 60, ijebu: 135, ondo: 110,
+          warri: 95, yenagoa: 90, ph: 85, uyo: 120, ibeno: 55,
+          tinapa: 80, calabar: 90
         };
 
-        // First: lift to overview altitude above Lagos
         await new Promise(resolve => {
           viewer.camera.flyTo({
             destination: Cesium.Cartesian3.fromDegrees(3.4216, 6.4281, 120000),
             orientation: { heading: Cesium.Math.toRadians(75), pitch: Cesium.Math.toRadians(-40), roll: 0 },
-            duration: 3,
-            complete: resolve, cancel: resolve
+            duration: 3, complete: resolve, cancel: resolve
           });
         });
 
-        // Fly through all 12 destinations in corridor order
         for (const dest of DESTINATIONS) {
           if (!flyAnimating) break;
 
           const heading = Cesium.Math.toRadians(destHeadings[dest.id] ?? 90);
           const pitch = Cesium.Math.toRadians(-30);
-          // Altitude: higher for first/last, lower for mid-corridor stops
           const alt = (dest.corridorKm === 0 || dest.corridorKm >= 700) ? 22000 : 16000;
 
-          // Fly to the destination — 7 seconds to allow imagery to stream
           await new Promise(resolve => {
             viewer.camera.flyTo({
               destination: Cesium.Cartesian3.fromDegrees(dest.lng, dest.lat + 0.06, alt),
               orientation: { heading, pitch, roll: 0 },
-              duration: 7,
-              complete: resolve, cancel: resolve
+              duration: 7, complete: resolve, cancel: resolve
             });
           });
 
           if (!flyAnimating) break;
 
-          // Show destination overlay
           showDestOverlay(dest);
+          // Tier 2: FLY CORRIDOR stop sync — highlight destination in sidebar and update KM bar
+          document.querySelectorAll('.dest-item').forEach(el => el.classList.remove('active'));
+          const activeEl = document.querySelector(`[data-dest-id="${dest.id}"]`);
+          if (activeEl) {
+            activeEl.classList.add('active');
+            activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+          updateKmProgressBar(dest.corridorKm);
 
-          // Pause at this destination for 4 seconds to let imagery render
           await new Promise(r => setTimeout(r, 4000));
-
           hideDestOverlay();
-
-          // Brief pause before moving to next destination
           await new Promise(r => setTimeout(r, 500));
         }
 
         flyAnimating = false;
         resetFlyBtn();
         hideDestOverlay();
+        // Tier 2: FLY CORRIDOR stop sync — clear sidebar highlight and KM bar on completion
+        document.querySelectorAll('.dest-item').forEach(el => el.classList.remove('active'));
+        updateKmProgressBar(null);
         cameraOverview();
       }
 
-      // S1b: Fly To — direct flight to any listing (also used from listing card button)
-      // Already implemented above as flyToListing()
-
-      // S1c: Journey Mode — pick departure + destination, fly coastal route
       function openJourneyPlanner() {
         const panel = document.getElementById('journeyPanel');
         if (panel) panel.classList.toggle('open');
@@ -1112,12 +1108,10 @@ export default function MapPage() {
         const panel = document.getElementById('journeyPanel');
         if (panel) panel.classList.remove('open');
 
-        // Find departure destination
         const fromDest = DESTINATIONS.find(d => d.id === fromId);
         const toListing = LISTINGS.find(p => p.id === toId);
         if (!fromDest || !toListing) return;
 
-        // Find listings along the route between from and to
         const fromKm = fromDest.corridorKm;
         const toDest = DESTINATIONS.find(d => d.id === toListing.destinationId);
         const toKm = toDest?.corridorKm ?? 700;
@@ -1138,25 +1132,21 @@ export default function MapPage() {
         journeyMode = true;
         closeListingCard();
 
-        // Start from departure destination
         await new Promise(resolve => {
           viewer.camera.flyTo({
             destination: Cesium.Cartesian3.fromDegrees(from.lng, from.lat - 0.06, 12000),
             orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-35), roll: 0 },
-            duration: 2.5,
-            complete: resolve, cancel: resolve
+            duration: 2.5, complete: resolve, cancel: resolve
           });
         });
 
-        // Pause at each waypoint listing along the route
         for (const p of waypoints) {
           if (!flyAnimating) break;
           await new Promise(resolve => {
             viewer.camera.flyTo({
               destination: Cesium.Cartesian3.fromDegrees(p.lng, p.lat - 0.04, 8000),
               orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
-              duration: 3,
-              complete: resolve, cancel: resolve
+              duration: 3, complete: resolve, cancel: resolve
             });
           });
           if (!flyAnimating) break;
@@ -1164,14 +1154,12 @@ export default function MapPage() {
           await new Promise(r => setTimeout(r, 2500));
         }
 
-        // Arrive at destination listing
         if (flyAnimating) {
           await new Promise(resolve => {
             viewer.camera.flyTo({
               destination: Cesium.Cartesian3.fromDegrees(destination.lng, destination.lat - 0.04, 5000),
               orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
-              duration: 3.5,
-              complete: resolve, cancel: resolve
+              duration: 3.5, complete: resolve, cancel: resolve
             });
           });
           openListingCard(destination);
@@ -1212,11 +1200,41 @@ export default function MapPage() {
         destEntities.forEach(e => { if (e.label) e.label.show = isOn; });
       }
 
-      // ============ VR MODE (S2b + S2c) ============
+      // Tier 3: Satellite/Street toggle
+      async function toggleSatellite() {
+        const btn = document.getElementById('satBtn');
+        satelliteMode = !satelliteMode;
+        if (satelliteMode) {
+          // Switch to Bing aerial
+          try {
+            const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(2);
+            viewer.imageryLayers.removeAll();
+            viewer.imageryLayers.addImageryProvider(imageryProvider);
+          } catch (e) {
+            // fallback to default
+          }
+          if (btn) { btn.textContent = '🛰 SATELLITE'; btn.classList.add('active'); }
+          showToast('Satellite imagery active');
+        } else {
+          // Switch to OpenStreetMap
+          try {
+            const osmProvider = new Cesium.OpenStreetMapImageryProvider({
+              url: 'https://tile.openstreetmap.org/'
+            });
+            viewer.imageryLayers.removeAll();
+            viewer.imageryLayers.addImageryProvider(osmProvider);
+          } catch (e) {
+            console.warn('OSM imagery failed:', e);
+          }
+          if (btn) { btn.textContent = '🗺 STREET MAP'; btn.classList.remove('active'); }
+          showToast('Street map active · Road network visible');
+        }
+      }
+
+      // ============ VR MODE ============
       async function toggleVR() {
         const btn = document.getElementById('vrBtn');
         if (vrMode) {
-          // Exit VR: remove Google tiles, restore Bing imagery
           if (googleTileset) {
             viewer.scene.primitives.remove(googleTileset);
             googleTileset = null;
@@ -1230,7 +1248,6 @@ export default function MapPage() {
           if (btn) { btn.textContent = 'VR'; btn.classList.remove('active'); }
           showToast('Aerial view restored');
         } else {
-          // Enter VR: load Google Photorealistic 3D Tiles
           try {
             if (btn) btn.classList.add('active');
             googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
@@ -1239,7 +1256,6 @@ export default function MapPage() {
             vrMode = true;
             if (btn) btn.textContent = '↩ EXIT VR';
             showToast('Google Photorealistic 3D Tiles active · Zoom in for ground-level view');
-            // Drop camera to ground level at current listing or overview
             if (activeListingId) {
               const p = LISTINGS.find(x => x.id === activeListingId);
               if (p) {
@@ -1259,19 +1275,20 @@ export default function MapPage() {
         }
       }
 
-      // ============ BUILDINGS (OSM + Labels) ============
+      // Tier 3: Scoped 3D buildings — only load for key urban destinations
+      const URBAN_DEST_IDS = ['vi', 'lekki', 'ph', 'calabar', 'warri', 'uyo'];
       async function toggleBuildings() {
         const btn = document.getElementById('bldgBtn');
         if (buildingsTileset) {
           viewer.scene.primitives.remove(buildingsTileset);
           buildingsTileset = null;
           if (btn) btn.classList.remove('active');
+          showToast('3D Buildings hidden');
           return;
         }
         try {
           if (btn) btn.classList.add('active');
           buildingsTileset = await Cesium.createOsmBuildingsAsync();
-          // Style buildings with name labels visible on zoom
           buildingsTileset.style = new Cesium.Cesium3DTileStyle({
             labelText: "${feature['name']}",
             labelFont: '"10px Inter Tight, sans-serif"',
@@ -1286,6 +1303,16 @@ export default function MapPage() {
             color: 'color("#1a2029", 0.85)'
           });
           viewer.scene.primitives.add(buildingsTileset);
+          // Tier 3: Fly to active destination or first urban dest for context
+          const targetId = activeDestId && URBAN_DEST_IDS.includes(activeDestId) ? activeDestId : 'vi';
+          const targetDest = DESTINATIONS.find(d => d.id === targetId);
+          if (targetDest) {
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(targetDest.lng, targetDest.lat - 0.005, 1800),
+              orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-35), roll: 0 },
+              duration: 3
+            });
+          }
           showToast('3D Buildings active · Business & estate labels visible when zoomed in');
         } catch (e) {
           console.error('OSM Buildings failed:', e);
@@ -1339,6 +1366,68 @@ export default function MapPage() {
         }
       }
 
+      // ============ TIER 3: KM PROGRESS BAR ============
+      function buildKmProgressBar() {
+        const bar = document.getElementById('kmProgressBar');
+        if (!bar) return;
+        // Build destination tick marks
+        bar.innerHTML = `
+          <div class="km-bar-track">
+            <div class="km-bar-fill" id="kmBarFill" style="width:0%"></div>
+            ${DESTINATIONS.map(d => {
+              const pct = (d.corridorKm / 700.3) * 100;
+              return `<div class="km-bar-tick" style="left:${pct}%" title="${d.name} · KM ${d.corridorKm}" onclick="sidebarClickDest('${d.id}')"></div>`;
+            }).join('')}
+          </div>
+          <div class="km-bar-labels">
+            <span class="km-bar-label-start">Lagos · KM 0</span>
+            <span class="km-bar-label-active" id="kmBarLabel"></span>
+            <span class="km-bar-label-end">Calabar · KM 700.3</span>
+          </div>
+        `;
+      }
+
+      function updateKmProgressBar(km: number | null) {
+        const fill = document.getElementById('kmBarFill');
+        const label = document.getElementById('kmBarLabel');
+        if (!fill || !label) return;
+        if (km === null) {
+          fill.style.width = '0%';
+          label.textContent = '';
+        } else {
+          const pct = Math.min(100, (km / 700.3) * 100);
+          fill.style.width = `${pct}%`;
+          const dest = DESTINATIONS.find(d => d.corridorKm === km);
+          label.textContent = dest ? `${dest.name} · KM ${km}` : `KM ${km}`;
+        }
+      }
+
+      // ============ TIER 2: DEEP-LINK URL SUPPORT ============
+      function updateDeepLinkUrl(destId: string | null, listingId: string | null) {
+        try {
+          const url = new URL(window.location.href);
+          if (destId) { url.searchParams.set('dest', destId); url.searchParams.delete('listing'); }
+          else if (listingId) { url.searchParams.set('listing', listingId); url.searchParams.delete('dest'); }
+          else { url.searchParams.delete('dest'); url.searchParams.delete('listing'); }
+          window.history.replaceState({}, '', url.toString());
+        } catch (e) { /* ignore */ }
+      }
+
+      function handleDeepLink() {
+        try {
+          const url = new URL(window.location.href);
+          const destId = url.searchParams.get('dest');
+          const listingId = url.searchParams.get('listing');
+          if (destId) {
+            const d = DESTINATIONS.find(x => x.id === destId);
+            if (d) setTimeout(() => openDestinationPanel(d), 2800);
+          } else if (listingId) {
+            const p = LISTINGS.find(x => x.id === listingId);
+            if (p) setTimeout(() => { openListingCard(p); flyToListing(p.id, false); }, 2800);
+          }
+        } catch (e) { /* ignore */ }
+      }
+
       // ============ EXPOSE TO WINDOW ============
       (window as any).cameraOverview = cameraOverview;
       (window as any).expressFly = expressFly;
@@ -1352,6 +1441,7 @@ export default function MapPage() {
       (window as any).cycleTime = cycleTime;
       (window as any).toggleBuildings = toggleBuildings;
       (window as any).toggleVR = toggleVR;
+      (window as any).toggleSatellite = toggleSatellite;
       (window as any).closeListingCard = closeListingCard;
       (window as any).flyToListing = flyToListing;
       (window as any).sidebarClickDest = sidebarClickDest;
@@ -1365,6 +1455,7 @@ export default function MapPage() {
       (window as any).setStateFilter = setStateFilter;
       (window as any).setVerifiedFilter = setVerifiedFilter;
       (window as any).setFeaturedFilter = setFeaturedFilter;
+      (window as any).setDestSearch = setDestSearch;
 
       init();
     }
@@ -1375,7 +1466,6 @@ export default function MapPage() {
     };
   }, []);
 
-  // Build journey panel options
   const destOptions = DESTINATIONS.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
   const listingOptions = LISTINGS.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
 
@@ -1452,6 +1542,18 @@ export default function MapPage() {
         .sidebar-headline { font-size: 16px; font-weight: 700; color: var(--text); }
         .sidebar-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
         #listingCount { color: var(--ochre); font-weight: 600; }
+
+        /* Tier 2: Destination search input */
+        .dest-search-wrap {
+          padding: 8px 16px; border-bottom: 1px solid var(--line);
+        }
+        .dest-search-input {
+          width: 100%; padding: 6px 10px; border-radius: 6px;
+          background: var(--ink-3); border: 1px solid var(--line-2);
+          color: var(--text); font-size: 11px; outline: none;
+          box-sizing: border-box;
+        }
+        .dest-search-input::placeholder { color: var(--text-muted); }
 
         .listings-list { flex: 1; overflow-y: auto; padding: 8px 0; }
         .listings-list::-webkit-scrollbar { width: 3px; }
@@ -1538,12 +1640,29 @@ export default function MapPage() {
         }
         .lp-hero-overlay {
           position: absolute; inset: 0;
-          background: linear-gradient(to bottom, transparent 40%, rgba(10,14,18,0.9) 100%);
+          background: linear-gradient(to bottom, transparent 30%, rgba(10,14,18,0.85) 100%);
         }
         .lp-yoy {
           position: absolute; top: 12px; right: 12px;
           background: var(--success); color: var(--ink); padding: 3px 8px;
           border-radius: 4px; font-size: 11px; font-weight: 700;
+        }
+
+        /* Tier 1: Destination hero label overlay */
+        .dest-hero-label {
+          position: absolute; bottom: 16px; left: 16px; right: 16px;
+        }
+        .dest-hero-state {
+          font-size: 10px; letter-spacing: 0.14em; color: rgba(255,255,255,0.7);
+          text-transform: uppercase; margin-bottom: 4px;
+        }
+        .dest-hero-name {
+          font-size: 20px; font-weight: 800; color: #fff; line-height: 1.2; margin-bottom: 8px;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+        }
+        .dest-hero-tag {
+          display: inline-block; padding: 3px 10px; border-radius: 20px;
+          font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
         }
 
         .lp-body { padding: 16px; }
@@ -1753,7 +1872,7 @@ export default function MapPage() {
           padding: 0 4px; flex-shrink: 0;
         }
 
-        /* ===== DESTINATION DETAIL PANEL (right panel) ===== */
+        /* ===== DESTINATION DETAIL PANEL ===== */
         .lp-stats-grid {
           display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0;
         }
@@ -1784,9 +1903,42 @@ export default function MapPage() {
         .dlr-yoy { font-size: 9px; color: var(--success); font-weight: 600; }
         .dlr-arrow { font-size: 18px; color: var(--text-muted); flex-shrink: 0; }
 
+        /* ===== TIER 3: KM PROGRESS BAR ===== */
+        .km-progress-bar {
+          position: fixed; bottom: 72px; left: 280px; right: 0; z-index: 18;
+          padding: 0 24px 0 20px;
+          pointer-events: all;
+        }
+        .km-bar-track {
+          position: relative; height: 3px;
+          background: rgba(255,255,255,0.1); border-radius: 2px;
+        }
+        .km-bar-fill {
+          height: 100%; background: var(--ochre); border-radius: 2px;
+          transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .km-bar-tick {
+          position: absolute; top: -4px; width: 3px; height: 11px;
+          background: rgba(255,255,255,0.25); border-radius: 1px;
+          transform: translateX(-50%); cursor: pointer;
+          transition: background 0.15s;
+        }
+        .km-bar-tick:hover { background: var(--ochre); }
+        .km-bar-labels {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-top: 5px;
+        }
+        .km-bar-label-start, .km-bar-label-end {
+          font-size: 9px; color: var(--text-muted); letter-spacing: 0.08em;
+        }
+        .km-bar-label-active {
+          font-size: 9px; color: var(--ochre); font-weight: 700; letter-spacing: 0.08em;
+          text-align: center; flex: 1; padding: 0 8px;
+        }
+
         /* ===== LEGEND ===== */
         .cc-legend {
-          position: fixed; bottom: 80px; right: 20px; z-index: 15;
+          position: fixed; bottom: 100px; right: 20px; z-index: 15;
           background: rgba(10,14,18,0.88); border: 1px solid var(--line);
           border-radius: 8px; padding: 10px 14px;
           backdrop-filter: blur(10px);
@@ -1795,6 +1947,64 @@ export default function MapPage() {
         .legend-item { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
         .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
         .legend-label { font-size: 10px; color: var(--text-dim); }
+
+        /* ===== TIER 1: MOBILE RESPONSIVE ===== */
+        @media (max-width: 768px) {
+          .cc-sidebar {
+            width: 100%; bottom: auto; top: 0; height: 48px; padding-top: 0;
+            flex-direction: row; align-items: center; overflow: hidden;
+            border-right: none; border-bottom: 1px solid var(--line);
+            z-index: 22;
+          }
+          .cc-sidebar.mobile-open {
+            height: 60vh; flex-direction: column; align-items: stretch; overflow-y: auto;
+          }
+          .sidebar-header {
+            display: flex; align-items: center; padding: 0 16px;
+            min-height: 48px; border-bottom: none; cursor: pointer;
+            flex-shrink: 0;
+          }
+          .cc-sidebar.mobile-open .sidebar-header { border-bottom: 1px solid var(--line); }
+          .sidebar-headline { font-size: 13px; }
+          .sidebar-sub { display: none; }
+          .sidebar-title { display: none; }
+          .listings-list { display: none; }
+          .cc-sidebar.mobile-open .listings-list { display: block; flex: 1; }
+          .dest-search-wrap { display: none; }
+          .cc-sidebar.mobile-open .dest-search-wrap { display: block; }
+          .sidebar-toggle-icon {
+            margin-left: auto; font-size: 18px; color: var(--text-muted);
+          }
+
+          .cc-filter-bar {
+            left: 0; top: 48px; padding: 8px 12px; gap: 8px;
+          }
+          .filter-label { display: none; }
+
+          .listing-panel {
+            width: 100%; right: -100%; top: auto; bottom: 0;
+            height: 70vh; border-left: none; border-top: 1px solid var(--line-2);
+            border-radius: 16px 16px 0 0;
+            transition: bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            right: 0; bottom: -100vh;
+          }
+          .listing-panel.open { bottom: 0; right: 0; }
+
+          .cc-toolbar {
+            bottom: 16px; padding: 6px 10px; gap: 2px;
+          }
+          .toolbar-btn { padding: 6px 8px; font-size: 10px; letter-spacing: 0.04em; }
+
+          .km-progress-bar { left: 0; bottom: 64px; padding: 0 12px; }
+
+          .cc-legend { display: none; }
+
+          .cc-topbar { padding: 10px 16px; }
+          .cc-meta { gap: 12px
+; }
+          .cc-meta-value { font-size: 11px; }
+          .cc-meta-label { font-size: 8px; }
+        }
       `}</style>
 
       {/* Cesium globe */}
@@ -1837,11 +2047,29 @@ export default function MapPage() {
       </div>
 
       {/* Left sidebar — destinations */}
-      <div className="cc-sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-title">§01 · Corridor Destinations</div>
-          <div className="sidebar-headline">12 Stops · Lagos to Calabar</div>
-          <div className="sidebar-sub">Click a destination to explore</div>
+      <div className="cc-sidebar" id="ccSidebar">
+        <div
+          className="sidebar-header"
+          onClick={() => {
+            const sb = document.getElementById('ccSidebar');
+            if (sb) sb.classList.toggle('mobile-open');
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div className="sidebar-title">§01 · Corridor Destinations</div>
+            <div className="sidebar-headline">12 Stops · Lagos to Calabar</div>
+            <div className="sidebar-sub">Click a destination to explore</div>
+          </div>
+          <div className="sidebar-toggle-icon">☰</div>
+        </div>
+        {/* Tier 2: destination search */}
+        <div className="dest-search-wrap">
+          <input
+            className="dest-search-input"
+            type="text"
+            placeholder="Search destinations..."
+            onInput={(e) => (window as any).setDestSearch?.((e.target as HTMLInputElement).value)}
+          />
         </div>
         <div className="listings-list" id="listingsList" />
       </div>
@@ -1866,6 +2094,9 @@ export default function MapPage() {
         />
       </div>
 
+      {/* Tier 3: KM Progress Bar */}
+      <div className="km-progress-bar" id="kmProgressBar" />
+
       {/* Bottom toolbar */}
       <div className="cc-toolbar">
         <button className="toolbar-btn" onClick={() => (window as any).cameraOverview?.()}>⊕ OVERVIEW</button>
@@ -1875,6 +2106,7 @@ export default function MapPage() {
         <div className="toolbar-sep" />
         <button className="toolbar-btn" id="layerBtn" onClick={() => (window as any).toggleLayersPanel?.()}>⊞ LAYERS</button>
         <button className="toolbar-btn" id="timeBtn" onClick={() => (window as any).cycleTime?.()}>☀ <span id="timeLabel">MIDDAY</span></button>
+        <button className="toolbar-btn active" id="satBtn" onClick={() => (window as any).toggleSatellite?.()}>🛰 SATELLITE</button>
         <button className="toolbar-btn" id="bldgBtn" onClick={() => (window as any).toggleBuildings?.()}>🏢 BUILDINGS</button>
         <button className="toolbar-btn" id="vrBtn" onClick={() => (window as any).toggleVR?.()}>VR</button>
       </div>
