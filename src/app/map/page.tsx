@@ -1104,10 +1104,10 @@ export default function MapPage() {
         cameraOverview();
       }
 
-      // ============ FLIGHT HUD (speed/altitude/km/time) ============
+      // ============ FLIGHT HUD ============
       let hudInterval: ReturnType<typeof setInterval> | null = null;
       let hudStartTime = 0;
-      let hudPrevPos: Cesium.Cartesian3 | null = null;
+      let hudPrevPos: any = null; // Cesium.Cartesian3 loaded via CDN — use any
       let hudPrevTime = 0;
 
       function startFlightHud() {
