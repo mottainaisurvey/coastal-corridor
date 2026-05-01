@@ -3,39 +3,41 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // ---------------------------------------------------------------------------
-// Subdomain routing
+// Subdomain routing map
 // ---------------------------------------------------------------------------
-function subdomainRewrite(request: NextRequest): NextResponse | null {
-  const hostname = request.headers.get('host') || '';
-  const url = request.nextUrl.clone();
-  const subdomain = hostname.split('.')[0];
+const SUBDOMAIN_ROUTES: Record<string, string> = {
+  admin: '/admin/sign-in',
+  agent: '/agent',
+  developer: '/developer/sign-up',
+  map: '/map',
+  operator: '/operator/sign-in',
+  host: '/host/sign-in',
+};
 
-  if (subdomain === 'admin' && url.pathname === '/') {
-    url.pathname = '/admin/sign-in';
-    return NextResponse.rewrite(url);
-  }
-  if (subdomain === 'agent' && url.pathname === '/') {
-    url.pathname = '/agent';
-    return NextResponse.rewrite(url);
-  }
-  if (subdomain === 'developer' && url.pathname === '/') {
-    url.pathname = '/developer/sign-up';
-    return NextResponse.rewrite(url);
-  }
-  if (subdomain === 'map' && url.pathname === '/') {
-    url.pathname = '/map';
-    return NextResponse.rewrite(url);
-  }
-  if (subdomain === 'operator' && url.pathname === '/') {
-    url.pathname = '/operator/sign-in';
-    return NextResponse.rewrite(url);
-  }
-  if (subdomain === 'host' && url.pathname === '/') {
-    url.pathname = '/host/sign-in';
-    return NextResponse.rewrite(url);
-  }
-  return null;
-}
+// Routes that Clerk should completely ignore (no auth processing at all)
+const IGNORED_PATHS = [
+  '/',
+  '/map',
+  '/about',
+  '/contact',
+  '/listings',
+  '/destinations',
+  '/agents',
+  '/tourism',
+  '/diaspora',
+  '/how-verification-works',
+  '/for-agents',
+  '/for-developers',
+  '/fractional',
+  '/press',
+  '/careers',
+  '/legal',
+  '/terms',
+  '/privacy',
+  '/cookies',
+  '/unauthorized',
+  '/professional',
+];
 
 // ---------------------------------------------------------------------------
 // Role constants — stored in Clerk publicMetadata.role
@@ -47,50 +49,21 @@ const OPERATOR_ROLES = ['operator', 'OPERATOR', 'admin', 'superadmin', 'ADMIN'];
 const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 
 // ---------------------------------------------------------------------------
-// Main auth middleware
+// Clerk auth middleware (handles all non-subdomain-root requests)
 // ---------------------------------------------------------------------------
-export default authMiddleware({
-  // ignoredRoutes: Clerk completely skips these — no interstitial, no cookie check
-  // Use for fully public pages that never need auth context
+const clerkAuth = authMiddleware({
   ignoredRoutes: [
-    '/',
-    '/properties',
-    '/properties/(.*)',
-    '/destinations',
-    '/destinations/(.*)',
-    '/agents',
-    '/tourism',
-    '/invest',
-    '/map',
-    '/how-verification-works',
-    '/unauthorized',
-    '/about',
-    '/press',
-    '/careers',
-    '/contact',
-    '/legal',
-    '/terms',
-    '/privacy',
-    '/cookies',
-    '/for-agents',
-    '/for-agents/(.*)',
-    '/for-developers',
-    '/for-developers/(.*)',
-    '/for-operators',
-    '/for-operators/(.*)',
-    '/fractional',
-    '/diaspora',
-    // Public API routes
-    '/api/properties(.*)',
+    '/((?!api|trpc)(_next|.+\\.[\\w]+$))',
+    ...IGNORED_PATHS,
+    '/listings(.*)',
+    '/destinations(.*)',
+    '/agents(.*)',
+    '/tourism(.*)',
+    '/api/listings(.*)',
     '/api/destinations(.*)',
-    '/api/search(.*)',
-    '/api/health(.*)',
     '/api/inquiries(.*)',
     '/api/admin/migrate(.*)',
   ],
-
-  // publicRoutes: Clerk processes these (for auth context) but doesn't redirect
-  // Use for auth pages and pages that behave differently when logged in
   publicRoutes: [
     '/sign-in',
     '/sign-in/(.*)',
@@ -117,15 +90,6 @@ export default authMiddleware({
     '/host/sign-in',
     '/host/sign-in/(.*)',
   ],
-
-  // Run subdomain rewriting before auth
-  beforeAuth: (req) => {
-    const rewrite = subdomainRewrite(req);
-    if (rewrite) return rewrite;
-  },
-
-  // After auth: enforce role-based access + redirect authenticated users on
-  // landing pages to their correct dashboards
   afterAuth: (auth, req) => {
     const { userId, sessionClaims } = auth;
     const url = req.nextUrl.clone();
@@ -138,7 +102,6 @@ export default authMiddleware({
         return NextResponse.redirect(url);
       }
     }
-
     // ---- Authenticated developer on the sign-up page → dashboard ----
     if (url.pathname === '/developer/sign-up' && userId) {
       const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
@@ -147,7 +110,6 @@ export default authMiddleware({
         return NextResponse.redirect(url);
       }
     }
-
     // ---- Authenticated admin on the sign-in page → dashboard ----
     if (url.pathname === '/admin/sign-in' && userId) {
       const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
@@ -156,7 +118,6 @@ export default authMiddleware({
         return NextResponse.redirect(url);
       }
     }
-
     // ---- Admin routes (/admin/*) — protect all except sign-in page --------
     if (url.pathname.startsWith('/admin') && !url.pathname.startsWith('/admin/sign-in')) {
       if (userId) {
@@ -168,7 +129,6 @@ export default authMiddleware({
         }
       }
     }
-
     // ---- Agent routes (/agent/*) — protect dashboard/listings only --------
     if (
       url.pathname.startsWith('/agent/dashboard') ||
@@ -183,7 +143,6 @@ export default authMiddleware({
         }
       }
     }
-
     // ---- Developer routes (/developer/*) — protect dashboard and sub-pages --
     if (
       url.pathname.startsWith('/developer/dashboard') ||
@@ -199,7 +158,6 @@ export default authMiddleware({
         }
       }
     }
-
     // ---- Operator routes (/operator/*) — protect dashboard and sub-pages ----
     if (url.pathname.startsWith('/operator/dashboard')) {
       if (userId) {
@@ -211,7 +169,6 @@ export default authMiddleware({
         }
       }
     }
-
     // ---- Host routes (/host/*) — protect dashboard and sub-pages ------------
     if (url.pathname.startsWith('/host/dashboard')) {
       if (userId) {
@@ -223,10 +180,39 @@ export default authMiddleware({
         }
       }
     }
-
     return NextResponse.next();
   },
 });
+
+// ---------------------------------------------------------------------------
+// Main exported middleware — subdomain rewriting runs FIRST, before Clerk
+// ---------------------------------------------------------------------------
+export function middleware(request: NextRequest) {
+  const hostname = request.headers.get('host') || '';
+  const url = request.nextUrl.clone();
+
+  // Extract subdomain: "admin.coastalcorridor.africa" → "admin"
+  // Handle both production (2-part TLD like .africa) and localhost
+  const hostParts = hostname.split('.');
+  let subdomain: string | null = null;
+
+  if (hostname.includes('localhost')) {
+    // localhost:3000 — no subdomain routing in dev
+    subdomain = null;
+  } else if (hostParts.length >= 3) {
+    // e.g. admin.coastalcorridor.africa → subdomain = "admin"
+    subdomain = hostParts[0];
+  }
+
+  // Apply subdomain rewrite if we're at the root path
+  if (subdomain && url.pathname === '/' && SUBDOMAIN_ROUTES[subdomain]) {
+    url.pathname = SUBDOMAIN_ROUTES[subdomain];
+    return NextResponse.rewrite(url);
+  }
+
+  // For all other requests, run Clerk auth middleware
+  return (clerkAuth as any)(request);
+}
 
 export const config = {
   matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
