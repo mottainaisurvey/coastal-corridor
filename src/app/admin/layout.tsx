@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser, UserButton } from '@clerk/nextjs';
+import { useAuth, useUser, UserButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -45,10 +45,11 @@ const ADMIN_NAV = [
 ];
 
 function AdminSidebar() {
+  const { sessionClaims } = useAuth();
   const { user } = useUser();
   const pathname = usePathname();
 
-  const role = (user?.publicMetadata?.role as string) || '';
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isSuperAdmin = role === 'superadmin' || role === 'SUPERADMIN';
 
   return (

@@ -17,7 +17,7 @@ const STATUS_COLOURS: Record<string, string> = {
 };
 
 export default function AgentInquiriesPage() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
 
@@ -30,7 +30,7 @@ export default function AgentInquiriesPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const PAGE_SIZE = 20;
 
-  const role = (user?.publicMetadata?.role as string) || '';
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isAgent = AGENT_ROLES.includes(role);
 
   useEffect(() => {
@@ -38,8 +38,8 @@ export default function AgentInquiriesPage() {
   }, [isLoaded, userId, router]);
 
   useEffect(() => {
-    if (isLoaded && user && !isAgent) router.replace('/unauthorized?required=agent');
-  }, [isLoaded, user, isAgent, router]);
+    if (isLoaded && userId && role && !isAgent) router.replace('/unauthorized?required=agent');
+  }, [isLoaded, userId, role, isAgent, router]);
 
   useEffect(() => {
     if (!userId || !isAgent) return;

@@ -9,14 +9,15 @@ import { Eye, MessageSquare, Home, TrendingUp, Calendar, BadgeCheck } from 'luci
 const AGENT_ROLES = ['agent', 'AGENT', 'admin', 'superadmin', 'ADMIN'];
 
 export default function AgentDashboard() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [recentInquiries, setRecentInquiries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const role = (user?.publicMetadata?.role as string) || '';
+  // Use sessionClaims first (available immediately from JWT), fall back to user.publicMetadata
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isAgent = AGENT_ROLES.includes(role);
 
   // Redirect unauthenticated users
@@ -26,12 +27,12 @@ export default function AgentDashboard() {
     }
   }, [isLoaded, userId, router]);
 
-  // Redirect users without agent role
+  // Redirect users without agent role — only redirect when role is confirmed loaded
   useEffect(() => {
-    if (isLoaded && user && !isAgent) {
+    if (isLoaded && userId && role && !isAgent) {
       router.replace('/unauthorized?required=agent');
     }
-  }, [isLoaded, user, isAgent, router]);
+  }, [isLoaded, userId, role, isAgent, router]);
 
   useEffect(() => {
     if (!userId || !isAgent) return;
