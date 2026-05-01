@@ -52,7 +52,11 @@ function AdminSignInContent() {
 
   const selectRole = (role: Role) => {
     sessionStorage.setItem('adminSignInRole', role);
-    router.push(`/admin/sign-in?role=${role}`);
+    // Use window.location.assign instead of router.push to avoid Next.js
+    // subdomain rewrite context resolving the path to the wrong domain
+    if (typeof window !== 'undefined') {
+      window.location.assign(`/admin/sign-in?role=${role}`);
+    }
   };
 
   const clearRole = () => {
