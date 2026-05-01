@@ -26,6 +26,14 @@ function subdomainRewrite(request: NextRequest): NextResponse | null {
     url.pathname = '/map';
     return NextResponse.rewrite(url);
   }
+  if (subdomain === 'operator' && url.pathname === '/') {
+    url.pathname = '/operator/sign-in';
+    return NextResponse.rewrite(url);
+  }
+  if (subdomain === 'host' && url.pathname === '/') {
+    url.pathname = '/host/sign-in';
+    return NextResponse.rewrite(url);
+  }
   return null;
 }
 
