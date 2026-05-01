@@ -1,18 +1,5 @@
 import { authMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-
-// ---------------------------------------------------------------------------
-// Subdomain routing map: subdomain → internal path
-// ---------------------------------------------------------------------------
-const SUBDOMAIN_ROUTES: Record<string, string> = {
-  admin: '/admin/sign-in',
-  agent: '/agent',
-  developer: '/developer/sign-up',
-  map: '/map',
-  operator: '/operator/sign-in',
-  host: '/host/sign-in',
-};
 
 // ---------------------------------------------------------------------------
 // Role constants — stored in Clerk publicMetadata.role
@@ -24,7 +11,7 @@ const OPERATOR_ROLES = ['operator', 'OPERATOR', 'admin', 'superadmin', 'ADMIN'];
 const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 
 // ---------------------------------------------------------------------------
-// Main auth middleware
+// Main auth middleware — subdomain routing is handled in next.config.js rewrites
 // ---------------------------------------------------------------------------
 export default authMiddleware({
   // ignoredRoutes: Clerk skips these entirely — no interstitial, no auth check
@@ -83,32 +70,6 @@ export default authMiddleware({
     '/host/sign-in',
     '/host/sign-in/(.*)',
   ],
-  // beforeAuth: handle subdomain rewrites BEFORE Clerk processes the request
-  beforeAuth: (req: NextRequest) => {
-    const hostname = req.headers.get('host') || '';
-    const hostParts = hostname.split('.');
-
-    // Detect subdomain: need at least 3 parts (sub.domain.tld)
-    // Skip localhost
-    if (!hostname.includes('localhost') && hostParts.length >= 3) {
-      const subdomain = hostParts[0];
-      const targetPath = SUBDOMAIN_ROUTES[subdomain];
-
-      if (targetPath && req.nextUrl.pathname === '/') {
-        // Build absolute rewrite URL using the MAIN domain (not the subdomain)
-        // This tells Next.js to serve the content from the main domain's route
-        const mainDomain = hostParts.slice(1).join('.');
-        const rewriteUrl = new URL(
-          `${req.nextUrl.protocol}//${mainDomain}${targetPath}`
-        );
-        // Copy query params if any
-        rewriteUrl.search = req.nextUrl.search;
-        return NextResponse.rewrite(rewriteUrl);
-      }
-    }
-    // No subdomain rewrite needed — continue to Clerk auth
-    return undefined;
-  },
   // afterAuth: enforce role-based access
   afterAuth: (auth, req) => {
     const { userId, sessionClaims } = auth;
