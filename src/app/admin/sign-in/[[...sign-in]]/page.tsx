@@ -3,8 +3,8 @@
 import { SignIn } from '@clerk/nextjs';
 import Link from 'next/link';
 import { ShieldCheck, Lock, ChevronRight } from 'lucide-react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Suspense } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 
 type Role = 'superadmin' | 'admin';
 
@@ -15,12 +15,38 @@ const ROLE_EMAILS: Record<Role, string> = {
 
 function AdminSignInContent() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
+
+  // Read role from URL param first, then fall back to sessionStorage
+  // This handles the case where Clerk navigates to /factor-one and drops query params
   const roleParam = searchParams.get('role') as Role | null;
-  const selectedRole: Role | null = roleParam === 'superadmin' || roleParam === 'admin' ? roleParam : null;
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+
+  useEffect(() => {
+    if (roleParam === 'superadmin' || roleParam === 'admin') {
+      // URL has role — save to sessionStorage and use it
+      sessionStorage.setItem('adminSignInRole', roleParam);
+      setSelectedRole(roleParam);
+    } else {
+      // URL has no role — check sessionStorage (Clerk sub-route navigation)
+      const stored = sessionStorage.getItem('adminSignInRole') as Role | null;
+      if (stored === 'superadmin' || stored === 'admin') {
+        setSelectedRole(stored);
+      } else {
+        setSelectedRole(null);
+      }
+    }
+  }, [roleParam, pathname]);
 
   const selectRole = (role: Role) => {
+    sessionStorage.setItem('adminSignInRole', role);
     router.push(`/admin/sign-in?role=${role}`);
+  };
+
+  const clearRole = () => {
+    sessionStorage.removeItem('adminSignInRole');
+    setSelectedRole(null);
   };
 
   return (
@@ -172,13 +198,13 @@ function AdminSignInContent() {
             <div>
               {/* Back + role indicator */}
               <div className="flex items-center gap-3 mb-6">
-                <Link
-                  href="/admin/sign-in"
+                <button
+                  onClick={clearRole}
                   className="flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-micro text-ink/40 hover:text-ink/70 transition-colors"
                 >
                   <ChevronRight className="h-3 w-3 rotate-180" />
                   Back
-                </Link>
+                </button>
                 <div className="h-3 w-px bg-ink/15" />
                 <span className={`font-mono text-[10px] uppercase tracking-micro px-2.5 py-1 rounded-sm border ${
                   selectedRole === 'superadmin'
