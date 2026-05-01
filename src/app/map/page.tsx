@@ -276,9 +276,11 @@ export default function MapPage() {
           viewer.scene.skyAtmosphere.brightnessShift = -0.1;
           viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0e12');
 
+          // Mobile: zoom closer to the Nigerian coastline corridor
+          const isMobile = window.innerWidth < 768;
           viewer.camera.setView({
-            destination: Cesium.Cartesian3.fromDegrees(5.8, 4.2, 1100000),
-            orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-55), roll: 0 }
+            destination: Cesium.Cartesian3.fromDegrees(5.8, 4.2, isMobile ? 700000 : 1100000),
+            orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(isMobile ? -60 : -55), roll: 0 }
           });
 
           plotListings();
@@ -990,9 +992,10 @@ export default function MapPage() {
 
       // ============ FLYTHROUGH MODES ============
       function cameraOverview() {
+        const isMob = window.innerWidth < 768;
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(5.8, 4.2, 1000000),
-          orientation: { heading: Cesium.Math.toRadians(10), pitch: Cesium.Math.toRadians(-48), roll: 0 },
+          destination: Cesium.Cartesian3.fromDegrees(5.8, 4.2, isMob ? 650000 : 1000000),
+          orientation: { heading: Cesium.Math.toRadians(10), pitch: Cesium.Math.toRadians(isMob ? -62 : -48), roll: 0 },
           duration: 3
         });
         closeListingCard();
@@ -1006,7 +1009,8 @@ export default function MapPage() {
           overlay.style.cssText = `
             position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
             background:rgba(10,14,18,0.88); border:1px solid rgba(212,162,76,0.5);
-            border-radius:8px; padding:14px 28px; text-align:center;
+            border-radius:8px; padding:14px 20px; text-align:center;
+            max-width:calc(100vw - 24px); box-sizing:border-box;
             font-family:'Inter Tight',sans-serif; color:#f5f0e8;
             pointer-events:none; z-index:9999;
             transition:opacity 0.4s ease;
@@ -2067,14 +2071,17 @@ export default function MapPage() {
 
         /* ===== TIER 1: MOBILE RESPONSIVE ===== */
         @media (max-width: 768px) {
+
+          /* --- Sidebar: collapses to a top drawer --- */
           .cc-sidebar {
             width: 100%; bottom: auto; top: 0; height: 48px; padding-top: 0;
             flex-direction: row; align-items: center; overflow: hidden;
             border-right: none; border-bottom: 1px solid var(--line);
             z-index: 22;
+            background: rgba(10,14,18,0.97);
           }
           .cc-sidebar.mobile-open {
-            height: 60vh; flex-direction: column; align-items: stretch; overflow-y: auto;
+            height: 65vh; flex-direction: column; align-items: stretch; overflow-y: auto;
           }
           .sidebar-header {
             display: flex; align-items: center; padding: 0 16px;
@@ -2093,34 +2100,123 @@ export default function MapPage() {
             margin-left: auto; font-size: 18px; color: var(--text-muted);
           }
 
+          /* --- Filter bar: single scrollable row, no wrap --- */
           .cc-filter-bar {
-            left: 0; top: 48px; padding: 8px 12px; gap: 8px;
+            left: 0; right: 0; top: 48px;
+            padding: 6px 12px;
+            gap: 0;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x mandatory;
+            background: rgba(10,14,18,0.95);
+            border-bottom: 1px solid var(--line);
+            scrollbar-width: none;
           }
+          .cc-filter-bar::-webkit-scrollbar { display: none; }
+          .filter-group {
+            flex-shrink: 0;
+            scroll-snap-align: start;
+            padding-right: 10px;
+          }
+          .filter-group:last-child { padding-right: 4px; }
           .filter-label { display: none; }
+          .filter-pills { flex-wrap: nowrap; gap: 4px; }
+          .filter-pill {
+            padding: 5px 11px; font-size: 11px;
+            white-space: nowrap; flex-shrink: 0;
+            min-height: 32px;
+          }
+          .filter-select {
+            font-size: 11px; padding: 5px 8px; min-height: 32px;
+          }
+          .filter-toggles { flex-wrap: nowrap; gap: 10px; }
+          .filter-toggle-item { font-size: 11px; white-space: nowrap; }
 
+          /* --- Listing panel: full-width bottom sheet --- */
           .listing-panel {
-            width: 100%; right: -100%; top: auto; bottom: 0;
-            height: 70vh; border-left: none; border-top: 1px solid var(--line-2);
-            border-radius: 16px 16px 0 0;
+            width: 100%; right: 0; top: auto; bottom: -100vh;
+            height: 75vh; border-left: none; border-top: 1px solid var(--line-2);
+            border-radius: 20px 20px 0 0;
             transition: bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-            right: 0; bottom: -100vh;
           }
-          .listing-panel.open { bottom: 0; right: 0; }
+          .listing-panel.open { bottom: 0; }
+          .lp-close {
+            width: 36px; height: 36px; font-size: 22px;
+            display: flex; align-items: center; justify-content: center;
+          }
 
+          /* --- Bottom toolbar: scrollable pill row, safe-area aware --- */
           .cc-toolbar {
-            bottom: 16px; padding: 6px 10px; gap: 2px;
+            bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+            left: 12px; right: 12px;
+            transform: none;
+            padding: 6px 8px; gap: 0;
+            border-radius: 28px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
           }
-          .toolbar-btn { padding: 6px 8px; font-size: 10px; letter-spacing: 0.04em; }
+          .cc-toolbar::-webkit-scrollbar { display: none; }
+          .toolbar-btn {
+            padding: 7px 10px; font-size: 10px; letter-spacing: 0.03em;
+            white-space: nowrap; flex-shrink: 0; min-height: 34px;
+          }
+          .toolbar-sep { flex-shrink: 0; }
 
-          .km-progress-bar { left: 0; bottom: 64px; padding: 0 12px; }
+          /* --- KM progress bar: above toolbar --- */
+          .km-progress-bar {
+            left: 0; right: 0;
+            bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 58px);
+            padding: 0 12px;
+          }
 
+          /* --- Layers / Journey panels: full width, bottom-anchored --- */
+          .layers-panel {
+            left: 12px; right: 12px;
+            bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 64px);
+            transform: none;
+            min-width: unset; width: auto;
+          }
+          .journey-panel {
+            left: 12px; right: 12px;
+            bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 64px);
+            transform: none;
+            min-width: unset; width: auto;
+          }
+
+          /* --- HUD: smaller, top-right --- */
+          .flight-hud {
+            top: 100px; right: 8px;
+            padding: 8px 10px;
+          }
+          .hud-row { font-size: 10px; }
+          .hud-value { font-size: 12px; }
+
+          /* --- Legend: hidden on mobile --- */
           .cc-legend { display: none; }
 
-          .cc-topbar { padding: 10px 16px; }
-          .cc-meta { gap: 12px
-; }
-          .cc-meta-value { font-size: 11px; }
-          .cc-meta-label { font-size: 8px; }
+          /* --- Topbar: hide on mobile (sidebar takes top position) --- */
+          .cc-topbar { display: none; }
+
+          /* --- Dest toast: full width --- */
+          .dest-toast {
+            left: 12px; right: 12px;
+            transform: none;
+            bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 64px);
+          }
+        }
+
+        /* ===== EXTRA SMALL PHONES (< 400px) ===== */
+        @media (max-width: 400px) {
+          .toolbar-btn { padding: 6px 8px; font-size: 9px; }
+          .filter-pill { padding: 4px 9px; font-size: 10px; }
+          .lp-price { font-size: 18px; }
+          .lp-title { font-size: 13px; }
         }
       `}</style>
 
