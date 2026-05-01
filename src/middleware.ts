@@ -14,19 +14,18 @@ const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 // Main auth middleware — subdomain routing is handled in next.config.js rewrites
 // NOTE: Clerk v4 authMiddleware uses micromatch glob patterns (NOT regex).
 //       Use '/path/:path*' for wildcards, NOT '/path(.*)'.
+// NOTE: ignoredRoutes = completely bypass Clerk (no interstitial, no token check)
+//       publicRoutes = Clerk processes but doesn't redirect unauthenticated users
 // ---------------------------------------------------------------------------
 export default authMiddleware({
-  // publicRoutes: Clerk processes these but doesn't redirect unauthenticated users
-  publicRoutes: [
-    '/',
-    '/map',
-    '/about',
-    '/contact',
+  // ignoredRoutes: Clerk completely skips these — prevents interstitial on sign-in pages
+  // and on all public marketing/content pages
+  ignoredRoutes: [
+    // All sign-in/sign-up pages — must be ignored to prevent Clerk interstitial
     '/sign-in',
     '/sign-in/:path*',
     '/sign-up',
     '/sign-up/:path*',
-    '/agent',
     '/agent/sign-in',
     '/agent/sign-in/:path*',
     '/agent/sign-up',
@@ -45,6 +44,12 @@ export default authMiddleware({
     '/host/sign-in/:path*',
     '/host/sign-up',
     '/host/sign-up/:path*',
+    // Public marketing/content pages
+    '/',
+    '/map',
+    '/about',
+    '/contact',
+    '/agent',
     '/professional',
     '/unauthorized',
     '/listings',
@@ -82,11 +87,6 @@ export default authMiddleware({
     const url = req.nextUrl.clone();
     const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
 
-    // ---- Authenticated agent on the marketing landing page → dashboard ----
-    if (url.pathname === '/agent' && userId && role && AGENT_ROLES.includes(role)) {
-      url.pathname = '/agent/dashboard';
-      return NextResponse.redirect(url);
-    }
     // ---- Authenticated developer on the sign-up page → dashboard ----
     if (url.pathname === '/developer/sign-up' && userId && role && DEVELOPER_ROLES.includes(role)) {
       url.pathname = '/developer/dashboard';
