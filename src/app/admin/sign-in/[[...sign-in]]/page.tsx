@@ -231,8 +231,7 @@ function AdminSignInContent() {
               </div>
 
               <SignIn
-                routing="path"
-                path="/admin/sign-in"
+                routing="virtual"
                 afterSignInUrl="https://admin.coastalcorridor.africa/admin/dashboard"
                 initialValues={{
                   emailAddress: ROLE_EMAILS[selectedRole],
