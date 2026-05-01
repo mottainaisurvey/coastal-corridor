@@ -99,7 +99,7 @@ export default function OperatorSignUpPage() {
             routing="path"
             path="/operator/sign-up"
             signInUrl="/operator/sign-in"
-            afterSignUpUrl="/operator/dashboard"
+            forceRedirectUrl="/operator/dashboard"
             appearance={{
               elements: {
                 rootBox: 'w-full',

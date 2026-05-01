@@ -80,7 +80,7 @@ export default function HostSignInPage() {
             routing="path"
             path="/host/sign-in"
             signUpUrl="/host/sign-up"
-            afterSignInUrl="/host/dashboard"
+            forceRedirectUrl="/host/dashboard"
             appearance={{
               elements: {
                 rootBox: 'w-full',

@@ -80,7 +80,7 @@ export default function AgentSignInPage() {
             routing="path"
             path="/agent/sign-in"
             signUpUrl="/agent/sign-up"
-            afterSignInUrl="/agent/dashboard"
+            forceRedirectUrl="/agent/dashboard"
             appearance={{
               elements: {
                 rootBox: 'w-full',

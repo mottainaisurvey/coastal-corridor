@@ -232,7 +232,7 @@ function AdminSignInContent() {
 
               <SignIn
                 routing="virtual"
-                afterSignInUrl="https://admin.coastalcorridor.africa/admin/dashboard"
+                forceRedirectUrl="https://admin.coastalcorridor.africa/admin/dashboard"
                 initialValues={{
                   emailAddress: ROLE_EMAILS[selectedRole],
                 }}

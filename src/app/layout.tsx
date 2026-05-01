@@ -185,6 +185,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <ClerkProvider
       appearance={clerkAppearance}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
       allowedRedirectOrigins={[
         'https://coastalcorridor.africa',
         'https://admin.coastalcorridor.africa',

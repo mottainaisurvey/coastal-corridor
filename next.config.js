@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // ---------------------------------------------------------------------------
+  // Clerk v7 environment variables — required for OAuth/SSO redirect to work
+  // These tell Clerk where the sign-in/sign-up pages are so that after Google
+  // OAuth the user is redirected correctly instead of seeing a blank page.
+  // ---------------------------------------------------------------------------
+  env: {
+    NEXT_PUBLIC_CLERK_SIGN_IN_URL: '/sign-in',
+    NEXT_PUBLIC_CLERK_SIGN_UP_URL: '/sign-up',
+    NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: '/',
+    NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: '/',
+  },
   typescript: {
     // Cesium is loaded via CDN and has no TS declarations — ignore type errors at build time
     ignoreBuildErrors: true
@@ -61,5 +72,4 @@ const nextConfig = {
     };
   },
 };
-
 module.exports = nextConfig;

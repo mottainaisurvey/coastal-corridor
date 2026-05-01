@@ -99,7 +99,7 @@ export default function DeveloperSignUpPage() {
             routing="path"
             path="/developer/sign-up"
             signInUrl="/developer/sign-in"
-            afterSignUpUrl="/developer/dashboard"
+            forceRedirectUrl="/developer/dashboard"
             appearance={{
               elements: {
                 rootBox: 'w-full',

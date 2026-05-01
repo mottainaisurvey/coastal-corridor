@@ -80,7 +80,7 @@ export default function OperatorSignInPage() {
             routing="path"
             path="/operator/sign-in"
             signUpUrl="/operator/sign-up"
-            afterSignInUrl="/operator/dashboard"
+            forceRedirectUrl="/operator/dashboard"
             appearance={{
               elements: {
                 rootBox: 'w-full',
