@@ -9,10 +9,24 @@ export const metadata: Metadata = {
   description:
     'The verified real estate, tourism and investment platform for the Lagos-Calabar Coastal Highway corridor. 700km of coastline, 12 destinations, one platform.',
   keywords: ['Nigeria real estate', 'Lagos Calabar highway', 'diaspora property', 'coastal Nigeria'],
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48', type: 'image/x-icon' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      { rel: 'icon', url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { rel: 'icon', url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+  },
   openGraph: {
     title: 'Coastal Corridor — Lagos to Calabar',
     description: 'Verified real estate and tourism across the 700km Coastal Highway.',
     type: 'website',
+    images: [{ url: '/icon-512.png', width: 512, height: 512 }],
   },
 };
 
