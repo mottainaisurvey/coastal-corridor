@@ -55,7 +55,7 @@ function AdminSignInContent() {
     // Use window.location.assign instead of router.push to avoid Next.js
     // subdomain rewrite context resolving the path to the wrong domain
     if (typeof window !== 'undefined') {
-      window.location.assign(`/admin/sign-in?role=${role}`);
+      window.location.assign(`https://admin.coastalcorridor.africa/admin/sign-in?role=${role}`);
     }
   };
 
@@ -233,7 +233,7 @@ function AdminSignInContent() {
               <SignIn
                 routing="path"
                 path="/admin/sign-in"
-                afterSignInUrl="/admin/dashboard"
+                afterSignInUrl="https://admin.coastalcorridor.africa/admin/dashboard"
                 initialValues={{
                   emailAddress: ROLE_EMAILS[selectedRole],
                 }}
