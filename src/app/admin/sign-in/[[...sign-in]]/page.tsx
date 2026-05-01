@@ -1,19 +1,27 @@
 'use client';
 
-import { SignIn, useSignIn } from '@clerk/nextjs';
+import { SignIn } from '@clerk/nextjs';
 import Link from 'next/link';
 import { ShieldCheck, Lock, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense } from 'react';
 
-type Role = 'superadmin' | 'admin' | null;
+type Role = 'superadmin' | 'admin';
 
-const ROLE_EMAILS: Record<'superadmin' | 'admin', string> = {
+const ROLE_EMAILS: Record<Role, string> = {
   superadmin: 'superadmin@coastalcorridor.africa',
   admin: 'admin@coastalcorridor.africa',
 };
 
-export default function AdminSignInPage() {
-  const [selectedRole, setSelectedRole] = useState<Role>(null);
+function AdminSignInContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const roleParam = searchParams.get('role') as Role | null;
+  const selectedRole: Role | null = roleParam === 'superadmin' || roleParam === 'admin' ? roleParam : null;
+
+  const selectRole = (role: Role) => {
+    router.push(`/admin/sign-in?role=${role}`);
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -116,7 +124,7 @@ export default function AdminSignInPage() {
               <div className="space-y-3">
                 {/* Superadmin button */}
                 <button
-                  onClick={() => setSelectedRole('superadmin')}
+                  onClick={() => selectRole('superadmin')}
                   className="w-full group flex items-center justify-between p-5 rounded-sm border-2 border-ochre/30 bg-ochre/5 hover:bg-ochre/10 hover:border-ochre/60 transition-all duration-150 cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-4">
@@ -133,7 +141,7 @@ export default function AdminSignInPage() {
 
                 {/* Admin button */}
                 <button
-                  onClick={() => setSelectedRole('admin')}
+                  onClick={() => selectRole('admin')}
                   className="w-full group flex items-center justify-between p-5 rounded-sm border-2 border-ocean/30 bg-ocean/5 hover:bg-ocean/10 hover:border-ocean/60 transition-all duration-150 cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-4">
@@ -164,13 +172,13 @@ export default function AdminSignInPage() {
             <div>
               {/* Back + role indicator */}
               <div className="flex items-center gap-3 mb-6">
-                <button
-                  onClick={() => setSelectedRole(null)}
+                <Link
+                  href="/admin/sign-in"
                   className="flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-micro text-ink/40 hover:text-ink/70 transition-colors"
                 >
                   <ChevronRight className="h-3 w-3 rotate-180" />
                   Back
-                </button>
+                </Link>
                 <div className="h-3 w-px bg-ink/15" />
                 <span className={`font-mono text-[10px] uppercase tracking-micro px-2.5 py-1 rounded-sm border ${
                   selectedRole === 'superadmin'
@@ -233,5 +241,17 @@ export default function AdminSignInPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function AdminSignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <div className="animate-pulse h-10 w-40 bg-ink/10 rounded" />
+      </div>
+    }>
+      <AdminSignInContent />
+    </Suspense>
   );
 }
