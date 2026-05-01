@@ -26,6 +26,11 @@ const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 //    Use '/path/:path*' for wildcards, NOT '/path(.*)'.
 // ---------------------------------------------------------------------------
 export default authMiddleware({
+  // skipInterstitial: prevents Clerk from showing the blank interstitial page
+  // when a JWT token is expired/refreshed. Without this, publicRoutes show a
+  // blank page while Clerk refreshes the token. This is safe because our
+  // afterAuth callback handles all role-based redirects explicitly.
+  skipInterstitial: true,
   // publicRoutes: Clerk processes these but does NOT redirect unauthenticated users.
   // Sign-in/sign-up pages MUST be here so Clerk can complete the auth flow and
   // set the session cookie after a successful sign-in.
