@@ -67,7 +67,7 @@ export default function AdminUsersPage() {
         if (res.ok) {
           const data = await res.json();
           setUsers(data.data || []);
-          setTotal(data.total || 0);
+          setTotal(data.pagination?.total ?? data.total ?? 0);
         }
       } catch (e) {
         console.error(e);

@@ -56,7 +56,7 @@ export default function AdminListingsPage() {
         if (res.ok) {
           const data = await res.json();
           setListings(data.data || []);
-          setTotal(data.total || 0);
+          setTotal(data.pagination?.total ?? data.total ?? 0);
         }
       } catch (e) {
         console.error(e);

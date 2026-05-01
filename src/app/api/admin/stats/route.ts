@@ -4,6 +4,23 @@ import { prisma } from '@/lib/db';
 // Skip static generation for this route
 export const dynamic = 'force-dynamic';
 
+const EMPTY_STATS = {
+  totalUsers: 0,
+  agents: 0,
+  developers: 0,
+  buyers: 0,
+  activeListings: 0,
+  pendingListings: 0,
+  soldListings: 0,
+  verifiedAgents: 0,
+  pendingAgentVerification: 0,
+  pendingVerification: 0,
+  totalTransactions: 0,
+  completedTransactions: 0,
+  failedTransactions: 0,
+  newInquiries: 0,
+};
+
 export async function GET(req: NextRequest) {
   try {
     // Get total users by role
@@ -64,9 +81,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error('Failed to fetch admin stats:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch stats' },
-      { status: 500 }
-    );
+    // Return empty stats instead of 500 when DB is not connected
+    return NextResponse.json({ data: EMPTY_STATS });
   }
 }

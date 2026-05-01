@@ -58,7 +58,7 @@ export default function AdminTransactionsPage() {
         if (res.ok) {
           const data = await res.json();
           setTransactions(data.data || []);
-          setTotal(data.total || 0);
+          setTotal(data.pagination?.total ?? data.total ?? 0);
           if (data.summary) setSummary(data.summary);
         }
       } catch (e) { console.error(e); }
