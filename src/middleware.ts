@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { authMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -39,167 +39,185 @@ const OPERATOR_ROLES = ['operator', 'OPERATOR', 'admin', 'superadmin', 'ADMIN'];
 const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 
 // ---------------------------------------------------------------------------
-// Public routes — no auth required, no interstitial
+// Main auth middleware
 // ---------------------------------------------------------------------------
-const isPublicRoute = createRouteMatcher([
-  '/',
-  '/properties(.*)',
-  '/destinations(.*)',
-  '/agents(.*)',
-  '/tourism(.*)',
-  '/invest(.*)',
-  '/map(.*)',
-  '/how-verification-works(.*)',
-  '/unauthorized(.*)',
-  '/about(.*)',
-  '/press(.*)',
-  '/careers(.*)',
-  '/contact(.*)',
-  '/legal(.*)',
-  '/terms(.*)',
-  '/privacy(.*)',
-  '/cookies(.*)',
-  '/for-agents(.*)',
-  '/for-developers(.*)',
-  '/for-operators(.*)',
-  '/fractional(.*)',
-  '/diaspora(.*)',
-  // Auth pages
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/agent/sign-in(.*)',
-  '/agent/sign-up(.*)',
-  '/admin/sign-in(.*)',
-  '/developer/sign-in(.*)',
-  '/developer/sign-up(.*)',
-  '/operator/sign-in(.*)',
-  '/operator/sign-up(.*)',
-  '/host/sign-in(.*)',
-  '/host/sign-up(.*)',
-  '/professional(.*)',
-  '/agent',
-  // Public API routes
-  '/api/properties(.*)',
-  '/api/destinations(.*)',
-  '/api/search(.*)',
-  '/api/health(.*)',
-  '/api/inquiries(.*)',
-  '/api/admin/migrate(.*)',
-]);
+export default authMiddleware({
+  // ignoredRoutes: Clerk completely skips these — no interstitial, no cookie check
+  // Use for fully public pages that never need auth context
+  ignoredRoutes: [
+    '/',
+    '/properties',
+    '/properties/(.*)',
+    '/destinations',
+    '/destinations/(.*)',
+    '/agents',
+    '/tourism',
+    '/invest',
+    '/map',
+    '/how-verification-works',
+    '/unauthorized',
+    '/about',
+    '/press',
+    '/careers',
+    '/contact',
+    '/legal',
+    '/terms',
+    '/privacy',
+    '/cookies',
+    '/for-agents',
+    '/for-agents/(.*)',
+    '/for-developers',
+    '/for-developers/(.*)',
+    '/for-operators',
+    '/for-operators/(.*)',
+    '/fractional',
+    '/diaspora',
+    // Public API routes
+    '/api/properties(.*)',
+    '/api/destinations(.*)',
+    '/api/search(.*)',
+    '/api/health(.*)',
+    '/api/inquiries(.*)',
+    '/api/admin/migrate(.*)',
+  ],
 
-// ---------------------------------------------------------------------------
-// Main middleware using clerkMiddleware (no interstitial on public routes)
-// ---------------------------------------------------------------------------
-export default clerkMiddleware(async (auth, req: NextRequest) => {
-  // 1. Subdomain rewriting (runs before auth check)
-  const rewrite = subdomainRewrite(req);
-  if (rewrite) return rewrite;
+  // publicRoutes: Clerk processes these (for auth context) but doesn't redirect
+  // Use for auth pages and pages that behave differently when logged in
+  publicRoutes: [
+    '/sign-in',
+    '/sign-in/(.*)',
+    '/sign-up',
+    '/sign-up/(.*)',
+    '/agent',
+    '/agent/sign-up',
+    '/agent/sign-up/(.*)',
+    '/agent/sign-in',
+    '/agent/sign-in/(.*)',
+    '/admin/sign-in',
+    '/admin/sign-in/(.*)',
+    '/developer/sign-up',
+    '/developer/sign-up/(.*)',
+    '/developer/sign-in',
+    '/developer/sign-in/(.*)',
+    '/professional',
+    '/operator/sign-up',
+    '/operator/sign-up/(.*)',
+    '/operator/sign-in',
+    '/operator/sign-in/(.*)',
+    '/host/sign-up',
+    '/host/sign-up/(.*)',
+    '/host/sign-in',
+    '/host/sign-in/(.*)',
+  ],
 
-  const url = req.nextUrl.clone();
+  // Run subdomain rewriting before auth
+  beforeAuth: (req) => {
+    const rewrite = subdomainRewrite(req);
+    if (rewrite) return rewrite;
+  },
 
-  // 2. Public routes — skip auth entirely
-  if (isPublicRoute(req)) {
-    // Still handle authenticated user redirects on landing pages
-    const { userId, sessionClaims } = await auth();
-    if (userId) {
+  // After auth: enforce role-based access + redirect authenticated users on
+  // landing pages to their correct dashboards
+  afterAuth: (auth, req) => {
+    const { userId, sessionClaims } = auth;
+    const url = req.nextUrl.clone();
+
+    // ---- Authenticated agent on the marketing landing page → dashboard ----
+    if (url.pathname === '/agent' && userId) {
       const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-
-      // Authenticated admin on sign-in page → dashboard
-      if (url.pathname === '/admin/sign-in' && role && ADMIN_ROLES.includes(role)) {
-        url.pathname = '/admin/dashboard';
-        return NextResponse.redirect(url);
-      }
-      // Authenticated agent on marketing page → dashboard
-      if (url.pathname === '/agent' && role && AGENT_ROLES.includes(role)) {
+      if (role && AGENT_ROLES.includes(role)) {
         url.pathname = '/agent/dashboard';
         return NextResponse.redirect(url);
       }
-      // Authenticated developer on sign-up page → dashboard
-      if (url.pathname === '/developer/sign-up' && role && DEVELOPER_ROLES.includes(role)) {
+    }
+
+    // ---- Authenticated developer on the sign-up page → dashboard ----
+    if (url.pathname === '/developer/sign-up' && userId) {
+      const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+      if (role && DEVELOPER_ROLES.includes(role)) {
         url.pathname = '/developer/dashboard';
         return NextResponse.redirect(url);
       }
     }
-    return NextResponse.next();
-  }
 
-  // 3. Protected routes — require authentication
-  const { userId, sessionClaims } = await auth();
+    // ---- Authenticated admin on the sign-in page → dashboard ----
+    if (url.pathname === '/admin/sign-in' && userId) {
+      const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+      if (role && ADMIN_ROLES.includes(role)) {
+        url.pathname = '/admin/dashboard';
+        return NextResponse.redirect(url);
+      }
+    }
 
-  if (!userId) {
-    // Not logged in — redirect to appropriate sign-in page
-    if (url.pathname.startsWith('/admin')) {
-      url.pathname = '/admin/sign-in';
-      return NextResponse.redirect(url);
+    // ---- Admin routes (/admin/*) — protect all except sign-in page --------
+    if (url.pathname.startsWith('/admin') && !url.pathname.startsWith('/admin/sign-in')) {
+      if (userId) {
+        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+        if (!role || !ADMIN_ROLES.includes(role)) {
+          url.pathname = '/unauthorized';
+          url.searchParams.set('required', 'admin');
+          return NextResponse.redirect(url);
+        }
+      }
     }
-    if (url.pathname.startsWith('/agent/dashboard') || url.pathname.startsWith('/agent/listings')) {
-      url.pathname = '/agent/sign-in';
-      return NextResponse.redirect(url);
+
+    // ---- Agent routes (/agent/*) — protect dashboard/listings only --------
+    if (
+      url.pathname.startsWith('/agent/dashboard') ||
+      url.pathname.startsWith('/agent/listings')
+    ) {
+      if (userId) {
+        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+        if (!role || !AGENT_ROLES.includes(role)) {
+          url.pathname = '/unauthorized';
+          url.searchParams.set('required', 'agent');
+          return NextResponse.redirect(url);
+        }
+      }
     }
-    if (url.pathname.startsWith('/developer/dashboard') || url.pathname.startsWith('/developer/projects')) {
-      url.pathname = '/developer/sign-in';
-      return NextResponse.redirect(url);
+
+    // ---- Developer routes (/developer/*) — protect dashboard and sub-pages --
+    if (
+      url.pathname.startsWith('/developer/dashboard') ||
+      url.pathname.startsWith('/developer/projects') ||
+      url.pathname.startsWith('/developer/profile')
+    ) {
+      if (userId) {
+        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+        if (!role || !DEVELOPER_ROLES.includes(role)) {
+          url.pathname = '/unauthorized';
+          url.searchParams.set('required', 'developer');
+          return NextResponse.redirect(url);
+        }
+      }
     }
+
+    // ---- Operator routes (/operator/*) — protect dashboard and sub-pages ----
     if (url.pathname.startsWith('/operator/dashboard')) {
-      url.pathname = '/operator/sign-in';
-      return NextResponse.redirect(url);
+      if (userId) {
+        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+        if (!role || !OPERATOR_ROLES.includes(role)) {
+          url.pathname = '/unauthorized';
+          url.searchParams.set('required', 'operator');
+          return NextResponse.redirect(url);
+        }
+      }
     }
+
+    // ---- Host routes (/host/*) — protect dashboard and sub-pages ------------
     if (url.pathname.startsWith('/host/dashboard')) {
-      url.pathname = '/host/sign-in';
-      return NextResponse.redirect(url);
+      if (userId) {
+        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+        if (!role || !HOST_ROLES.includes(role)) {
+          url.pathname = '/unauthorized';
+          url.searchParams.set('required', 'host');
+          return NextResponse.redirect(url);
+        }
+      }
     }
-    // Default: let Clerk handle it
+
     return NextResponse.next();
-  }
-
-  const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-
-  // 4. Role-based access control for protected routes
-  if (url.pathname.startsWith('/admin') && !url.pathname.startsWith('/admin/sign-in')) {
-    if (!role || !ADMIN_ROLES.includes(role)) {
-      url.pathname = '/unauthorized';
-      url.searchParams.set('required', 'admin');
-      return NextResponse.redirect(url);
-    }
-  }
-
-  if (url.pathname.startsWith('/agent/dashboard') || url.pathname.startsWith('/agent/listings')) {
-    if (!role || !AGENT_ROLES.includes(role)) {
-      url.pathname = '/unauthorized';
-      url.searchParams.set('required', 'agent');
-      return NextResponse.redirect(url);
-    }
-  }
-
-  if (
-    url.pathname.startsWith('/developer/dashboard') ||
-    url.pathname.startsWith('/developer/projects') ||
-    url.pathname.startsWith('/developer/profile')
-  ) {
-    if (!role || !DEVELOPER_ROLES.includes(role)) {
-      url.pathname = '/unauthorized';
-      url.searchParams.set('required', 'developer');
-      return NextResponse.redirect(url);
-    }
-  }
-
-  if (url.pathname.startsWith('/operator/dashboard')) {
-    if (!role || !OPERATOR_ROLES.includes(role)) {
-      url.pathname = '/unauthorized';
-      url.searchParams.set('required', 'operator');
-      return NextResponse.redirect(url);
-    }
-  }
-
-  if (url.pathname.startsWith('/host/dashboard')) {
-    if (!role || !HOST_ROLES.includes(role)) {
-      url.pathname = '/unauthorized';
-      url.searchParams.set('required', 'host');
-      return NextResponse.redirect(url);
-    }
-  }
-
-  return NextResponse.next();
+  },
 });
 
 export const config = {
