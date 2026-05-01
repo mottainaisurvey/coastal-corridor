@@ -69,7 +69,18 @@ export default function AdminListingsPage() {
   if (!isLoaded || !user) return (
     <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>
   );
-  if (!isAdmin) return null;
+  if (!isAdmin) {
+  return (
+    <div className="container-x py-24">
+      <div className="animate-pulse space-y-4">
+        <div className="h-4 bg-ink/10 rounded w-24" />
+        <div className="h-10 bg-ink/10 rounded w-1/3" />
+        <div className="h-4 bg-ink/10 rounded w-1/2" />
+        <div className="h-4 bg-ink/10 rounded w-2/3" />
+      </div>
+    </div>
+  );
+  }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
