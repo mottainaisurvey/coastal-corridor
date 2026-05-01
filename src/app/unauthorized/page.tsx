@@ -1,11 +1,12 @@
 'use client';
+import { Suspense } from 'react';
 
 import { useSearchParams } from 'next/navigation';
 import { useClerk, useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { ShieldOff } from 'lucide-react';
 
-export default function UnauthorizedPage() {
+function UnauthorizedContent() {
   const params = useSearchParams();
   const required = params.get('required');
   const { user } = useUser();
@@ -61,5 +62,22 @@ export default function UnauthorizedPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function UnauthorizedPage() {
+  return (
+    <Suspense fallback={
+      <div className="bg-paper min-h-screen flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center px-6 py-24">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-alert/10 mb-8">
+            <ShieldOff className="h-8 w-8 text-alert" />
+          </div>
+          <div className="eyebrow mb-4 text-alert">Access Denied</div>
+        </div>
+      </div>
+    }>
+      <UnauthorizedContent />
+    </Suspense>
   );
 }

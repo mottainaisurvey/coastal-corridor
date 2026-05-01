@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 
 export async function GET() {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const saved = await prisma.savedPlot.findMany({
@@ -53,7 +53,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { plotId, note } = await req.json();
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(req.url);

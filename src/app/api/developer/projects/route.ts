@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 
 async function getDevProfile(clerkId: string) {
@@ -12,7 +12,7 @@ async function getDevProfile(clerkId: string) {
 
 export async function GET() {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const devProfile = await getDevProfile(clerkId);
@@ -45,7 +45,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
