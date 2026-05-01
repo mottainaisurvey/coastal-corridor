@@ -1008,11 +1008,13 @@ export default function MapPage() {
           overlay.id = 'destOverlay';
           overlay.style.cssText = `
             position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
-            background:rgba(10,14,18,0.88); border:1px solid rgba(212,162,76,0.5);
-            border-radius:8px; padding:14px 20px; text-align:center;
+            background:rgba(10,14,18,0.30); border:1px solid rgba(212,162,76,0.35);
+            border-radius:12px; padding:14px 20px; text-align:center;
             max-width:calc(100vw - 24px); box-sizing:border-box;
             font-family:'Inter Tight',sans-serif; color:#f5f0e8;
             pointer-events:none; z-index:9999;
+            backdrop-filter:blur(18px) saturate(1.4);
+            -webkit-backdrop-filter:blur(18px) saturate(1.4);
             transition:opacity 0.4s ease;
           `;
           document.body.appendChild(overlay);
@@ -2030,9 +2032,10 @@ export default function MapPage() {
         .flight-hud {
           position: fixed; bottom: 108px; right: 24px; z-index: 20;
           display: none; flex-direction: column; gap: 2px;
-          background: rgba(10,10,10,0.82); border: 1px solid rgba(212,162,76,0.35);
-          border-radius: 8px; padding: 10px 14px; min-width: 180px;
-          backdrop-filter: blur(8px);
+          background: rgba(10,14,18,0.28); border: 1px solid rgba(212,162,76,0.25);
+          border-radius: 10px; padding: 10px 14px; min-width: 180px;
+          backdrop-filter: blur(16px) saturate(1.4);
+          -webkit-backdrop-filter: blur(16px) saturate(1.4);
           font-family: 'JetBrains Mono', 'Courier New', monospace;
         }
         .flight-hud.active { display: flex; }
@@ -2189,13 +2192,16 @@ export default function MapPage() {
             min-width: unset; width: auto;
           }
 
-          /* --- HUD: smaller, top-right --- */
+          /* --- HUD: compact, top-right, below filter bar --- */
           .flight-hud {
-            top: 100px; right: 8px;
+            top: 102px; right: 8px;
+            bottom: auto;
             padding: 8px 10px;
+            min-width: 140px;
           }
-          .hud-row { font-size: 10px; }
+          .hud-row { font-size: 10px; gap: 10px; }
           .hud-value { font-size: 12px; }
+          .hud-label { font-size: 7px; }
 
           /* --- Legend: hidden on mobile --- */
           .cc-legend { display: none; }
