@@ -187,6 +187,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       appearance={clerkAppearance}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
+      allowedRedirectOrigins={[
+        'https://coastalcorridor.africa',
+        'https://admin.coastalcorridor.africa',
+        'https://agent.coastalcorridor.africa',
+        'https://developer.coastalcorridor.africa',
+        'https://operator.coastalcorridor.africa',
+        'https://host.coastalcorridor.africa',
+        'https://map.coastalcorridor.africa',
+      ]}
     >
       <html lang="en">
         <body className="min-h-screen flex flex-col">

@@ -1,8 +1,8 @@
-import { authMiddleware } from '@clerk/nextjs/server';
+import { authMiddleware } from '@clerk/nextjs';
 import { NextResponse } from 'next/server';
 
 // ---------------------------------------------------------------------------
-// Role constants — stored in Clerk publicMetadata.role
+// Role arrays
 // ---------------------------------------------------------------------------
 const ADMIN_ROLES = ['admin', 'superadmin', 'ADMIN'];
 const AGENT_ROLES = ['agent', 'AGENT', 'admin', 'superadmin', 'ADMIN'];
@@ -11,31 +11,40 @@ const OPERATOR_ROLES = ['operator', 'OPERATOR', 'admin', 'superadmin', 'ADMIN'];
 const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 
 // ---------------------------------------------------------------------------
-// Main auth middleware — subdomain routing is handled in next.config.js rewrites
-// NOTE: Clerk v4 authMiddleware uses micromatch glob patterns (NOT regex).
-//       Use '/path/:path*' for wildcards, NOT '/path(.*)'.
-// NOTE: ignoredRoutes = completely bypass Clerk (no interstitial, no token check)
-//       publicRoutes = Clerk processes but doesn't redirect unauthenticated users
+// Main auth middleware
+//
+// KEY DESIGN DECISIONS:
+// 1. Sign-in/sign-up routes MUST be in publicRoutes (NOT ignoredRoutes).
+//    ignoredRoutes bypasses Clerk entirely — Clerk cannot establish a session
+//    after authentication if the sign-in route is ignored. This causes the
+//    "stuck on factor-two" bug where auth completes but the redirect never fires.
+//
+// 2. ignoredRoutes is reserved for truly static/public pages that never need
+//    any Clerk session handling (marketing pages, static assets, public APIs).
+//
+// 3. Clerk v4 uses micromatch glob patterns (NOT regex).
+//    Use '/path/:path*' for wildcards, NOT '/path(.*)'.
 // ---------------------------------------------------------------------------
 export default authMiddleware({
-  // ignoredRoutes: Clerk completely skips these — prevents interstitial on sign-in pages
-  // and on all public marketing/content pages
-  ignoredRoutes: [
-    // All sign-in/sign-up pages — must be ignored to prevent Clerk interstitial
+  // publicRoutes: Clerk processes these but does NOT redirect unauthenticated users.
+  // Sign-in/sign-up pages MUST be here so Clerk can complete the auth flow and
+  // set the session cookie after a successful sign-in.
+  publicRoutes: [
+    // Sign-in / sign-up pages for all portals
     '/sign-in',
     '/sign-in/:path*',
     '/sign-up',
     '/sign-up/:path*',
+    '/admin/sign-in',
+    '/admin/sign-in/:path*',
     '/agent/sign-in',
     '/agent/sign-in/:path*',
     '/agent/sign-up',
     '/agent/sign-up/:path*',
-    '/admin/sign-in',
-    '/admin/sign-in/:path*',
-    '/developer/sign-up',
-    '/developer/sign-up/:path*',
     '/developer/sign-in',
     '/developer/sign-in/:path*',
+    '/developer/sign-up',
+    '/developer/sign-up/:path*',
     '/operator/sign-in',
     '/operator/sign-in/:path*',
     '/operator/sign-up',
@@ -81,6 +90,7 @@ export default authMiddleware({
     '/api/admin/migrate',
     '/api/admin/migrate/:path*',
   ],
+
   // afterAuth: enforce role-based access for protected routes
   afterAuth: (auth, req) => {
     const { userId, sessionClaims } = auth;
@@ -88,51 +98,54 @@ export default authMiddleware({
     const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
 
     // ---- Admin routes (/admin/*) — protect all except sign-in page --------
-    // NOTE: We do NOT redirect authenticated admins from sign-in → dashboard here.
-    // That is handled by the sign-in page component itself to avoid cross-domain redirect issues.
     if (url.pathname.startsWith('/admin') && !url.pathname.startsWith('/admin/sign-in')) {
-      if (userId && (!role || !ADMIN_ROLES.includes(role))) {
+      if (userId && role && !ADMIN_ROLES.includes(role)) {
         url.pathname = '/unauthorized';
         url.searchParams.set('required', 'admin');
         return NextResponse.redirect(url);
       }
     }
+
     // ---- Agent dashboard/listings — protect --------
     if (url.pathname.startsWith('/agent/dashboard') || url.pathname.startsWith('/agent/listings')) {
-      if (userId && (!role || !AGENT_ROLES.includes(role))) {
+      if (userId && role && !AGENT_ROLES.includes(role)) {
         url.pathname = '/unauthorized';
         url.searchParams.set('required', 'agent');
         return NextResponse.redirect(url);
       }
     }
+
     // ---- Developer dashboard — protect --------
     if (
       url.pathname.startsWith('/developer/dashboard') ||
       url.pathname.startsWith('/developer/projects') ||
       url.pathname.startsWith('/developer/profile')
     ) {
-      if (userId && (!role || !DEVELOPER_ROLES.includes(role))) {
+      if (userId && role && !DEVELOPER_ROLES.includes(role)) {
         url.pathname = '/unauthorized';
         url.searchParams.set('required', 'developer');
         return NextResponse.redirect(url);
       }
     }
+
     // ---- Operator dashboard — protect --------
     if (url.pathname.startsWith('/operator/dashboard')) {
-      if (userId && (!role || !OPERATOR_ROLES.includes(role))) {
+      if (userId && role && !OPERATOR_ROLES.includes(role)) {
         url.pathname = '/unauthorized';
         url.searchParams.set('required', 'operator');
         return NextResponse.redirect(url);
       }
     }
+
     // ---- Host dashboard — protect --------
     if (url.pathname.startsWith('/host/dashboard')) {
-      if (userId && (!role || !HOST_ROLES.includes(role))) {
+      if (userId && role && !HOST_ROLES.includes(role)) {
         url.pathname = '/unauthorized';
         url.searchParams.set('required', 'host');
         return NextResponse.redirect(url);
       }
     }
+
     return NextResponse.next();
   },
 });
