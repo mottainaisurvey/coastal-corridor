@@ -96,7 +96,7 @@ const LISTINGS = [
     price: '₦65M', pricePerSqm: '₦186K/sqm', bedrooms: 3, bathrooms: 4, areaSqm: 350,
     yoy: 12, floodRisk: 20, disputeRisk: 8, titleStatus: 'VERIFIED',
     agentName: 'Enobong Essien', agentVerified: true, featured: false,
-    heroImage: 'https://images.unsplash.com/photo-1570213489059-0aac6626d401?w=800&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800&q=80',
     virtualTourUrl: null,
     amenities: ['Estate security', 'Street lights', 'Tarred roads']
   },
@@ -168,14 +168,14 @@ const DESTINATIONS = [
 // Tier 1: Destination hero images (curated Unsplash aerial/coastal photography per destination)
 const DEST_HEROES: Record<string, string> = {
   vi:      'https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?w=800&q=80', // Lagos skyline / VI
-  lekki:   'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=800&q=80', // Lekki coastline
+  lekki:   'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80', // Lekki coastline
   epe:     'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80', // Coastal lagoon
   ijebu:   'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=800&q=80', // Tropical road
   ondo:    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80', // Ondo beach coast
   warri:   'https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=800&q=80', // Delta waterway
   yenagoa: 'https://images.unsplash.com/photo-1514214246283-d427a95c5d2f?w=800&q=80', // River / waterfront
   ph:      'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80', // Port / waterfront
-  uyo:     'https://images.unsplash.com/photo-1570213489059-0aac6626d401?w=800&q=80', // Estate road
+  uyo:     'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800&q=80', // Estate road
   ibeno:   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80', // Ibeno beach
   tinapa:  'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80', // Resort / marina
   calabar: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800&q=80', // Calabar hillside

@@ -10,7 +10,7 @@ export const destinations: Destination[] = [
     latitude: 6.4281,
     longitude: 3.4216,
     corridorKm: 0,
-    heroImage: 'https://images.unsplash.com/photo-1580746738099-7b0b3a58b9ca?w=1600&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1600&q=80',
     tagline: 'Western origin of the corridor',
     description:
       'Victoria Island is the dense commercial district and gateway to Lagos metropolis. Ferry terminals, business infrastructure, and the primary urban real estate market in West Africa converge here, making it the natural terminus for the corridor.',
@@ -36,7 +36,7 @@ export const destinations: Destination[] = [
     latitude: 6.4474,
     longitude: 3.557,
     corridorKm: 24,
-    heroImage: 'https://images.unsplash.com/photo-1572205796404-8a4a46c29ee3?w=1600&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1600&q=80',
     tagline: 'Flagship urban expansion zone',
     description:
       'Lekki combines high-value coastal residential estates, Lekki Free Zone, Dangote Refinery, and the Deep Sea Port into the densest cluster of verified plots on the platform. The anchor segment for the entire corridor thesis.',
@@ -218,7 +218,7 @@ export const destinations: Destination[] = [
     latitude: 5.0378,
     longitude: 7.9128,
     corridorKm: 600,
-    heroImage: 'https://images.unsplash.com/photo-1570213489059-0aac6626d401?w=1600&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=1600&q=80',
     tagline: 'Rising capital, rising capital flows',
     description:
       'State capital with rapid infrastructure investment, new airport, and strong diaspora remittance flows. Ibom Deep Sea Port in planning stages — a secondary investment thesis on this segment.',

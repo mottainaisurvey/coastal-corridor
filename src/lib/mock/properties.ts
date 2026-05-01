@@ -65,7 +65,7 @@ export const properties: Property[] = [
     heroImage: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1600&q=80',
     images: [
       'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1600&q=80',
-      'https://images.unsplash.com/photo-1502780402662-acc01917cf0f?w=1600&q=80',
+      'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1600&q=80',
       'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=80'
     ],
     priceKobo: 2400000000, // ₦24M
@@ -286,9 +286,9 @@ export const properties: Property[] = [
     bathrooms: 4,
     yearBuilt: 2024,
     amenities: ['Estate security', 'Street lights', 'Tarred roads', 'Central drainage'],
-    heroImage: 'https://images.unsplash.com/photo-1570213489059-0aac6626d401?w=1600&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=1600&q=80',
     images: [
-      'https://images.unsplash.com/photo-1570213489059-0aac6626d401?w=1600&q=80',
+      'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=1600&q=80',
       'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1600&q=80'
     ],
     priceKobo: 6500000000, // ₦65M
