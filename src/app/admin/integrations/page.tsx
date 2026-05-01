@@ -91,10 +91,10 @@ export default function AdminIntegrationsPage() {
 
   useEffect(() => {
     if (isLoaded && userId && role && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
-  }, [metadataLoaded, isSuperadmin, router]);
+  }, [isLoaded, userId, role, router]);
 
   if (!isLoaded || !user) return <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>;
-  if (metadataLoaded && !isSuperadmin) {
+  if (isLoaded && userId && role && !isSuperadmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

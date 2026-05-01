@@ -27,7 +27,7 @@ export default function AdminAnalyticsPage() {
 
   useEffect(() => {
     if (isLoaded && userId && role && !isAdmin) router.replace('/unauthorized?required=admin');
-  }, [metadataLoaded, isAdmin, router]);
+  }, [isLoaded, userId, role, router]);
 
   useEffect(() => {
     if (!userId || !isAdmin) return;
