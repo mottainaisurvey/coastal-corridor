@@ -87,17 +87,9 @@ export default authMiddleware({
     const url = req.nextUrl.clone();
     const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
 
-    // ---- Authenticated developer on the sign-up page → dashboard ----
-    if (url.pathname === '/developer/sign-up' && userId && role && DEVELOPER_ROLES.includes(role)) {
-      url.pathname = '/developer/dashboard';
-      return NextResponse.redirect(url);
-    }
-    // ---- Authenticated admin on the sign-in page → dashboard ----
-    if (url.pathname === '/admin/sign-in' && userId && role && ADMIN_ROLES.includes(role)) {
-      url.pathname = '/admin/dashboard';
-      return NextResponse.redirect(url);
-    }
     // ---- Admin routes (/admin/*) — protect all except sign-in page --------
+    // NOTE: We do NOT redirect authenticated admins from sign-in → dashboard here.
+    // That is handled by the sign-in page component itself to avoid cross-domain redirect issues.
     if (url.pathname.startsWith('/admin') && !url.pathname.startsWith('/admin/sign-in')) {
       if (userId && (!role || !ADMIN_ROLES.includes(role))) {
         url.pathname = '/unauthorized';

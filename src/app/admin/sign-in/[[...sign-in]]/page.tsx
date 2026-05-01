@@ -1,6 +1,7 @@
 'use client';
 
 import { SignIn } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import { ShieldCheck, Lock, ChevronRight } from 'lucide-react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
@@ -17,6 +18,16 @@ function AdminSignInContent() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
+  const { isLoaded, userId, sessionClaims } = useAuth();
+
+  // If already authenticated as admin/superadmin, redirect to dashboard
+  useEffect(() => {
+    if (!isLoaded || !userId) return;
+    const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+    if (role && ['admin', 'superadmin', 'ADMIN'].includes(role)) {
+      router.replace('/admin/dashboard');
+    }
+  }, [isLoaded, userId, sessionClaims, router]);
 
   // Read role from URL param first, then fall back to sessionStorage
   // This handles the case where Clerk navigates to /factor-one and drops query params
