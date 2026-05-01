@@ -45,7 +45,7 @@ export default function AdminAuditPage() {
   }, [isLoaded, userId, router]);
 
   useEffect(() => {
-    if (isLoaded && user && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
+    if (isLoaded && userId && role && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
   }, [metadataLoaded, isSuperadmin, router]);
 
   useEffect(() => {
