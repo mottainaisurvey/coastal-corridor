@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // ---------------------------------------------------------------------------
-// Subdomain routing map
+// Subdomain routing map: subdomain → internal path
 // ---------------------------------------------------------------------------
 const SUBDOMAIN_ROUTES: Record<string, string> = {
   admin: '/admin/sign-in',
@@ -13,31 +13,6 @@ const SUBDOMAIN_ROUTES: Record<string, string> = {
   operator: '/operator/sign-in',
   host: '/host/sign-in',
 };
-
-// Routes that Clerk should completely ignore (no auth processing at all)
-const IGNORED_PATHS = [
-  '/',
-  '/map',
-  '/about',
-  '/contact',
-  '/listings',
-  '/destinations',
-  '/agents',
-  '/tourism',
-  '/diaspora',
-  '/how-verification-works',
-  '/for-agents',
-  '/for-developers',
-  '/fractional',
-  '/press',
-  '/careers',
-  '/legal',
-  '/terms',
-  '/privacy',
-  '/cookies',
-  '/unauthorized',
-  '/professional',
-];
 
 // ---------------------------------------------------------------------------
 // Role constants — stored in Clerk publicMetadata.role
@@ -49,21 +24,39 @@ const OPERATOR_ROLES = ['operator', 'OPERATOR', 'admin', 'superadmin', 'ADMIN'];
 const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 
 // ---------------------------------------------------------------------------
-// Clerk auth middleware (handles all non-subdomain-root requests)
+// Main auth middleware
 // ---------------------------------------------------------------------------
-const clerkAuth = authMiddleware({
+export default authMiddleware({
+  // ignoredRoutes: Clerk skips these entirely — no interstitial, no auth check
   ignoredRoutes: [
     '/((?!api|trpc)(_next|.+\\.[\\w]+$))',
-    ...IGNORED_PATHS,
+    '/',
+    '/map',
+    '/about',
+    '/contact',
     '/listings(.*)',
     '/destinations(.*)',
     '/agents(.*)',
     '/tourism(.*)',
+    '/diaspora(.*)',
+    '/how-verification-works',
+    '/for-agents',
+    '/for-developers',
+    '/fractional',
+    '/press',
+    '/careers',
+    '/legal',
+    '/terms',
+    '/privacy',
+    '/cookies',
+    '/unauthorized',
+    '/professional',
     '/api/listings(.*)',
     '/api/destinations(.*)',
     '/api/inquiries(.*)',
     '/api/admin/migrate(.*)',
   ],
+  // publicRoutes: Clerk processes these but doesn't redirect unauthenticated users
   publicRoutes: [
     '/sign-in',
     '/sign-in/(.*)',
@@ -90,6 +83,33 @@ const clerkAuth = authMiddleware({
     '/host/sign-in',
     '/host/sign-in/(.*)',
   ],
+  // beforeAuth: handle subdomain rewrites BEFORE Clerk processes the request
+  beforeAuth: (req: NextRequest) => {
+    const hostname = req.headers.get('host') || '';
+    const hostParts = hostname.split('.');
+
+    // Detect subdomain: need at least 3 parts (sub.domain.tld)
+    // Skip localhost
+    if (!hostname.includes('localhost') && hostParts.length >= 3) {
+      const subdomain = hostParts[0];
+      const targetPath = SUBDOMAIN_ROUTES[subdomain];
+
+      if (targetPath && req.nextUrl.pathname === '/') {
+        // Build absolute rewrite URL using the MAIN domain (not the subdomain)
+        // This tells Next.js to serve the content from the main domain's route
+        const mainDomain = hostParts.slice(1).join('.');
+        const rewriteUrl = new URL(
+          `${req.nextUrl.protocol}//${mainDomain}${targetPath}`
+        );
+        // Copy query params if any
+        rewriteUrl.search = req.nextUrl.search;
+        return NextResponse.rewrite(rewriteUrl);
+      }
+    }
+    // No subdomain rewrite needed — continue to Clerk auth
+    return undefined;
+  },
+  // afterAuth: enforce role-based access
   afterAuth: (auth, req) => {
     const { userId, sessionClaims } = auth;
     const url = req.nextUrl.clone();
@@ -183,36 +203,6 @@ const clerkAuth = authMiddleware({
     return NextResponse.next();
   },
 });
-
-// ---------------------------------------------------------------------------
-// Main exported middleware — subdomain rewriting runs FIRST, before Clerk
-// ---------------------------------------------------------------------------
-export function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host') || '';
-  const url = request.nextUrl.clone();
-
-  // Extract subdomain: "admin.coastalcorridor.africa" → "admin"
-  // Handle both production (2-part TLD like .africa) and localhost
-  const hostParts = hostname.split('.');
-  let subdomain: string | null = null;
-
-  if (hostname.includes('localhost')) {
-    // localhost:3000 — no subdomain routing in dev
-    subdomain = null;
-  } else if (hostParts.length >= 3) {
-    // e.g. admin.coastalcorridor.africa → subdomain = "admin"
-    subdomain = hostParts[0];
-  }
-
-  // Apply subdomain rewrite if we're at the root path
-  if (subdomain && url.pathname === '/' && SUBDOMAIN_ROUTES[subdomain]) {
-    url.pathname = SUBDOMAIN_ROUTES[subdomain];
-    return NextResponse.rewrite(url);
-  }
-
-  // For all other requests, run Clerk auth middleware
-  return (clerkAuth as any)(request);
-}
 
 export const config = {
   matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
