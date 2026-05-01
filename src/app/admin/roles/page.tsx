@@ -21,7 +21,7 @@ const ROLE_COLOURS: Record<string, string> = {
 };
 
 export default function AdminRolesPage() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
 
@@ -34,7 +34,8 @@ export default function AdminRolesPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const PAGE_SIZE = 20;
 
-  const role = (user?.publicMetadata?.role as string) || '';
+  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isSuperadmin = SUPERADMIN_ROLES.includes(role);
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function AdminRolesPage() {
 
   useEffect(() => {
     if (isLoaded && user && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
-  }, [isLoaded, user, isSuperadmin, router]);
+  }, [metadataLoaded, isSuperadmin, router]);
 
   useEffect(() => {
     if (!userId || !isSuperadmin) return;
@@ -81,7 +82,7 @@ export default function AdminRolesPage() {
   };
 
   if (!isLoaded || !user) return <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>;
-  if (!isSuperadmin) {
+  if (metadataLoaded && !isSuperadmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

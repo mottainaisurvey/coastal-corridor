@@ -23,7 +23,7 @@ const ACTION_ICONS: Record<string, any> = {
 };
 
 export default function AdminAuditPage() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
 
@@ -36,7 +36,8 @@ export default function AdminAuditPage() {
   const [total, setTotal] = useState(0);
   const PAGE_SIZE = 30;
 
-  const role = (user?.publicMetadata?.role as string) || '';
+  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isSuperadmin = SUPERADMIN_ROLES.includes(role);
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function AdminAuditPage() {
 
   useEffect(() => {
     if (isLoaded && user && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
-  }, [isLoaded, user, isSuperadmin, router]);
+  }, [metadataLoaded, isSuperadmin, router]);
 
   useEffect(() => {
     if (!userId || !isSuperadmin) return;
@@ -71,7 +72,7 @@ export default function AdminAuditPage() {
   }, [userId, isSuperadmin, page, search, actionFilter, entityFilter]);
 
   if (!isLoaded || !user) return <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>;
-  if (!isSuperadmin) {
+  if (metadataLoaded && !isSuperadmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

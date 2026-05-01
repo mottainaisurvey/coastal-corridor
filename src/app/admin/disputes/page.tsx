@@ -15,7 +15,7 @@ const PRIORITY_COLOURS: Record<string, string> = {
 };
 
 export default function AdminDisputesPage() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
 
@@ -24,7 +24,8 @@ export default function AdminDisputesPage() {
   const [filter, setFilter] = useState('ALL');
   const [stats, setStats] = useState({ open: 0, resolved: 0, avgDays: 0 });
 
-  const role = (user?.publicMetadata?.role as string) || '';
+  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isAdmin = ADMIN_ROLES.includes(role);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function AdminDisputesPage() {
 
   useEffect(() => {
     if (isLoaded && user && !isAdmin) router.replace('/unauthorized?required=admin');
-  }, [isLoaded, user, isAdmin, router]);
+  }, [metadataLoaded, isAdmin, router]);
 
   useEffect(() => {
     if (!userId || !isAdmin) return;
@@ -54,7 +55,7 @@ export default function AdminDisputesPage() {
   }, [userId, isAdmin, filter]);
 
   if (!isLoaded || !user) return <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>;
-  if (!isAdmin) {
+  if (metadataLoaded && !isAdmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

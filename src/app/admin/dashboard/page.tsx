@@ -7,16 +7,19 @@ import Link from 'next/link';
 import { Users, Home, TrendingUp, AlertCircle, CheckCircle, ShieldCheck, Shield } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   // Derive role from Clerk publicMetadata
-  const role = (user?.publicMetadata?.role as string) || '';
+  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isSuperAdmin = role === 'superadmin' || role === 'SUPERADMIN';
   const isAdmin = isSuperAdmin || role === 'admin' || role === 'ADMIN';
+  // sessionClaims are available as soon as isLoaded=true (from JWT)
+  const metadataLoaded = isLoaded;
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -27,10 +30,10 @@ export default function AdminDashboard() {
 
   // Redirect users without admin role once user data is loaded
   useEffect(() => {
-    if (isLoaded && user && !isAdmin) {
+    if (metadataLoaded && !isAdmin) {
       router.replace('/unauthorized?required=admin');
     }
-  }, [isLoaded, user, isAdmin, router]);
+  }, [metadataLoaded, isAdmin, router]);
 
   useEffect(() => {
     if (!userId || !isAdmin) return;
@@ -53,7 +56,7 @@ export default function AdminDashboard() {
   }, [userId, isAdmin]);
 
   // Loading skeleton
-  if (!isLoaded || !user) {
+  if (!isLoaded) {
     return (
       <div className="container-x py-24">
         <div className="animate-pulse space-y-4">
@@ -66,7 +69,7 @@ export default function AdminDashboard() {
   }
 
   // Waiting for role check
-  if (!isAdmin) {
+  if (metadataLoaded && !isAdmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

@@ -9,7 +9,7 @@ import { ArrowLeft, TrendingUp, Users, Home, DollarSign, BarChart2, Activity } f
 const ADMIN_ROLES = ['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'];
 
 export default function AdminAnalyticsPage() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
 
@@ -17,7 +17,8 @@ export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('30d');
 
-  const role = (user?.publicMetadata?.role as string) || '';
+  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isAdmin = ADMIN_ROLES.includes(role);
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export default function AdminAnalyticsPage() {
 
   useEffect(() => {
     if (isLoaded && user && !isAdmin) router.replace('/unauthorized?required=admin');
-  }, [isLoaded, user, isAdmin, router]);
+  }, [metadataLoaded, isAdmin, router]);
 
   useEffect(() => {
     if (!userId || !isAdmin) return;
@@ -45,7 +46,7 @@ export default function AdminAnalyticsPage() {
   }, [userId, isAdmin, period]);
 
   if (!isLoaded || !user) return <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>;
-  if (!isAdmin) {
+  if (metadataLoaded && !isAdmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

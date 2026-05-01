@@ -11,7 +11,7 @@ const ADMIN_ROLES = ['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'];
 type Tab = 'agents' | 'plots';
 
 export default function AdminVerificationPage() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
 
@@ -20,7 +20,8 @@ export default function AdminVerificationPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ pendingAgents: 0, pendingPlots: 0, verifiedToday: 0 });
 
-  const role = (user?.publicMetadata?.role as string) || '';
+  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
+  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
   const isAdmin = ADMIN_ROLES.includes(role);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function AdminVerificationPage() {
 
   useEffect(() => {
     if (isLoaded && user && !isAdmin) router.replace('/unauthorized?required=admin');
-  }, [isLoaded, user, isAdmin, router]);
+  }, [metadataLoaded, isAdmin, router]);
 
   useEffect(() => {
     if (!userId || !isAdmin) return;
@@ -54,7 +55,7 @@ export default function AdminVerificationPage() {
   if (!isLoaded || !user) return (
     <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>
   );
-  if (!isAdmin) {
+  if (metadataLoaded && !isAdmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">
