@@ -7,7 +7,8 @@
  *   - Missing required headers → 400
  *   - Duplicate event (already in WebhookDelivery) → 200 + duplicate:true
  *   - Unknown event type → 200 (logged, not errored)
- *   - All 12 event types are routed without throwing
+ *   - All 12 OpenAPI spec contract events are routed without throwing
+ *   - 5 supplementary events (not in spec) are also handled gracefully
  *
  * The handler imports getPrisma from db-safe and verifyInboundWebhook from hmac.
  * Both are mocked to isolate the handler from infrastructure dependencies.
@@ -73,6 +74,9 @@ function makeMockPrismaFresh() {
     experience: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    reconciliationLog: {
+      create: vi.fn().mockResolvedValue({}),
+    },
   };
 }
 
@@ -106,7 +110,7 @@ describe('POST /api/v1/channel/webhooks/inbound', () => {
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = new NextRequest('http://localhost/api/v1/channel/webhooks/inbound', {
       method: 'POST',
-      body: JSON.stringify({ event: 'reservation.confirmed', data: {} }),
+      body: JSON.stringify({ event: 'reservation.cancelled', data: {} }),
       headers: { 'content-type': 'application/json' },
       // No x-owambe-signature, x-owambe-timestamp, x-owambe-event-id
     });
@@ -121,21 +125,21 @@ describe('POST /api/v1/channel/webhooks/inbound', () => {
     vi.mocked(verifyInboundWebhook).mockReturnValue(false);
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
-    const req = makeRequest({ event: 'reservation.confirmed', data: {} });
+    const req = makeRequest({ event: 'reservation.cancelled', data: {} });
     const res = await POST(req);
     expect(res.status).toBe(401);
     const json = await res.json();
     expect(json.error).toContain('Invalid webhook signature');
   });
 
-  it('returns 200 with received:true for a valid reservation.confirmed event', async () => {
+  it('returns 200 with received:true for a valid reservation.cancelled event', async () => {
     const { getPrisma } = await import('@/lib/db-safe');
     vi.mocked(getPrisma).mockReturnValue(makeMockPrismaFresh() as never);
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.confirmed',
-      data: { reservation_id: 'owambe-res-001' },
+      event: 'reservation.cancelled',
+      data: { reservation_id: 'owambe-res-001', reason: 'Guest request' },
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
@@ -150,7 +154,7 @@ describe('POST /api/v1/channel/webhooks/inbound', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest(
-      { event: 'reservation.confirmed', data: { reservation_id: 'owambe-res-001' } },
+      { event: 'reservation.cancelled', data: { reservation_id: 'owambe-res-001' } },
       { 'x-owambe-event-id': 'evt_dup' }
     );
     const res = await POST(req);
@@ -174,25 +178,30 @@ describe('POST /api/v1/channel/webhooks/inbound', () => {
     expect(json.received).toBe(true);
   });
 
-  // ─── All 12 event types ────────────────────────────────────────────────────
+  // ─── 12 OpenAPI spec contract events ──────────────────────────────────────
+  // These are the events Owambe's webhook publisher actually emits per the API contract.
 
-  const allEventTypes = [
-    { event: 'reservation.confirmed', data: { reservation_id: 'r1' } },
-    { event: 'reservation.cancelled', data: { reservation_id: 'r2', reason: 'Guest request' } },
-    { event: 'reservation.checked_in', data: { reservation_id: 'r3' } },
-    { event: 'reservation.checked_out', data: { reservation_id: 'r4' } },
-    { event: 'booking.confirmed', data: { booking_id: 'b1' } },
-    { event: 'booking.cancelled', data: { booking_id: 'b2', reason: 'Operator unavailable' } },
-    { event: 'booking.completed', data: { booking_id: 'b3' } },
-    { event: 'property.updated', data: { property_id: 'p1' } },
-    { event: 'property.deactivated', data: { property_id: 'p2' } },
-    { event: 'experience.updated', data: { experience_id: 'e1' } },
-    { event: 'experience.deactivated', data: { experience_id: 'e2' } },
-    { event: 'availability.updated', data: { room_id: 'room1', dates: [] } },
+  const contractEventTypes = [
+    // Stays (5 events)
+    { event: 'reservation.cancelled',        data: { reservation_id: 'r1', reason: 'Guest request' } },
+    { event: 'reservation.no_show',          data: { reservation_id: 'r2' } },
+    { event: 'reservation.guest_checked_in', data: { reservation_id: 'r3' } },
+    { event: 'reservation.guest_checked_out',data: { reservation_id: 'r4' } },
+    { event: 'reservation.refunded',         data: { reservation_id: 'r5', refund_amount: 50000 } },
+    // Experiences (4 events)
+    { event: 'booking.cancelled',            data: { booking_id: 'b1', reason: 'Operator unavailable' } },
+    { event: 'booking.no_show',              data: { booking_id: 'b2' } },
+    { event: 'booking.completed',            data: { booking_id: 'b3' } },
+    { event: 'booking.refunded',             data: { booking_id: 'b4', refund_amount: 25000 } },
+    // Inventory (2 events)
+    { event: 'property.deactivated',         data: { property_id: 'p1' } },
+    { event: 'experience.deactivated',       data: { experience_id: 'e1' } },
+    // Reconciliation (1 event)
+    { event: 'reconciliation.requested',     data: { scope: 'STAYS' } },
   ];
 
-  allEventTypes.forEach(({ event, data }) => {
-    it(`handles event type "${event}" without throwing`, async () => {
+  contractEventTypes.forEach(({ event, data }) => {
+    it(`[contract] handles "${event}" without throwing`, async () => {
       const { getPrisma } = await import('@/lib/db-safe');
       vi.mocked(getPrisma).mockReturnValue(makeMockPrismaFresh() as never);
 
@@ -200,6 +209,33 @@ describe('POST /api/v1/channel/webhooks/inbound', () => {
       const req = makeRequest({ event, data });
       const res = await POST(req);
       expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.received).toBe(true);
+    });
+  });
+
+  // ─── 5 supplementary events (NOT in OpenAPI spec) ─────────────────────────
+  // Owambe does not emit these. They are retained for internal state management.
+
+  const supplementaryEventTypes = [
+    { event: 'reservation.confirmed', data: { reservation_id: 'r10' } },
+    { event: 'booking.confirmed',     data: { booking_id: 'b10' } },
+    { event: 'property.updated',      data: { property_id: 'p10' } },
+    { event: 'experience.updated',    data: { experience_id: 'e10' } },
+    { event: 'availability.updated',  data: { room_id: 'room10', dates: [] } },
+  ];
+
+  supplementaryEventTypes.forEach(({ event, data }) => {
+    it(`[supplementary] handles "${event}" without throwing`, async () => {
+      const { getPrisma } = await import('@/lib/db-safe');
+      vi.mocked(getPrisma).mockReturnValue(makeMockPrismaFresh() as never);
+
+      const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
+      const req = makeRequest({ event, data });
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.received).toBe(true);
     });
   });
 });

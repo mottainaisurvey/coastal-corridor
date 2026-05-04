@@ -756,6 +756,7 @@ enum ReservationStatus {
   CHECKED_OUT
   CANCELLED
   NO_SHOW
+  REFUNDED
 }
 
 enum PaymentStatus {
@@ -918,6 +919,7 @@ enum ExperienceBookingStatus {
   COMPLETED
   CANCELLED
   NO_SHOW
+  REFUNDED
 }
 
 model Experience {

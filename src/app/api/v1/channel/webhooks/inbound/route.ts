@@ -7,29 +7,34 @@
  *   - Routes to the appropriate handler by event type
  *   - Returns 200 immediately; processing is synchronous but fast
  *
- * Supported events (Phase A — infrastructure only; handlers added in Phase B/C):
- *   - reservation.confirmed
- *   - reservation.cancelled
- *   - reservation.checked_in
- *   - reservation.checked_out
- *   - booking.confirmed
- *   - booking.cancelled
- *   - booking.completed
- *   - property.updated
- *   - property.deactivated
- *   - experience.updated
- *   - experience.deactivated
- *   - availability.updated
+ * Supported events per OpenAPI spec (12 contract events):
+ *   reservation.cancelled
+ *   reservation.no_show
+ *   reservation.guest_checked_in
+ *   reservation.guest_checked_out
+ *   reservation.refunded
+ *   booking.cancelled
+ *   booking.no_show
+ *   booking.completed
+ *   booking.refunded
+ *   property.deactivated
+ *   experience.deactivated
+ *   reconciliation.requested
+ *
+ * Supplementary events (not in OpenAPI spec; useful for internal state):
+ *   reservation.confirmed
+ *   booking.confirmed
+ *   property.updated
+ *   experience.updated
+ *   availability.updated
  *
  * Spec reference: Implementation Brief §10, API Narrative §7
  */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyInboundWebhook } from '@/lib/hmac';
 import { getPrisma } from '@/lib/db-safe';
 
-// ─── POST /api/v1/channel/webhooks/inbound ────────────────────────────────────────────────
-
+// ─── POST /api/v1/channel/webhooks/inbound ────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. Read raw body (must be done before any parsing)
   const rawBody = await req.text();
@@ -86,7 +91,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const existing = await prisma.webhookDelivery.findUnique({
       where: { eventId },
     });
-
     if (existing) {
       // Already processed — return 200 to prevent Owambe retrying
       console.info('[webhook/inbound] Duplicate event ignored:', eventId);
@@ -119,7 +123,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   } catch (err) {
     console.error(`[webhook/inbound] Handler error for event ${event}:`, err);
-
     // Mark as failed — will be retried by Owambe
     if (prisma) {
       await prisma.webhookDelivery.update({
@@ -132,7 +135,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         },
       });
     }
-
     // Return 500 so Owambe retries
     return NextResponse.json(
       { error: 'Internal processing error' },
@@ -144,49 +146,73 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 }
 
 // ─── Event router ─────────────────────────────────────────────────────────────
-
 async function routeWebhookEvent(
   event: string,
   data: Record<string, unknown>,
   eventId: string
 ): Promise<void> {
   switch (event) {
-    // Stays events
-    case 'reservation.confirmed':
-      await handleReservationConfirmed(data);
-      break;
+    // ── Contract events: Stays (OpenAPI spec §7) ──────────────────────────────
     case 'reservation.cancelled':
       await handleReservationCancelled(data);
       break;
-    case 'reservation.checked_in':
-      await handleReservationCheckedIn(data);
+    case 'reservation.no_show':
+      await handleReservationNoShow(data);
       break;
-    case 'reservation.checked_out':
-      await handleReservationCheckedOut(data);
+    case 'reservation.guest_checked_in':
+      await handleReservationGuestCheckedIn(data);
+      break;
+    case 'reservation.guest_checked_out':
+      await handleReservationGuestCheckedOut(data);
+      break;
+    case 'reservation.refunded':
+      await handleReservationRefunded(data);
       break;
 
-    // Experiences events
-    case 'booking.confirmed':
-      await handleBookingConfirmed(data);
-      break;
+    // ── Contract events: Experiences (OpenAPI spec §7) ────────────────────────
     case 'booking.cancelled':
       await handleBookingCancelled(data);
+      break;
+    case 'booking.no_show':
+      await handleBookingNoShow(data);
       break;
     case 'booking.completed':
       await handleBookingCompleted(data);
       break;
+    case 'booking.refunded':
+      await handleBookingRefunded(data);
+      break;
 
-    // Inventory events
-    case 'property.updated':
+    // ── Contract events: Inventory (OpenAPI spec §7) ──────────────────────────
     case 'property.deactivated':
-      await handlePropertyEvent(event, data);
+      await handlePropertyDeactivated(data);
+      break;
+    case 'experience.deactivated':
+      await handleExperienceDeactivated(data);
+      break;
+
+    // ── Contract events: Reconciliation (OpenAPI spec §7) ─────────────────────
+    case 'reconciliation.requested':
+      await handleReconciliationRequested(data, eventId);
+      break;
+
+    // ── Supplementary events (not in OpenAPI spec; internal use only) ─────────
+    // These are NOT emitted by Owambe's webhook publisher per the API contract.
+    // They are retained for internal state management and future use.
+    case 'reservation.confirmed':
+      await handleReservationConfirmed(data);
+      break;
+    case 'booking.confirmed':
+      await handleBookingConfirmed(data);
+      break;
+    case 'property.updated':
+      console.info(`[webhook/inbound] property.updated received for ${data.property_id} — Phase B reconciliation`);
       break;
     case 'experience.updated':
-    case 'experience.deactivated':
-      await handleExperienceEvent(event, data);
+      console.info(`[webhook/inbound] experience.updated received for ${data.experience_id} — Phase B reconciliation`);
       break;
     case 'availability.updated':
-      await handleAvailabilityUpdated(data);
+      console.info(`[webhook/inbound] availability.updated received for room ${data.room_id} — Phase B calendar sync`);
       break;
 
     default:
@@ -195,35 +221,15 @@ async function routeWebhookEvent(
   }
 }
 
-// ─── Stays handlers ───────────────────────────────────────────────────────────
-
-async function handleReservationConfirmed(
-  data: Record<string, unknown>
-): Promise<void> {
-  const prisma = getPrisma();
-  if (!prisma) return;
-
-  const owambeReservationId = data.reservation_id as string;
-  if (!owambeReservationId) return;
-
-  await prisma.reservation.updateMany({
-    where: { owambeReservationId },
-    data: {
-      status: 'CONFIRMED',
-      updatedAt: new Date(),
-    },
-  });
-}
+// ─── Contract: Stays handlers ─────────────────────────────────────────────────
 
 async function handleReservationCancelled(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
-
   const owambeReservationId = data.reservation_id as string;
   if (!owambeReservationId) return;
-
   await prisma.reservation.updateMany({
     where: { owambeReservationId },
     data: {
@@ -235,62 +241,73 @@ async function handleReservationCancelled(
   });
 }
 
-async function handleReservationCheckedIn(
+async function handleReservationNoShow(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
-
   const owambeReservationId = data.reservation_id as string;
   if (!owambeReservationId) return;
+  await prisma.reservation.updateMany({
+    where: { owambeReservationId },
+    data: { status: 'NO_SHOW', updatedAt: new Date() },
+  });
+}
 
+async function handleReservationGuestCheckedIn(
+  data: Record<string, unknown>
+): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) return;
+  const owambeReservationId = data.reservation_id as string;
+  if (!owambeReservationId) return;
   await prisma.reservation.updateMany({
     where: { owambeReservationId },
     data: { status: 'CHECKED_IN', updatedAt: new Date() },
   });
 }
 
-async function handleReservationCheckedOut(
+async function handleReservationGuestCheckedOut(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
-
   const owambeReservationId = data.reservation_id as string;
   if (!owambeReservationId) return;
-
   await prisma.reservation.updateMany({
     where: { owambeReservationId },
     data: { status: 'CHECKED_OUT', updatedAt: new Date() },
   });
 }
 
-// ─── Experiences handlers ─────────────────────────────────────────────────────
-
-async function handleBookingConfirmed(
+async function handleReservationRefunded(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
-
-  const owambeBookingId = data.booking_id as string;
-  if (!owambeBookingId) return;
-
-  await prisma.experienceBooking.updateMany({
-    where: { owambeBookingId },
-    data: { status: 'CONFIRMED', updatedAt: new Date() },
+  const owambeReservationId = data.reservation_id as string;
+  if (!owambeReservationId) return;
+  await prisma.reservation.updateMany({
+    where: { owambeReservationId },
+    data: {
+      status: 'REFUNDED',
+      refundAmount: data.refund_amount != null
+        ? (data.refund_amount as number)
+        : undefined,
+      updatedAt: new Date(),
+    },
   });
 }
+
+// ─── Contract: Experiences handlers ──────────────────────────────────────────
 
 async function handleBookingCancelled(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
-
   const owambeBookingId = data.booking_id as string;
   if (!owambeBookingId) return;
-
   await prisma.experienceBooking.updateMany({
     where: { owambeBookingId },
     data: {
@@ -299,6 +316,19 @@ async function handleBookingCancelled(
       cancellationInitiatedBy: 'OWAMBE',
       updatedAt: new Date(),
     },
+  });
+}
+
+async function handleBookingNoShow(
+  data: Record<string, unknown>
+): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) return;
+  const owambeBookingId = data.booking_id as string;
+  if (!owambeBookingId) return;
+  await prisma.experienceBooking.updateMany({
+    where: { owambeBookingId },
+    data: { status: 'NO_SHOW', updatedAt: new Date() },
   });
 }
 
@@ -307,68 +337,117 @@ async function handleBookingCompleted(
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
-
   const owambeBookingId = data.booking_id as string;
   if (!owambeBookingId) return;
-
   await prisma.experienceBooking.updateMany({
     where: { owambeBookingId },
     data: { status: 'COMPLETED', updatedAt: new Date() },
   });
 }
 
-// ─── Inventory handlers ───────────────────────────────────────────────────────
-
-async function handlePropertyEvent(
-  event: string,
+async function handleBookingRefunded(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
+  const owambeBookingId = data.booking_id as string;
+  if (!owambeBookingId) return;
+  await prisma.experienceBooking.updateMany({
+    where: { owambeBookingId },
+    data: {
+      status: 'REFUNDED',
+      refundAmount: data.refund_amount != null
+        ? (data.refund_amount as number)
+        : undefined,
+      updatedAt: new Date(),
+    },
+  });
+}
 
+// ─── Contract: Inventory handlers ────────────────────────────────────────────
+
+async function handlePropertyDeactivated(
+  data: Record<string, unknown>
+): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) return;
   const owambePropertyId = data.property_id as string;
   if (!owambePropertyId) return;
-
-  if (event === 'property.deactivated') {
-    await prisma.stayProperty.updateMany({
-      where: { owambePropertyId },
-      data: { status: 'INACTIVE', updatedAt: new Date() },
-    });
-  } else if (event === 'property.updated') {
-    // Phase B will implement full property sync here
-    // For Phase A, just log the event — the reconciliation cron handles sync
-    console.info(`[webhook/inbound] property.updated received for ${owambePropertyId} — reconciliation will sync`);
-  }
+  await prisma.stayProperty.updateMany({
+    where: { owambePropertyId },
+    data: { status: 'INACTIVE', updatedAt: new Date() },
+  });
 }
 
-async function handleExperienceEvent(
-  event: string,
+async function handleExperienceDeactivated(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
-
   const owambeExperienceId = data.experience_id as string;
   if (!owambeExperienceId) return;
-
-  if (event === 'experience.deactivated') {
-    await prisma.experience.updateMany({
-      where: { owambeExperienceId },
-      data: { status: 'INACTIVE', updatedAt: new Date() },
-    });
-  } else if (event === 'experience.updated') {
-    console.info(`[webhook/inbound] experience.updated received for ${owambeExperienceId} — reconciliation will sync`);
-  }
+  await prisma.experience.updateMany({
+    where: { owambeExperienceId },
+    data: { status: 'INACTIVE', updatedAt: new Date() },
+  });
 }
 
-async function handleAvailabilityUpdated(
+// ─── Contract: Reconciliation handler ────────────────────────────────────────
+
+async function handleReconciliationRequested(
+  data: Record<string, unknown>,
+  eventId: string
+): Promise<void> {
+  // Owambe is requesting a reconciliation snapshot.
+  // Phase B will implement the full reconciliation response (GET /api/v1/channel/reconciliation/stays/snapshot
+  // and GET /api/v1/channel/reconciliation/experiences/snapshot).
+  // For Phase A, log the request so it is visible in the audit trail.
+  const scope = (data.scope as string) ?? 'UNKNOWN';
+  console.info(
+    `[webhook/inbound] reconciliation.requested (scope: ${scope}, event: ${eventId}) — Phase B will implement snapshot response`
+  );
+  // Log to ReconciliationLog so the request is traceable
+  const prisma = getPrisma();
+  if (!prisma) return;
+  await prisma.reconciliationLog.create({
+    data: {
+      scope,
+      entitiesChecked: 0,
+      mismatchesFound: 0,
+      autoCorrected: 0,
+      manualReviewItems: 0,
+      details: { trigger: 'owambe_webhook', eventId, raw: data },
+      durationMs: 0,
+    },
+  });
+}
+
+// ─── Supplementary: internal-only handlers ───────────────────────────────────
+// These handle events NOT in the OpenAPI spec. Owambe does not emit them.
+// They exist for internal state management only.
+
+async function handleReservationConfirmed(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
+  const owambeReservationId = data.reservation_id as string;
+  if (!owambeReservationId) return;
+  await prisma.reservation.updateMany({
+    where: { owambeReservationId },
+    data: { status: 'CONFIRMED', updatedAt: new Date() },
+  });
+}
 
-  // Phase B will implement full calendar sync here
-  // For Phase A, log the event
-  const roomId = data.room_id as string;
-  console.info(`[webhook/inbound] availability.updated received for room ${roomId} — calendar sync in Phase B`);
+async function handleBookingConfirmed(
+  data: Record<string, unknown>
+): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) return;
+  const owambeBookingId = data.booking_id as string;
+  if (!owambeBookingId) return;
+  await prisma.experienceBooking.updateMany({
+    where: { owambeBookingId },
+    data: { status: 'CONFIRMED', updatedAt: new Date() },
+  });
 }
