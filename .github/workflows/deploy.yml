@@ -9,9 +9,17 @@
 #   VERCEL_ORG_ID                 — Vercel organisation ID (from vercel.json or Vercel dashboard)
 #   VERCEL_PROJECT_ID             — Vercel project ID (from vercel.json or Vercel dashboard)
 #   VERCEL_STAGING_ENV_URL        — Expected staging URL for smoke test (e.g. https://coastal-corridor-staging.vercel.app)
+#   STAGING_DATABASE_URL          — Staging Supabase connection string (for prisma migrate deploy)
+#   PRODUCTION_DATABASE_URL       — Production Supabase connection string (for prisma migrate deploy)
 #
-# Environment variables are configured directly in Vercel per environment (staging / production).
-# They are NOT stored in this workflow file.
+# Environment variables for application runtime are configured directly in Vercel per environment
+# (staging / production). They are NOT stored in this workflow file.
+#
+# Migration strategy (Option A — automated):
+#   prisma migrate deploy runs against the target database BEFORE the new application code is
+#   deployed. This ensures schema changes are in place before traffic hits code that depends on them.
+#   The DATABASE_URL secrets here are used only for migration; they are separate from the
+#   DATABASE_URL configured in Vercel (which the application uses at runtime).
 #
 # Spec reference: Implementation Brief §10, STAGING_SETUP.md
 
@@ -74,6 +82,20 @@ jobs:
         with:
           version: 9
 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # Run migrations BEFORE deploying application code.
+      # If this step fails, the deploy step is skipped — preventing code from
+      # running against a schema it expects but that doesn't exist yet.
+      - name: Run database migrations (staging)
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: pnpm exec prisma migrate deploy
+
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
 
@@ -90,16 +112,16 @@ jobs:
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Deployed to: $URL"
 
-      - name: Smoke test — /health endpoint
+      - name: Smoke test — /api/health endpoint
         run: |
           STAGING_URL="${{ secrets.VERCEL_STAGING_ENV_URL }}"
           echo "Smoke testing $STAGING_URL/api/health"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/health")
           if [ "$STATUS" != "200" ]; then
-            echo "Smoke test failed: /health returned HTTP $STATUS"
+            echo "Smoke test failed: /api/health returned HTTP $STATUS"
             exit 1
           fi
-          echo "Smoke test passed: /health returned HTTP 200"
+          echo "Smoke test passed: /api/health returned HTTP 200"
 
   # ─── Deploy to Production ──────────────────────────────────────────────────
   deploy-production:
@@ -124,6 +146,20 @@ jobs:
         with:
           version: 9
 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # Run migrations BEFORE deploying application code.
+      # If this step fails, the deploy step is skipped — preventing code from
+      # running against a schema it expects but that doesn't exist yet.
+      - name: Run database migrations (production)
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: pnpm exec prisma migrate deploy
+
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
 
@@ -140,11 +176,11 @@ jobs:
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Deployed to: $URL"
 
-      - name: Smoke test — /health endpoint
+      - name: Smoke test — /api/health endpoint
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://coastalcorridor.africa/api/health")
           if [ "$STATUS" != "200" ]; then
-            echo "Production smoke test failed: /health returned HTTP $STATUS"
+            echo "Production smoke test failed: /api/health returned HTTP $STATUS"
             exit 1
           fi
-          echo "Production smoke test passed: /health returned HTTP 200"
+          echo "Production smoke test passed: /api/health returned HTTP 200"
