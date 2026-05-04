@@ -1,0 +1,150 @@
+# Coastal Corridor — CI/CD Workflow
+#
+# Deployment strategy:
+#   staging branch  → Vercel staging environment (auto-deploy on push)
+#   main branch     → Vercel production environment (auto-deploy on push, after staging acceptance)
+#
+# Required GitHub repository secrets:
+#   VERCEL_TOKEN                  — Vercel personal access token
+#   VERCEL_ORG_ID                 — Vercel organisation ID (from vercel.json or Vercel dashboard)
+#   VERCEL_PROJECT_ID             — Vercel project ID (from vercel.json or Vercel dashboard)
+#   VERCEL_STAGING_ENV_URL        — Expected staging URL for smoke test (e.g. https://coastal-corridor-staging.vercel.app)
+#
+# Environment variables are configured directly in Vercel per environment (staging / production).
+# They are NOT stored in this workflow file.
+#
+# Spec reference: Implementation Brief §10, STAGING_SETUP.md
+
+name: Deploy
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+
+jobs:
+  # ─── Test ──────────────────────────────────────────────────────────────────
+  test:
+    name: Run test suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      - name: Run unit and integration tests
+        run: pnpm exec vitest run
+
+  # ─── Deploy to Staging ─────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to staging
+    needs: test
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      - name: Pull Vercel environment (staging)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build project
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel staging
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $URL"
+
+      - name: Smoke test — /health endpoint
+        run: |
+          STAGING_URL="${{ secrets.VERCEL_STAGING_ENV_URL }}"
+          echo "Smoke testing $STAGING_URL/api/health"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/health")
+          if [ "$STATUS" != "200" ]; then
+            echo "Smoke test failed: /health returned HTTP $STATUS"
+            exit 1
+          fi
+          echo "Smoke test passed: /health returned HTTP 200"
+
+  # ─── Deploy to Production ──────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to production
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://coastalcorridor.africa
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      - name: Pull Vercel environment (production)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build project
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel production
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $URL"
+
+      - name: Smoke test — /health endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://coastalcorridor.africa/api/health")
+          if [ "$STATUS" != "200" ]; then
+            echo "Production smoke test failed: /health returned HTTP $STATUS"
+            exit 1
+          fi
+          echo "Production smoke test passed: /health returned HTTP 200"

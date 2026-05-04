@@ -103,7 +103,6 @@ model User {
   owambeUserId         String?   @unique  // FK reference to Owambe User
   paystackCustomerCode String?            // Paystack customer code for Stays/Experiences
   paystackSubaccountCode String?          // Subaccount code for host/operator payouts
-  owambeChannelId      String?            // Owambe channel ID for this user
 
   profile          Profile?
   agentProfile     AgentProfile?
