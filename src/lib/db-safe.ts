@@ -26,6 +26,9 @@ export function getPrismaClient() {
   }
 }
 
+// Alias used by Phase A integration files
+export const getPrisma = getPrismaClient;
+
 export const prisma = new Proxy({} as any, {
   get: (target, prop) => {
     const client = getPrismaClient();

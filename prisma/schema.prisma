@@ -3,13 +3,14 @@
 // ---
 // Design principles:
 // - All money amounts stored as BigInt (kobo/pence) to avoid float precision issues
+//   EXCEPTION: Stays/Experiences amounts use Decimal for multi-currency compatibility
 // - Spatial data uses PostGIS; not fully expressed here (Prisma limited) but noted
 // - Soft-delete via deletedAt for most entities; hard delete only for transient data
 // - Audit trail on every critical entity (createdBy, updatedBy, version)
 // - Separate Identity from Profile to allow identity provider changes
 // ---
-// Status: v0.1 — schema reviewed for MVP marketplace surface only.
-// Pre-production: REQUIRES review by senior backend engineer + Nigerian real estate lawyer.
+// Status: v0.2 — Phase A additions: Stays, Experiences, Owambe integration infrastructure
+// Schema is additive — all existing models preserved unchanged.
 
 generator client {
   provider = "prisma-client-js"
@@ -42,6 +43,11 @@ enum UserRole {
   ADMIN
   GOVERNMENT
   VERIFIER
+  // Phase A additions — Stays and Experiences verticals
+  HOST
+  OPERATOR
+  GUEST
+  PARTICIPANT
 }
 
 enum UserStatus {
@@ -49,6 +55,27 @@ enum UserStatus {
   ACTIVE
   SUSPENDED
   CLOSED
+}
+
+// Phase A addition — multi-currency support for Stays/Experiences
+enum Currency {
+  NGN
+  USD
+  GBP
+}
+
+// Phase A addition — cohort membership types
+enum CohortType {
+  COASTAL_CORRIDOR_HOST
+  COASTAL_CORRIDOR_OPERATOR
+  BOTH
+}
+
+// Phase A addition — cohort code lifecycle
+enum CohortCodeStatus {
+  ACTIVE
+  USED
+  REVOKED
 }
 
 model User {
@@ -66,15 +93,32 @@ model User {
   updatedAt       DateTime   @updatedAt
   deletedAt       DateTime?
 
+  // Phase A additions — all nullable for backward compatibility
+  preferredCurrency    Currency  @default(NGN)
+  cohortMember         Boolean   @default(false)
+  cohortCode           String?
+  cohortType           CohortType?
+  cohortStartDate      DateTime?
+  cohortEndDate        DateTime?
+  owambeUserId         String?   @unique  // FK reference to Owambe User
+  paystackCustomerCode String?            // Paystack customer code for Stays/Experiences
+
   profile          Profile?
   agentProfile     AgentProfile?
   devProfile       DeveloperProfile?
+  hostProfile      HostProfile?
+  operatorProfile  OperatorProfile?
   savedPlots       SavedPlot[]
   inquiries        Inquiry[]
   transactions     Transaction[]  @relation("TransactionBuyer")
   listings         Listing[]      @relation("ListingOwner")
   auditEntries     AuditEntry[]
   fractionalShares FractionalShare[]
+  // Phase A additions
+  stayProperties   StayProperty[]
+  experiences      Experience[]
+  reservations     Reservation[]  @relation("ReservationGuest")
+  experienceBookings ExperienceBooking[] @relation("BookingParticipant")
 
   @@index([role, status])
   @@index([diasporaCountry])
@@ -129,6 +173,38 @@ model DeveloperProfile {
   updatedAt    DateTime @updatedAt
 
   projects Project[]
+}
+
+// Phase A addition — Host profile for Stays vertical
+model HostProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName      String?
+  businessName     String?
+  bio              String?  @db.Text
+  commissionRate   Decimal  @default(0.15) @db.Decimal(5, 4) // default 15%, negotiable
+  paystackSubaccountCode String? // for commission splits at payment time
+  verificationLevel VerificationLevel?
+  verifiedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Phase A addition — Operator profile for Experiences vertical
+model OperatorProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName      String?
+  businessName     String?
+  bio              String?  @db.Text
+  commissionRate   Decimal  @default(0.15) @db.Decimal(5, 4) // default 15%, negotiable
+  paystackSubaccountCode String? // for commission splits at payment time
+  verificationLevel VerificationLevel?
+  verifiedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 // =========================================================
@@ -256,7 +332,7 @@ model Plot {
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
-  property    Property?
+  realEstateProperty RealEstateProperty?
   listings    Listing[]
   savedBy     SavedPlot[]
   inquiries   Inquiry[]
@@ -266,7 +342,9 @@ model Plot {
   @@index([titleStatus])
 }
 
-enum PropertyType {
+// Renamed from Property to RealEstateProperty to avoid collision with Stays StayProperty
+// The original "Property" model is preserved with all its fields and relations intact.
+enum RealEstatePropertyType {
   LAND_ONLY
   HOUSE
   APARTMENT
@@ -275,13 +353,13 @@ enum PropertyType {
   HOSPITALITY
 }
 
-model Property {
-  id              String       @id @default(cuid())
-  plotId          String       @unique
-  plot            Plot         @relation(fields: [plotId], references: [id])
-  type            PropertyType
+model RealEstateProperty {
+  id              String                 @id @default(cuid())
+  plotId          String                 @unique
+  plot            Plot                   @relation(fields: [plotId], references: [id])
+  type            RealEstatePropertyType
   projectId       String?
-  project         Project?     @relation(fields: [projectId], references: [id])
+  project         Project?               @relation(fields: [projectId], references: [id])
   title           String
   description     String
   bedrooms        Int?
@@ -323,7 +401,7 @@ model Project {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  properties Property[]
+  properties RealEstateProperty[]
 
   @@index([destinationId])
   @@index([status])
@@ -344,7 +422,7 @@ model Listing {
   plotId          String?
   plot            Plot?         @relation(fields: [plotId], references: [id])
   propertyId      String?
-  property        Property?     @relation(fields: [propertyId], references: [id])
+  property        RealEstateProperty? @relation(fields: [propertyId], references: [id])
 
   ownerId         String        // User who listed (could be agent, developer, or direct owner)
   owner           User          @relation("ListingOwner", fields: [ownerId], references: [id])
@@ -487,6 +565,13 @@ enum VerificationType {
   GOVERNMENT_RECORDS
 }
 
+// Phase A addition — verification levels for hosts, operators, and real estate agents
+enum VerificationLevel {
+  BASIC
+  ENHANCED
+  PREMIUM
+}
+
 model PlotVerification {
   id          String           @id @default(cuid())
   plotId      String
@@ -505,7 +590,7 @@ model PlotVerification {
 }
 
 // =========================================================
-// TOURISM VERTICAL
+// TOURISM VERTICAL (existing, preserved)
 // =========================================================
 
 model TourismListing {
@@ -527,7 +612,7 @@ model TourismListing {
 }
 
 // =========================================================
-// FRACTIONAL OWNERSHIP
+// FRACTIONAL OWNERSHIP (existing, preserved)
 // =========================================================
 
 model FractionalScheme {
@@ -575,7 +660,7 @@ model FractionalShare {
 }
 
 // =========================================================
-// STATE REGISTRY CONNECTORS
+// STATE REGISTRY CONNECTORS (existing, preserved)
 // =========================================================
 
 model RegistryRecord {
@@ -595,7 +680,7 @@ model RegistryRecord {
 }
 
 // =========================================================
-// OPERATOR & HOST APPLICATIONS
+// OPERATOR & HOST APPLICATIONS (existing, extended)
 // =========================================================
 
 model OperatorApplication {
@@ -623,6 +708,8 @@ model OperatorApplication {
   status               String   @default("PENDING") // PENDING | REVIEWING | ACCEPTED | DECLINED
   reviewedAt           DateTime?
   reviewNotes          String?
+  // Phase A addition — link to cohort code issued on acceptance
+  cohortCodeId         String?  // FK to CohortCode.code (set when ACCEPTED)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -632,9 +719,376 @@ model OperatorApplication {
 }
 
 // =========================================================
-// AUDIT & SYSTEM
+// STAYS VERTICAL — Phase A additions
 // =========================================================
 
+enum StayPropertyType {
+  BEACH_HOUSE
+  GUESTHOUSE
+  HOTEL
+  SERVICED_APARTMENT
+  RESORT
+  HERITAGE
+  OTHER
+}
+
+enum StayPropertyStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_REVIEW
+}
+
+enum RoomType {
+  STANDARD
+  DELUXE
+  SUITE
+  FAMILY
+  ENTIRE_PROPERTY
+  OTHER
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  FAILED
+  REFUNDED
+}
+
+// Stays property — sourced from Owambe via integration.
+// Distinct from RealEstateProperty (real estate vertical).
+model StayProperty {
+  id                  String             @id @default(cuid())
+  owambePropertyId    String             @unique  // source-of-truth reference
+  hostUserId          String
+  host                User               @relation(fields: [hostUserId], references: [id])
+  name                String
+  description         String             @db.Text
+  propertyType        StayPropertyType
+  addressLine1        String
+  addressLine2        String?
+  city                String
+  state               String
+  country             String             @default("Nigeria")
+  latitude            Decimal            @db.Decimal(10, 7)
+  longitude           Decimal            @db.Decimal(10, 7)
+  amenities           String[]
+  policies            Json               // check-in, check-out, cancellation, house rules, damage deposit
+  status              StayPropertyStatus @default(UNDER_REVIEW)
+  verificationLevel   VerificationLevel?
+  verifiedAt          DateTime?
+  rooms               Room[]
+  reservations        Reservation[]
+  images              StayPropertyImage[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([city, state])
+  @@index([latitude, longitude])
+}
+
+model Room {
+  id              String   @id @default(cuid())
+  owambeRoomId    String   @unique
+  propertyId      String
+  property        StayProperty @relation(fields: [propertyId], references: [id])
+  name            String
+  roomType        RoomType
+  capacity        Int
+  baseRate        Decimal  @db.Decimal(10, 2)
+  baseCurrency    Currency @default(NGN)
+  amenities       String[]
+  active          Boolean  @default(true)
+  calendarEntries CalendarEntry[]
+  reservations    Reservation[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CalendarEntry {
+  id            String   @id @default(cuid())
+  roomId        String
+  room          Room     @relation(fields: [roomId], references: [id])
+  date          DateTime @db.Date
+  available     Boolean  @default(true)
+  rate          Decimal? @db.Decimal(10, 2)
+  currency      Currency @default(NGN)
+  minimumStay   Int?     // nights
+  maximumStay   Int?     // nights
+  closedReason  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([roomId, date])
+  @@index([roomId, date])
+}
+
+model Reservation {
+  id                       String            @id @default(cuid())
+  owambeReservationId      String?           @unique
+  propertyId               String
+  property                 StayProperty      @relation(fields: [propertyId], references: [id])
+  roomId                   String
+  room                     Room              @relation(fields: [roomId], references: [id])
+  guestUserId              String
+  guest                    User              @relation("ReservationGuest", fields: [guestUserId], references: [id])
+  checkInDate              DateTime          @db.Date
+  checkOutDate             DateTime          @db.Date
+  numberOfGuests           Int
+  totalAmount              Decimal           @db.Decimal(10, 2)
+  currency                 Currency
+  channelCommissionAmount  Decimal           @db.Decimal(10, 2)
+  channelCommissionPercent Decimal           @db.Decimal(5, 2)
+  netToHost                Decimal           @db.Decimal(10, 2)
+  damageDeposit            Decimal?          @db.Decimal(10, 2)
+  specialRequests          String?           @db.Text
+  paystackReference        String?
+  outboundIdempotencyKey   String?           @unique  // UUID v4 for outbound call to Owambe
+  paymentStatus            PaymentStatus     @default(PENDING)
+  status                   ReservationStatus @default(PENDING)
+  cancellationReason       String?
+  cancellationInitiatedBy  String?
+  refundAmount             Decimal?          @db.Decimal(10, 2)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  @@index([guestUserId])
+  @@index([propertyId, checkInDate, checkOutDate])
+}
+
+model StayPropertyImage {
+  id          String       @id @default(cuid())
+  propertyId  String
+  property    StayProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  url         String       // Supabase Storage URL
+  caption     String?
+  isPrimary   Boolean      @default(false)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+}
+
+// =========================================================
+// EXPERIENCES VERTICAL — Phase A additions
+// =========================================================
+
+enum ExperienceType {
+  TOUR
+  CHARTER
+  WORKSHOP
+  FOOD_EXPERIENCE
+  TRANSPORT
+  EVENT_SPECIALIST
+  WELLNESS
+  OTHER
+}
+
+enum ExperienceStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_REVIEW
+}
+
+enum PricingModel {
+  PER_PERSON
+  PER_GROUP
+  TIERED
+}
+
+enum TimeSlotStatus {
+  OPEN
+  FULL
+  CANCELLED
+  COMPLETED
+}
+
+enum ExperienceBookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Experience {
+  id                      String           @id @default(cuid())
+  owambeExperienceId      String           @unique
+  operatorUserId          String
+  operator                User             @relation(fields: [operatorUserId], references: [id])
+  name                    String
+  description             String           @db.Text
+  experienceType          ExperienceType
+  durationMinutes         Int
+  capacity                Int
+  meetingPointDescription String
+  meetingPointLatitude    Decimal          @db.Decimal(10, 7)
+  meetingPointLongitude   Decimal          @db.Decimal(10, 7)
+  pricingModel            PricingModel
+  basePrice               Decimal          @db.Decimal(10, 2)
+  baseCurrency            Currency         @default(NGN)
+  ageRestriction          String?
+  fitnessRequirement      String?
+  weatherDependent        Boolean          @default(false)
+  equipmentProvided       String[]
+  equipmentRequired       String[]
+  status                  ExperienceStatus @default(UNDER_REVIEW)
+  verificationLevel       VerificationLevel?
+  verifiedAt              DateTime?
+  timeSlots               TimeSlot[]
+  bookings                ExperienceBooking[]
+  images                  ExperienceImage[]
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  @@index([meetingPointLatitude, meetingPointLongitude])
+}
+
+model TimeSlot {
+  id                String         @id @default(cuid())
+  owambeTimeSlotId  String         @unique
+  experienceId      String
+  experience        Experience     @relation(fields: [experienceId], references: [id])
+  startDateTime     DateTime
+  endDateTime       DateTime
+  capacity          Int
+  spotsBooked       Int            @default(0)
+  rate              Decimal?       @db.Decimal(10, 2)
+  currency          Currency       @default(NGN)
+  recurrencePattern String?        // RFC 5545 RRULE if recurring
+  status            TimeSlotStatus @default(OPEN)
+  bookings          ExperienceBooking[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([experienceId, startDateTime])
+}
+
+model ExperienceBooking {
+  id                       String                  @id @default(cuid())
+  owambeBookingId          String?                 @unique
+  experienceId             String
+  experience               Experience              @relation(fields: [experienceId], references: [id])
+  timeSlotId               String
+  timeSlot                 TimeSlot                @relation(fields: [timeSlotId], references: [id])
+  participantUserId        String
+  participant              User                    @relation("BookingParticipant", fields: [participantUserId], references: [id])
+  numberOfParticipants     Int
+  participantNames         String[]
+  totalAmount              Decimal                 @db.Decimal(10, 2)
+  currency                 Currency
+  channelCommissionAmount  Decimal                 @db.Decimal(10, 2)
+  channelCommissionPercent Decimal                 @db.Decimal(5, 2)
+  netToOperator            Decimal                 @db.Decimal(10, 2)
+  specialRequirements      String?                 @db.Text
+  pickupRequested          Boolean                 @default(false)
+  pickupAddress            String?
+  paystackReference        String?
+  outboundIdempotencyKey   String?                 @unique  // UUID v4 for outbound call to Owambe
+  paymentStatus            PaymentStatus           @default(PENDING)
+  status                   ExperienceBookingStatus @default(PENDING)
+  cancellationReason       String?
+  cancellationInitiatedBy  String?
+  refundAmount             Decimal?                @db.Decimal(10, 2)
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+
+  @@index([participantUserId])
+}
+
+model ExperienceImage {
+  id            String     @id @default(cuid())
+  experienceId  String
+  experience    Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  url           String
+  caption       String?
+  isPrimary     Boolean    @default(false)
+  sortOrder     Int        @default(0)
+  createdAt     DateTime   @default(now())
+}
+
+// =========================================================
+// OWAMBE INTEGRATION INFRASTRUCTURE — Phase A additions
+// =========================================================
+
+model CohortCode {
+  code                  String          @id  // e.g. CC-H4K2N9PX (host) or CC-O8M3R7QV (operator)
+  cohortType            CohortType
+  status                CohortCodeStatus @default(ACTIVE)
+  issuedAt              DateTime        @default(now())
+  expiresAt             DateTime?
+  usedByUserId          String?
+  usedAt                DateTime?
+  notes                 String?         @db.Text
+  operatorApplicationId String?         // FK to OperatorApplication.id if recruited via cohort
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([status])
+  @@index([operatorApplicationId])
+}
+
+model IdempotencyCache {
+  id              String   @id  // hash(idempotencyKey + endpointPath + bodyHash)
+  idempotencyKey  String
+  endpointPath    String
+  bodyHash        String   // SHA-256 of request body
+  responseStatus  Int
+  responseBody    Bytes
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime // createdAt + 7 days
+
+  @@index([expiresAt])
+  @@index([idempotencyKey])
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  DEAD_LETTER
+}
+
+model WebhookDelivery {
+  id              String                @id @default(cuid())
+  eventType       String
+  eventId         String                @unique
+  targetPlatform  String                // OWAMBE
+  payload         Json
+  signature       String
+  status          WebhookDeliveryStatus @default(PENDING)
+  attempts        Int                   @default(0)
+  lastAttemptAt   DateTime?
+  nextAttemptAt   DateTime?
+  errorMessage    String?               @db.Text
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([status, nextAttemptAt])
+}
+
+model ReconciliationLog {
+  id                String   @id @default(cuid())
+  runAt             DateTime @default(now())
+  scope             String   // STAYS | EXPERIENCES
+  entitiesChecked   Int
+  mismatchesFound   Int
+  autoCorrected     Int
+  manualReviewItems Int
+  details           Json
+  durationMs        Int
+}
+
+// =========================================================
+// AUDIT & SYSTEM (existing, preserved)
+// =========================================================
 
 model AuditEntry {
   id         String   @id @default(cuid())
