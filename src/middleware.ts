@@ -53,6 +53,9 @@ const isPublicRoute = createRouteMatcher([
   '/api/destinations(.*)',
   '/api/inquiries(.*)',
   '/api/admin/migrate(.*)',
+  '/api/health',
+  '/api/v1/channel/webhooks/(.*)',
+  '/api/webhooks/(.*)',
 ]);
 
 // Protected route matchers
