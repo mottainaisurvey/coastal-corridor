@@ -56,6 +56,10 @@ const isPublicRoute = createRouteMatcher([
   '/api/health',
   '/api/v1/channel/webhooks/(.*)',
   '/api/webhooks/(.*)',
+  // Phase B — channel inbound endpoints (HMAC-protected, not Clerk-protected)
+  '/api/v1/channel/stays/(.*)',
+  '/api/v1/channel/experiences/(.*)',
+  '/api/v1/channel/reconciliation/(.*)',
 ]);
 
 // Protected route matchers
