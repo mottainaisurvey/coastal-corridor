@@ -108,7 +108,10 @@ jobs:
         id: deploy
         run: |
           RAW=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
-          URL=$(echo "$RAW" | grep -E '^https://' | tail -1)
+          URL=$(echo "$RAW" | tr -d '\r' | grep -E '^https://[^ ]+\.vercel\.app$' | tail -1)
+          if [ -z "$URL" ]; then
+            URL=$(echo "$RAW" | tr -d '\r' | grep -oE 'https://[a-zA-Z0-9._-]+\.vercel\.app' | tail -1)
+          fi
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Deployed to: $URL"
 
