@@ -6,31 +6,27 @@
 #
 # Required GitHub repository secrets:
 #   VERCEL_TOKEN                  — Vercel personal access token
-#   VERCEL_ORG_ID                 — Vercel organisation ID (from vercel.json or Vercel dashboard)
-#   VERCEL_PROJECT_ID             — Vercel project ID (from vercel.json or Vercel dashboard)
-#   VERCEL_STAGING_ENV_URL        — Expected staging URL for smoke test (e.g. https://coastal-corridor-staging.vercel.app)
+#   VERCEL_ORG_ID                 — Vercel organisation/team ID (team_QEfjvuMgcDwFu4DU1zQqpAj5)
+#   VERCEL_PROJECT_ID             — Vercel staging project ID (prj_dFudWPPxt710VhRQtZEmbUoqfyQ9)
+#   VERCEL_PROD_PROJECT_ID        — Vercel production project ID (prj_BtWrjynFVbo9YzsydpGe6O57UgUT)
+#   VERCEL_STAGING_ENV_URL        — Expected staging URL for smoke test
 #   STAGING_DATABASE_URL          — Staging Supabase connection string (for prisma migrate deploy)
 #   PRODUCTION_DATABASE_URL       — Production Supabase connection string (for prisma migrate deploy)
 #
-# Environment variables for application runtime are configured directly in Vercel per environment
-# (staging / production). They are NOT stored in this workflow file.
+# Environment variables for application runtime are configured directly in Vercel per environment.
+# They are NOT stored in this workflow file.
 #
 # Migration strategy (Option A — automated):
 #   prisma migrate deploy runs against the target database BEFORE the new application code is
 #   deployed. This ensures schema changes are in place before traffic hits code that depends on them.
-#   The DATABASE_URL secrets here are used only for migration; they are separate from the
-#   DATABASE_URL configured in Vercel (which the application uses at runtime).
 #
 # Spec reference: Implementation Brief §10, STAGING_SETUP.md
-
 name: Deploy
-
 on:
   push:
     branches:
       - staging
       - main
-
 jobs:
   # ─── Test ──────────────────────────────────────────────────────────────────
   test:
@@ -68,6 +64,9 @@ jobs:
     environment:
       name: staging
       url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,12 +115,18 @@ jobs:
         run: |
           STAGING_URL="${{ secrets.VERCEL_STAGING_ENV_URL }}"
           echo "Smoke testing $STAGING_URL/api/health"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/health")
-          if [ "$STATUS" != "200" ]; then
-            echo "Smoke test failed: /api/health returned HTTP $STATUS"
-            exit 1
-          fi
-          echo "Smoke test passed: /api/health returned HTTP 200"
+          # Allow up to 60s for the deployment to become available
+          for i in $(seq 1 6); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/health")
+            if [ "$STATUS" = "200" ]; then
+              echo "Smoke test passed: /api/health returned HTTP 200"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS — waiting 10s..."
+            sleep 10
+          done
+          echo "Smoke test failed: /api/health did not return 200 after 60s"
+          exit 1
 
   # ─── Deploy to Production ──────────────────────────────────────────────────
   deploy-production:
@@ -132,6 +137,9 @@ jobs:
     environment:
       name: production
       url: https://coastalcorridor.africa
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROD_PROJECT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -153,8 +161,6 @@ jobs:
         run: pnpm exec prisma generate
 
       # Run migrations BEFORE deploying application code.
-      # If this step fails, the deploy step is skipped — preventing code from
-      # running against a schema it expects but that doesn't exist yet.
       - name: Run database migrations (production)
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
@@ -178,9 +184,14 @@ jobs:
 
       - name: Smoke test — /api/health endpoint
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://coastalcorridor.africa/api/health")
-          if [ "$STATUS" != "200" ]; then
-            echo "Production smoke test failed: /api/health returned HTTP $STATUS"
-            exit 1
-          fi
-          echo "Production smoke test passed: /api/health returned HTTP 200"
+          for i in $(seq 1 6); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://coastalcorridor.africa/api/health")
+            if [ "$STATUS" = "200" ]; then
+              echo "Production smoke test passed: /api/health returned HTTP 200"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS — waiting 10s..."
+            sleep 10
+          done
+          echo "Production smoke test failed: /api/health did not return 200 after 60s"
+          exit 1
