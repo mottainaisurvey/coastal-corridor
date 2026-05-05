@@ -13,7 +13,8 @@
 // Schema is additive — all existing models preserved unchanged.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 model Config {
