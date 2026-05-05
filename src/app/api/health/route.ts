@@ -15,13 +15,25 @@ import { NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/db-safe';
 
 async function checkDatabase(): Promise<'operational' | 'not-connected'> {
+  // Diagnostic: log whether DATABASE_URL is present at runtime
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    console.error('[health] DATABASE_URL is undefined at runtime — Prisma client cannot be initialized');
+    return 'not-connected';
+  }
+  console.log('[health] DATABASE_URL present at runtime, length:', dbUrl.length, 'prefix:', dbUrl.substring(0, 20));
+
   const prisma = getPrisma();
-  if (!prisma) return 'not-connected';
+  if (!prisma) {
+    console.error('[health] getPrisma() returned null despite DATABASE_URL being set');
+    return 'not-connected';
+  }
   try {
     // Lightweight connectivity probe — no table scan
     await prisma.$queryRaw`SELECT 1`;
     return 'operational';
-  } catch {
+  } catch (err) {
+    console.error('[health] Prisma $queryRaw SELECT 1 failed:', err);
     return 'not-connected';
   }
 }
