@@ -107,7 +107,9 @@ jobs:
       - name: Deploy to Vercel staging
         id: deploy
         run: |
-          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tail -1)
+          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          echo "$DEPLOY_OUTPUT"
+          URL=$(echo "$DEPLOY_OUTPUT" | grep -oP 'https://[^\s\[]+' | tail -1)
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Deployed to: $URL"
 
