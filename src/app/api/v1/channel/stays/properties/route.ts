@@ -7,12 +7,14 @@
  *   1. HMAC signature verification
  *   2. Idempotency check (return cached response if duplicate key)
  *   3. Payload validation
- *   4. Business validation (host user must exist)
+ *   4. Host find-or-create
+ *      a. Look up User by owambeUserId = host_owambe_user_id
+ *      b. If not found: validate cohort_code, create User + mark code USED
  *   5. Transactional upsert: StayProperty + Rooms
  *   6. Cache response for idempotency
  *   7. Return 201 with created property ID
  *
- * Spec reference: Implementation Brief §10, OpenAPI spec §stays/properties
+ * Spec reference: Implementation Brief §02 (cohort model), §10 (channel API)
  */
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,7 +26,6 @@ import { getPrisma } from '@/lib/db-safe';
 const ENDPOINT_PATH = '/api/v1/channel/stays/properties';
 
 // ─── Payload types ────────────────────────────────────────────────────────────
-
 interface RoomPayload {
   owambe_room_id: string;
   name: string;
@@ -37,7 +38,8 @@ interface RoomPayload {
 
 interface StayPropertyPayload {
   owambe_property_id: string;
-  host_user_id: string;
+  host_owambe_user_id: string;
+  cohort_code?: string;
   name: string;
   description: string;
   property_type: string;
@@ -54,10 +56,9 @@ interface StayPropertyPayload {
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
-
 const REQUIRED_FIELDS: (keyof StayPropertyPayload)[] = [
   'owambe_property_id',
-  'host_user_id',
+  'host_owambe_user_id',
   'name',
   'description',
   'property_type',
@@ -83,7 +84,6 @@ function validatePayload(
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. HMAC verification
   const guard = await verifyChannelRequest(req);
@@ -100,7 +100,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 3. Parse + validate body
   const { data: body, parseError } = parseBody<Record<string, unknown>>(rawBody);
   if (parseError) return parseError;
-
   const validation = validatePayload(body);
   if (!validation.valid) {
     const errResponse = { error: validation.error };
@@ -109,21 +108,118 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const payload = validation.data;
 
-  // 4. Business validation — host user must exist
+  // 4. Host find-or-create
   const prisma = getPrisma();
   if (!prisma) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
   }
 
-  const hostUser = await prisma.user.findUnique({
-    where: { id: payload.host_user_id },
+  // 4a. Look up existing user by Owambe user ID
+  let hostUser = await prisma.user.findUnique({
+    where: { owambeUserId: payload.host_owambe_user_id },
     select: { id: true },
   });
+
+  // 4b. Auto-create if not found — requires a valid cohort code
   if (!hostUser) {
-    const errResponse = { error: `Host user not found: ${payload.host_user_id}` };
-    await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 422, errResponse);
-    return NextResponse.json(errResponse, { status: 422 });
+    if (!payload.cohort_code) {
+      const errResponse = {
+        error: `Host user not found for owambe_user_id: ${payload.host_owambe_user_id}. Provide cohort_code to auto-register.`,
+      };
+      await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 422, errResponse);
+      return NextResponse.json(errResponse, { status: 422 });
+    }
+
+    // Validate the cohort code
+    const cohortRecord = await prisma.cohortCode.findUnique({
+      where: { code: payload.cohort_code },
+    });
+
+    if (!cohortRecord) {
+      const errResponse = { error: `Cohort code not found: ${payload.cohort_code}` };
+      await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 422, errResponse);
+      return NextResponse.json(errResponse, { status: 422 });
+    }
+
+    if (cohortRecord.status !== 'ACTIVE') {
+      const errResponse = {
+        error: `Cohort code ${payload.cohort_code} is not active (status: ${cohortRecord.status})`,
+      };
+      await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 422, errResponse);
+      return NextResponse.json(errResponse, { status: 422 });
+    }
+
+    if (cohortRecord.expiresAt && cohortRecord.expiresAt < new Date()) {
+      const errResponse = { error: `Cohort code ${payload.cohort_code} has expired` };
+      await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 422, errResponse);
+      return NextResponse.json(errResponse, { status: 422 });
+    }
+
+    if (
+      cohortRecord.cohortType !== 'COASTAL_CORRIDOR_HOST' &&
+      cohortRecord.cohortType !== 'BOTH'
+    ) {
+      const errResponse = {
+        error: `Cohort code ${payload.cohort_code} does not grant HOST access (type: ${cohortRecord.cohortType})`,
+      };
+      await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 422, errResponse);
+      return NextResponse.json(errResponse, { status: 422 });
+    }
+
+    // Create the User and mark the cohort code as USED — both inside a transaction
+    const syntheticEmail = `owambe-${payload.host_owambe_user_id}@channel.coastal-corridor.internal`;
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email: syntheticEmail,
+            role: 'HOST',
+            status: 'ACTIVE',
+            owambeUserId: payload.host_owambe_user_id,
+            cohortMember: true,
+            cohortCode: cohortRecord.code,
+            cohortType: cohortRecord.cohortType,
+            cohortStartDate: cohortRecord.issuedAt,
+            cohortEndDate: cohortRecord.expiresAt ?? null,
+          },
+          select: { id: true },
+        });
+        await tx.cohortCode.update({
+          where: { code: cohortRecord.code },
+          data: {
+            status: 'USED',
+            usedByUserId: newUser.id,
+            usedAt: new Date(),
+          },
+        });
+        return newUser;
+      });
+      hostUser = created;
+    } catch (err: unknown) {
+      // Handle race condition: another request created the user between our findUnique and create
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code: string }).code === 'P2002'
+      ) {
+        // Unique constraint violation — user was just created by a concurrent request
+        hostUser = await prisma.user.findUnique({
+          where: { owambeUserId: payload.host_owambe_user_id },
+          select: { id: true },
+        });
+        if (!hostUser) {
+          console.error('[stays/properties POST] Race condition: user still not found after P2002');
+          return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        }
+      } else {
+        console.error('[stays/properties POST] Host auto-creation error:', err);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
   }
+
+  const hostUserId = hostUser.id;
 
   // 5. Transactional upsert: StayProperty + Rooms
   let property: { id: string; owambePropertyId: string };
@@ -133,7 +229,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         where: { owambePropertyId: payload.owambe_property_id },
         create: {
           owambePropertyId: payload.owambe_property_id,
-          hostUserId: payload.host_user_id,
+          hostUserId,
           name: payload.name,
           description: payload.description,
           propertyType: payload.property_type as any,
@@ -193,7 +289,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           });
         }
       }
-
       return created;
     });
   } catch (err) {

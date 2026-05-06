@@ -156,7 +156,7 @@ describe('Channel auth guard (shared)', () => {
 describe('POST /api/v1/channel/stays/properties', () => {
   const validPayload = {
     owambe_property_id: 'prop_001',
-    host_user_id: 'user_host_001',
+    host_owambe_user_id: 'owambe_user_001',
     name: 'Beachfront Villa',
     description: 'Beautiful villa on the beach',
     property_type: 'BEACH_HOUSE',
@@ -167,11 +167,16 @@ describe('POST /api/v1/channel/stays/properties', () => {
     longitude: 3.4219,
   };
 
+  const validPayloadWithCohort = {
+    ...validPayload,
+    cohort_code: 'CC-H4K2N9PX',
+  };
+
   it('returns 422 when required fields are missing', async () => {
     const req = makeReq(
       'http://localhost/api/v1/channel/stays/properties',
       'POST',
-      { owambe_property_id: 'prop_001' } // missing many fields
+      { owambe_property_id: 'prop_001' }
     );
     const res = await staysPropertiesPost(req);
     expect(res.status).toBe(422);
@@ -179,11 +184,10 @@ describe('POST /api/v1/channel/stays/properties', () => {
     expect(json.error).toMatch(/missing required field/i);
   });
 
-  it('returns 422 when host user does not exist', async () => {
+  it('returns 422 when host user is not found and no cohort_code is provided', async () => {
     vi.mocked(getPrisma).mockReturnValue({
       user: { findUnique: vi.fn().mockResolvedValue(null) },
     } as never);
-
     const req = makeReq(
       'http://localhost/api/v1/channel/stays/properties',
       'POST',
@@ -192,7 +196,120 @@ describe('POST /api/v1/channel/stays/properties', () => {
     const res = await staysPropertiesPost(req);
     expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.error).toMatch(/host user not found/i);
+    expect(json.error).toMatch(/provide cohort_code to auto-register/i);
+  });
+
+  it('returns 422 when cohort code is not found', async () => {
+    vi.mocked(getPrisma).mockReturnValue({
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+      cohortCode: { findUnique: vi.fn().mockResolvedValue(null) },
+    } as never);
+    const req = makeReq(
+      'http://localhost/api/v1/channel/stays/properties',
+      'POST',
+      validPayloadWithCohort
+    );
+    const res = await staysPropertiesPost(req);
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toMatch(/cohort code not found/i);
+  });
+
+  it('returns 422 when cohort code is not active', async () => {
+    vi.mocked(getPrisma).mockReturnValue({
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+      cohortCode: {
+        findUnique: vi.fn().mockResolvedValue({
+          code: 'CC-H4K2N9PX',
+          cohortType: 'COASTAL_CORRIDOR_HOST',
+          status: 'USED',
+          issuedAt: new Date('2026-01-01'),
+          expiresAt: null,
+        }),
+      },
+    } as never);
+    const req = makeReq(
+      'http://localhost/api/v1/channel/stays/properties',
+      'POST',
+      validPayloadWithCohort
+    );
+    const res = await staysPropertiesPost(req);
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toMatch(/not active/i);
+  });
+
+  it('returns 422 when cohort code does not grant HOST access', async () => {
+    vi.mocked(getPrisma).mockReturnValue({
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+      cohortCode: {
+        findUnique: vi.fn().mockResolvedValue({
+          code: 'CC-O8M3R7QV',
+          cohortType: 'COASTAL_CORRIDOR_OPERATOR',
+          status: 'ACTIVE',
+          issuedAt: new Date('2026-01-01'),
+          expiresAt: null,
+        }),
+      },
+    } as never);
+    const req = makeReq(
+      'http://localhost/api/v1/channel/stays/properties',
+      'POST',
+      { ...validPayload, cohort_code: 'CC-O8M3R7QV' }
+    );
+    const res = await staysPropertiesPost(req);
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toMatch(/does not grant HOST access/i);
+  });
+
+  it('returns 201 and auto-creates host user when cohort code is valid', async () => {
+    const mockTx = {
+      user: { create: vi.fn().mockResolvedValue({ id: 'new_user_cuid_001' }) },
+      cohortCode: { update: vi.fn().mockResolvedValue({}) },
+    };
+    vi.mocked(getPrisma).mockReturnValue({
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+      cohortCode: {
+        findUnique: vi.fn().mockResolvedValue({
+          code: 'CC-H4K2N9PX',
+          cohortType: 'COASTAL_CORRIDOR_HOST',
+          status: 'ACTIVE',
+          issuedAt: new Date('2026-01-01'),
+          expiresAt: null,
+        }),
+      },
+      $transaction: vi.fn()
+        .mockImplementationOnce((cb: (tx: typeof mockTx) => Promise<{ id: string }>) => cb(mockTx))
+        .mockResolvedValueOnce({ id: 'prop_cuid_001', owambePropertyId: 'prop_001' }),
+    } as never);
+    const req = makeReq(
+      'http://localhost/api/v1/channel/stays/properties',
+      'POST',
+      validPayloadWithCohort
+    );
+    const res = await staysPropertiesPost(req);
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.id).toBe('prop_cuid_001');
+    expect(json.owambe_property_id).toBe('prop_001');
+    expect(json.status).toBe('UNDER_REVIEW');
+    expect(mockTx.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          owambeUserId: 'owambe_user_001',
+          role: 'HOST',
+          cohortMember: true,
+          cohortCode: 'CC-H4K2N9PX',
+        }),
+      })
+    );
+    expect(mockTx.cohortCode.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { code: 'CC-H4K2N9PX' },
+        data: expect.objectContaining({ status: 'USED' }),
+      })
+    );
   });
 
   it('returns 503 when database is unavailable', async () => {
@@ -206,12 +323,11 @@ describe('POST /api/v1/channel/stays/properties', () => {
     expect(res.status).toBe(503);
   });
 
-  it('returns 201 with property id on success', async () => {
+  it('returns 201 with property id on success when host already exists', async () => {
     vi.mocked(getPrisma).mockReturnValue({
       user: { findUnique: vi.fn().mockResolvedValue({ id: 'user_host_001' }) },
       $transaction: vi.fn().mockResolvedValue({ id: 'prop_cuid_001', owambePropertyId: 'prop_001' }),
     } as never);
-
     const req = makeReq(
       'http://localhost/api/v1/channel/stays/properties',
       'POST',
@@ -238,12 +354,10 @@ describe('POST /api/v1/channel/stays/properties', () => {
         },
       ],
     };
-
     vi.mocked(getPrisma).mockReturnValue({
       user: { findUnique: vi.fn().mockResolvedValue({ id: 'user_host_001' }) },
       $transaction: vi.fn().mockResolvedValue({ id: 'prop_cuid_001', owambePropertyId: 'prop_001' }),
     } as never);
-
     const req = makeReq(
       'http://localhost/api/v1/channel/stays/properties',
       'POST',
@@ -253,7 +367,6 @@ describe('POST /api/v1/channel/stays/properties', () => {
     expect(res.status).toBe(201);
   });
 });
-
 // ─── PATCH /stays/properties/{id} ────────────────────────────────────────────
 
 describe('PATCH /api/v1/channel/stays/properties/{id}', () => {
