@@ -117,3 +117,5 @@ Once deployed, verify the staging environment by:
 1. Triggering a test webhook from the Owambe dashboard and confirming a `200 OK` response.
 2. Initiating a test transaction via Paystack and verifying the webhook is received and processed.
 3. Checking the application logs for any errors related to missing environment variables or database connection issues.
+
+<!-- ci: trigger run #28 - new staging DB -->
