@@ -119,3 +119,5 @@ Once deployed, verify the staging environment by:
 3. Checking the application logs for any errors related to missing environment variables or database connection issues.
 
 <!-- ci: trigger run #28 - new staging DB -->
+
+<!-- ci: trigger run #29 - rotate staging DB password -->
