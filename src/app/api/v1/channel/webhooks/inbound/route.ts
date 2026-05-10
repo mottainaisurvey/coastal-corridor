@@ -1,5 +1,5 @@
 /**
- * Inbound Owambe Webhook Handler — Phase A
+ * Inbound Owambe Webhook Handler — CC-C-06
  *
  * Receives webhook events from Owambe and processes them:
  *   - Verifies HMAC-SHA256 signature
@@ -223,22 +223,100 @@ async function routeWebhookEvent(
 
 // ─── Contract: Stays handlers ─────────────────────────────────────────────────
 
+/**
+ * reservation.cancelled (host-originated on Owambe side) — CC-C-06 AC-3
+ *
+ * Business logic:
+ *   1. Mark reservation CANCELLED with reason and initiator
+ *   2. Initiate refund via PaystackAdapter if paystackReference is available;
+ *      otherwise emit refund-pending audit entry for the reconciliation worker
+ *   3. Queue guest notification (audit entry read by CC-D-04 notification worker)
+ *   4. Audit log entry for traceability (AC-7)
+ */
 async function handleReservationCancelled(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
   const owambeReservationId = data.reservation_id as string;
-  if (!owambeReservationId) return;
-  await prisma.reservation.updateMany({
+  if (!owambeReservationId) {
+    console.warn('[webhook/inbound] reservation.cancelled: missing reservation_id');
+    return;
+  }
+
+  // Step 1: Mark reservation CANCELLED
+  const updateResult = await prisma.reservation.updateMany({
     where: { owambeReservationId },
     data: {
       status: 'CANCELLED',
-      cancellationReason: (data.reason as string) ?? 'Cancelled by Owambe',
+      cancellationReason: (data.reason as string) ?? 'Cancelled by host via Owambe',
       cancellationInitiatedBy: 'OWAMBE',
       updatedAt: new Date(),
     },
   });
+
+  // Step 2: Initiate refund via PaystackAdapter if paystackReference is available
+  const paystackReference = data.paystack_reference as string | undefined;
+  let refundStatus: 'initiated' | 'pending' | 'no_payment_reference' = 'no_payment_reference';
+  let refundId: string | undefined;
+
+  if (paystackReference) {
+    try {
+      const { getPaystackAdapter } = await import('@/lib/paystack-adapter');
+      const adapter = getPaystackAdapter();
+      const refundResult = await adapter.refundTransaction(paystackReference);
+      refundStatus = 'initiated';
+      refundId = refundResult.refundId;
+      console.info(
+        `[webhook/inbound] reservation.cancelled: refund initiated for ${paystackReference} (refundId: ${refundId})`
+      );
+    } catch (err) {
+      // Refund initiation failed — log as pending for reconciliation worker
+      refundStatus = 'pending';
+      console.error(
+        `[webhook/inbound] reservation.cancelled: refund initiation failed for ${paystackReference}:`,
+        err
+      );
+    }
+  }
+
+  // Step 3: Queue guest notification (CC-D-04 notification worker reads action=guest_notification_queued)
+  await prisma.auditEntry.create({
+    data: {
+      entityType: 'Reservation',
+      entityId: owambeReservationId,
+      action: 'guest_notification_queued',
+      metadata: JSON.stringify({
+        event: 'reservation.cancelled',
+        owambeReservationId,
+        reason: (data.reason as string) ?? 'Cancelled by host via Owambe',
+        notificationType: 'CANCELLATION',
+        queuedAt: new Date().toISOString(),
+      }),
+    },
+  }).catch((err) => console.error('[webhook/inbound] Guest notification queue error:', err));
+
+  // Step 4: Audit log entry (AC-7)
+  await prisma.auditEntry.create({
+    data: {
+      entityType: 'Reservation',
+      entityId: owambeReservationId,
+      action: 'reservation_cancelled_by_owambe',
+      metadata: JSON.stringify({
+        event: 'reservation.cancelled',
+        owambeReservationId,
+        reason: (data.reason as string) ?? 'Cancelled by host via Owambe',
+        recordsUpdated: updateResult.count,
+        refundStatus,
+        refundId,
+        paystackReference,
+      }),
+    },
+  }).catch((err) => console.error('[webhook/inbound] Audit log error:', err));
+
+  console.info(
+    `[webhook/inbound] reservation.cancelled: ${owambeReservationId} — ${updateResult.count} record(s) updated, refund: ${refundStatus}`
+  );
 }
 
 async function handleReservationNoShow(
@@ -366,30 +444,104 @@ async function handleBookingRefunded(
 
 // ─── Contract: Inventory handlers ────────────────────────────────────────────
 
+/**
+ * property.deactivated — CC-C-06 AC-1
+ *
+ * Business logic:
+ *   1. Set StayProperty.status = INACTIVE (removes from search results within 60s;
+ *      search queries filter WHERE status = 'ACTIVE')
+ *   2. Existing Reservations on this property are NOT touched (AC-1: remain readable and valid)
+ *   3. Audit log entry for traceability (AC-7)
+ */
 async function handlePropertyDeactivated(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
   const owambePropertyId = data.property_id as string;
-  if (!owambePropertyId) return;
-  await prisma.stayProperty.updateMany({
+  if (!owambePropertyId) {
+    console.warn('[webhook/inbound] property.deactivated: missing property_id');
+    return;
+  }
+
+  // Step 1: Deactivate the property (search exclusion — AC-1)
+  const updateResult = await prisma.stayProperty.updateMany({
     where: { owambePropertyId },
     data: { status: 'INACTIVE', updatedAt: new Date() },
   });
+
+  // Step 2: Existing reservations are preserved — no update to Reservation table
+  // (AC-1: "existing reservations on that property remain readable and valid")
+
+  // Step 3: Audit log entry (AC-7)
+  await prisma.auditEntry.create({
+    data: {
+      entityType: 'StayProperty',
+      entityId: owambePropertyId,
+      action: 'property_deactivated_by_owambe',
+      metadata: JSON.stringify({
+        event: 'property.deactivated',
+        owambePropertyId,
+        reason: (data.reason as string) ?? undefined,
+        recordsUpdated: updateResult.count,
+        existingReservationsPreserved: true,
+      }),
+    },
+  }).catch((err) => console.error('[webhook/inbound] Audit log error:', err));
+
+  console.info(
+    `[webhook/inbound] property.deactivated: ${owambePropertyId} — ${updateResult.count} property record(s) set INACTIVE`
+  );
 }
 
+/**
+ * experience.deactivated — CC-C-06 AC-2
+ *
+ * Business logic:
+ *   1. Set Experience.status = INACTIVE (removes from search results within 60s;
+ *      search queries filter WHERE status = 'ACTIVE')
+ *   2. Existing ExperienceBookings on this experience are NOT touched (AC-2: remain readable and valid)
+ *   3. Audit log entry for traceability (AC-7)
+ */
 async function handleExperienceDeactivated(
   data: Record<string, unknown>
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) return;
   const owambeExperienceId = data.experience_id as string;
-  if (!owambeExperienceId) return;
-  await prisma.experience.updateMany({
+  if (!owambeExperienceId) {
+    console.warn('[webhook/inbound] experience.deactivated: missing experience_id');
+    return;
+  }
+
+  // Step 1: Deactivate the experience (search exclusion — AC-2)
+  const updateResult = await prisma.experience.updateMany({
     where: { owambeExperienceId },
     data: { status: 'INACTIVE', updatedAt: new Date() },
   });
+
+  // Step 2: Existing bookings are preserved — no update to ExperienceBooking table
+  // (AC-2: "existing bookings on that experience remain readable and valid")
+
+  // Step 3: Audit log entry (AC-7)
+  await prisma.auditEntry.create({
+    data: {
+      entityType: 'Experience',
+      entityId: owambeExperienceId,
+      action: 'experience_deactivated_by_owambe',
+      metadata: JSON.stringify({
+        event: 'experience.deactivated',
+        owambeExperienceId,
+        reason: (data.reason as string) ?? undefined,
+        recordsUpdated: updateResult.count,
+        existingBookingsPreserved: true,
+      }),
+    },
+  }).catch((err) => console.error('[webhook/inbound] Audit log error:', err));
+
+  console.info(
+    `[webhook/inbound] experience.deactivated: ${owambeExperienceId} — ${updateResult.count} experience record(s) set INACTIVE`
+  );
 }
 
 // ─── Contract: Reconciliation handler ────────────────────────────────────────

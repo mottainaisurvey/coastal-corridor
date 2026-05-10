@@ -74,12 +74,14 @@ function makeMockPrismaFresh() {
     experience: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    reconciliationLog: {
+     reconciliationLog: {
+      create: vi.fn().mockResolvedValue({}),
+    },
+    auditEntry: {
       create: vi.fn().mockResolvedValue({}),
     },
   };
 }
-
 /** Creates a mock Prisma instance where the event HAS already been processed. */
 function makeMockPrismaDuplicate() {
   return {

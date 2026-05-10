@@ -1,23 +1,23 @@
 /**
- * Inbound Paystack Webhook Handler — Phase A
+ * Inbound Paystack Webhook Handler — CC-C-01
  *
  * Receives payment event webhooks from Paystack and processes them:
- *   - Verifies HMAC-SHA512 signature (Paystack's algorithm)
+ *   - Verifies HMAC-SHA512 signature via PaystackAdapter (mode-aware, AC-8)
  *   - Idempotency check on event ID
  *   - Routes to the appropriate handler by event type
  *
- * Supported events (Phase A):
+ * Supported events:
  *   - charge.success       — payment completed, update reservation/booking status
  *   - charge.failed        — payment failed
- *   - refund.processed     — refund completed
+ *   - refund.processed     — refund completed; updates booking to REFUNDED (AC-7)
  *   - transfer.success     — subaccount payout completed
  *   - transfer.failed      — subaccount payout failed
  *
- * Spec reference: Implementation Brief §13
+ * AC-4: This route never branches on PAYSTACK_MODE — all mode logic is in PaystackAdapter.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyPaystackWebhook } from '@/lib/paystack';
+import { getPaystackAdapter } from '@/lib/paystack-adapter';
 import { getPrisma } from '@/lib/db-safe';
 
 // ─── POST /api/webhooks/paystack ──────────────────────────────────────────────
@@ -36,12 +36,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // 3. Verify HMAC-SHA512 signature
+  // 3. Verify HMAC-SHA512 signature via PaystackAdapter (AC-8: uses correct secret per mode)
   let signatureValid = false;
   try {
-    signatureValid = verifyPaystackWebhook(rawBody, signature);
+    const adapter = getPaystackAdapter();
+    signatureValid = adapter.verifyWebhookSignature(rawBody, signature);
   } catch (err) {
-    console.error('[webhook/paystack] Signature verification error:', err);
+    console.error('[webhook/paystack] Adapter/signature error:', err);
     return NextResponse.json(
       { error: 'Payment webhook secret not configured' },
       { status: 500 }
@@ -183,7 +184,18 @@ async function handleChargeSuccess(data: Record<string, unknown>): Promise<void>
     });
   }
 
-  // Log to audit
+    // Audit log
+  const prismaForAudit = getPrisma();
+  if (prismaForAudit) {
+    await prismaForAudit.auditEntry.create({
+      data: {
+        entityType: reservationType === 'STAY' ? 'Reservation' : 'ExperienceBooking',
+        entityId: entityId ?? 'unknown',
+        action: 'payment_captured',
+        metadata: JSON.stringify({ reference, event: 'charge.success', reservationType }),
+      },
+    }).catch((err) => console.error('[webhook/paystack] Audit log error:', err));
+  }
   console.info(`[webhook/paystack] charge.success: ${reference} (${reservationType} ${entityId})`);
 }
 
@@ -211,16 +223,70 @@ async function handleChargeFailed(data: Record<string, unknown>): Promise<void> 
   console.warn(`[webhook/paystack] charge.failed: ${reference}`);
 }
 
+/**
+ * refund.processed — Paystack has processed a refund.
+ * Updates Reservation or ExperienceBooking paymentStatus and status to REFUNDED.
+ * AC-7: Refund webhook callback received and processed; booking state updates to REFUNDED.
+ */
 async function handleRefundProcessed(data: Record<string, unknown>): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) return;
+
   const reference = data.transaction_reference as string;
-  console.info(`[webhook/paystack] refund.processed for transaction: ${reference}`);
-  // Phase C will implement full refund reconciliation
+  const refundAmountKobo = data.amount as number | undefined;
+  if (!reference) {
+    console.warn('[webhook/paystack] refund.processed: missing transaction_reference');
+    return;
+  }
+
+  // Update both Stay reservations and Experience bookings by paystackReference
+  const [stayResult, experienceResult] = await Promise.all([
+    prisma.reservation.updateMany({
+      where: { paystackReference: reference },
+      data: {
+        paymentStatus: 'REFUNDED',
+        status: 'REFUNDED',
+        refundAmount: refundAmountKobo != null ? refundAmountKobo / 100 : undefined,
+        updatedAt: new Date(),
+      },
+    }),
+    prisma.experienceBooking.updateMany({
+      where: { paystackReference: reference },
+      data: {
+        paymentStatus: 'REFUNDED',
+        status: 'REFUNDED',
+        refundAmount: refundAmountKobo != null ? refundAmountKobo / 100 : undefined,
+        updatedAt: new Date(),
+      },
+    }),
+  ]);
+
+  const totalUpdated = stayResult.count + experienceResult.count;
+
+  // Audit log
+  await prisma.auditEntry.create({
+    data: {
+      entityType: 'Payment',
+      entityId: reference,
+      action: 'refund_processed',
+      metadata: JSON.stringify({
+        reference,
+        refundAmountKobo,
+        stayRecordsUpdated: stayResult.count,
+        experienceRecordsUpdated: experienceResult.count,
+      }),
+    },
+  }).catch((err) => console.error('[webhook/paystack] Audit log error:', err));
+
+  console.info(
+    `[webhook/paystack] refund.processed: ${reference} — ${totalUpdated} record(s) updated to REFUNDED`
+  );
 }
 
 async function handleTransferSuccess(data: Record<string, unknown>): Promise<void> {
   const transferCode = data.transfer_code as string;
   console.info(`[webhook/paystack] transfer.success: ${transferCode}`);
-  // Phase C will implement payout tracking
+  // CC-C-07 will implement full payout tracking
 }
 
 async function handleTransferFailed(data: Record<string, unknown>): Promise<void> {
