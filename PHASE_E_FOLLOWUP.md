@@ -156,3 +156,114 @@ DB (`wpepjsnqirnskfthzpxp`).
 
 None on CC side. The Owambe developer should verify which data source their reconciliation
 snapshot query is reading from.
+
+---
+
+## REG-BUG-03 — Misleading 'Property not found' error when property exists but is UNDER_REVIEW
+
+**Component:** `PUT /api/v1/channel/stays/properties/{id}/availability`  
+**File:** `src/app/api/v1/channel/stays/properties/[id]/availability/route.ts`  
+**Surfaced:** Wave 1, OWB-C-01 evidence run, May 10 2026  
+**Severity:** Medium — obscures debugging; same pattern as REG-BUG-01  
+**Blocking:** CC-C-08, CC-C-09 (production cohort host onboarding)
+
+### Description
+
+The availability endpoint's property lookup (step 4, line 100) uses:
+
+```typescript
+const property = await prisma.stayProperty.findUnique({
+  where: { owambePropertyId },
+  select: { id: true },
+});
+if (!property) {
+  return NextResponse.json({ error: `Property not found: ${owambePropertyId}` }, { status: 404 });
+}
+```
+
+There is **no** `status` filter — the endpoint does not restrict to `ACTIVE` properties by
+design (Model B: properties accept channel operations from the moment of registration).
+However, the 404 `"Property not found"` error message is returned for any lookup failure,
+including cases where the `owambePropertyId` is correct but the property is in `UNDER_REVIEW`
+or `INACTIVE` state.
+
+**Observed during Wave 1:** The Owambe developer received `404 Property not found` after
+successful registration. Investigation confirmed the property existed in the DB with
+`status = UNDER_REVIEW`. The actual cause was that the Owambe adapter was passing the
+property's internal CUID (`cmp03yfc9000gbror8hviqbd6`) as the `{id}` path parameter instead
+of the `owambePropertyId` (`39b80f7d-55ec-467a-bb43-a63063960d04`). The endpoint routes on
+`owambePropertyId`, not the internal CUID.
+
+This is a **dual issue**:
+
+1. **Owambe adapter bug:** The adapter must use `owambePropertyId` (the UUID returned in the
+   registration response as `owambe_property_id`) as the path parameter, not the CC internal
+   CUID.
+
+2. **CC error message gap:** Even if the adapter passes the correct `owambePropertyId`, if a
+   property is in `UNDER_REVIEW` state and the endpoint were to add a status filter in future,
+   the error message should distinguish:
+   - `"Property not found"` → `owambePropertyId` does not exist in DB
+   - `"Property not available (status: UNDER_REVIEW)"` → property exists but cannot accept
+     the operation
+
+### Required fix (CC side)
+
+No code change required for the current implementation — the endpoint correctly accepts
+`UNDER_REVIEW` properties. The error message issue is a pre-emptive fix for future
+status-gated variants:
+
+If a status filter is ever added, split the lookup:
+
+```typescript
+// Step 1: find regardless of status
+const property = await prisma.stayProperty.findUnique({
+  where: { owambePropertyId },
+  select: { id: true, status: true },
+});
+if (!property) {
+  return NextResponse.json({ error: `Property not found: ${owambePropertyId}` }, { status: 404 });
+}
+// Step 2: check status if a filter is required
+if (property.status !== 'ACTIVE') {
+  return NextResponse.json(
+    { error: `Property not available (status: ${property.status})` },
+    { status: 422 }
+  );
+}
+```
+
+### Required fix (Owambe side)
+
+The Owambe adapter must use the `owambe_property_id` field from the registration response
+as the `{id}` path parameter for all subsequent channel operations (availability, rooms, etc.),
+not the CC internal CUID.
+
+---
+
+## AVAIL-NOTE-01 — Availability endpoint design model clarification
+
+**Component:** `PUT /api/v1/channel/stays/properties/{id}/availability`  
+**Surfaced:** Wave 1, OWB-C-01 evidence run, May 10 2026  
+**Status:** Investigated and closed — no code change required
+
+### Findings
+
+The availability endpoint does **not** have an ACTIVE-only filter. The `findUnique` at
+`src/app/api/v1/channel/stays/properties/[id]/availability/route.ts:100` queries on
+`owambePropertyId` with no `status` condition. This is **Model B** by implementation:
+properties accept channel operations (availability writes) from the moment of registration,
+regardless of approval status.
+
+This is the correct model for the CC channel API. Properties in `UNDER_REVIEW` state can
+receive availability data from Owambe; the data is stored and will be surfaced in guest
+search once the property is approved (`status → ACTIVE`).
+
+The contract documentation (`API.md`) should be updated to clarify this explicitly:
+availability writes are accepted for properties in any status (`UNDER_REVIEW`, `ACTIVE`,
+`INACTIVE`). This prevents future confusion during onboarding flows.
+
+### Action required
+
+Add a note to `API.md` under the availability endpoint documentation clarifying that
+`UNDER_REVIEW` properties accept availability writes.
