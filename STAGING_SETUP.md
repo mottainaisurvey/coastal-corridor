@@ -122,3 +122,5 @@ Once deployed, verify the staging environment by:
 
 <!-- ci: trigger run #29 - rotate staging DB password -->
 
+<!-- ci: trigger run #32 - pick up PAYSTACK_TEST_WEBHOOK_SECRET value -->
+
