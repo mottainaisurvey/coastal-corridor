@@ -855,6 +855,7 @@ model Reservation {
   damageDeposit            Decimal?          @db.Decimal(10, 2)
   specialRequests          String?           @db.Text
   paystackReference        String?
+  stripePaymentIntentId    String?           // Stripe PaymentIntent ID (CC-C-02)
   outboundIdempotencyKey   String?           @unique  // UUID v4 for outbound call to Owambe
   paymentStatus            PaymentStatus     @default(PENDING)
   status                   ReservationStatus @default(PENDING)

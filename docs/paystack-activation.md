@@ -8,80 +8,94 @@ This document defines the seven-step procedure for switching the Paystack integr
 
 ---
 
-## Step 1 — Obtain live Paystack credentials
+## Step 1 — Verify live credentials are authentic
 
-Complete KYB (Know Your Business) approval on the Paystack dashboard. Once approved, navigate to **Settings → API Keys & Webhooks → Live** and copy the following values:
+Before making any environment changes, confirm that the live credentials are genuine Paystack live-mode keys:
 
-- **Live Secret Key** (`sk_live_...`)
-- **Live Public Key** (`pk_live_...`)
-
-These values are only available after KYB approval. Do not use test keys in production.
-
----
-
-## Step 2 — Generate a live webhook secret
-
-On the Paystack dashboard, navigate to **Settings → API Keys & Webhooks**. Set the webhook URL to:
-
-```
-https://coastalcorridor.co/api/webhooks/paystack
-```
-
-Copy the webhook secret shown, or generate a new one. This value becomes `PAYSTACK_LIVE_WEBHOOK_SECRET`.
+- Log in to the Paystack dashboard as the account owner.
+- Navigate to **Settings → API Keys & Webhooks → Live**.
+- Confirm the **Live Secret Key** begins with `sk_live_` and the **Live Public Key** begins with `pk_live_`.
+- Confirm KYB (Know Your Business) approval is complete. Live keys are only issued after KYB approval. Do not proceed if KYB is pending.
+- On the Paystack dashboard, navigate to **Settings → API Keys & Webhooks**. Set the webhook URL to `https://coastalcorridor.co/api/webhooks/paystack` and copy the webhook secret. This value becomes `PAYSTACK_LIVE_WEBHOOK_SECRET`.
 
 ---
 
-## Step 3 — Set environment variables in Vercel (production project)
+## Step 2 — Add live credentials to production environment variables
 
-In the Vercel dashboard, navigate to the **coastal-corridor** (production) project → **Settings → Environment Variables**. Add or update the following variables for the **Production** environment:
+In the Vercel dashboard, navigate to the **coastal-corridor** (production) project → **Settings → Environment Variables**. Add or update the following variables for the **Production** environment only:
 
 | Variable | Value |
 | :--- | :--- |
-| `PAYSTACK_MODE` | `live` |
 | `PAYSTACK_LIVE_SECRET_KEY` | `sk_live_...` (from Step 1) |
 | `PAYSTACK_LIVE_PUBLIC_KEY` | `pk_live_...` (from Step 1) |
-| `PAYSTACK_LIVE_WEBHOOK_SECRET` | `<webhook secret from Step 2>` |
+| `PAYSTACK_LIVE_WEBHOOK_SECRET` | `<webhook secret from Step 1>` |
 
-Leave all `PAYSTACK_TEST_*` variables in place. Do not remove them.
+Leave all `PAYSTACK_TEST_*` variables in place. Do not remove them. Do not change `PAYSTACK_MODE` yet.
 
 ---
 
-## Step 4 — Verify startup log
+## Step 3 — Change PAYSTACK_MODE to live
 
-After the next production deployment, check the Vercel function logs for the following entry:
+In the Vercel dashboard, update the `PAYSTACK_MODE` environment variable for the **Production** environment only:
+
+| Variable | Old Value | New Value |
+| :--- | :--- | :--- |
+| `PAYSTACK_MODE` | `test` | `live` |
+
+Do not change `PAYSTACK_MODE` for the Preview or Development environments. The staging environment must remain in `test` mode.
+
+---
+
+## Step 4 — Trigger a production redeploy
+
+After saving the environment variable changes, trigger a new production deployment to pick up the updated values:
+
+1. In the Vercel dashboard, navigate to the **coastal-corridor** project → **Deployments**.
+2. Click the three-dot menu on the current production deployment.
+3. Select **Redeploy** → confirm in the dialog.
+
+Wait for the deployment to reach **Ready** status before proceeding.
+
+---
+
+## Step 5 — Verify deployment and startup logs
+
+After the deployment reaches **Ready** status, verify that the `PaystackAdapter` initialised in live mode:
+
+1. In the Vercel dashboard, navigate to **Functions → Logs**.
+2. Filter by the most recent deployment.
+3. Search for the log line:
 
 ```
 [PaystackAdapter] Paystack adapter initialised in live mode
 ```
 
-If this log is absent or shows `test mode`, the environment variable was not picked up by the deployment. Trigger a redeploy and check again before proceeding.
+If this line is absent or shows `test mode`, the environment variable was not picked up. Trigger another redeploy and check again. Do not proceed to Step 6 until this log line is confirmed.
 
 ---
 
-## Step 5 — Run a smoke transaction
+## Step 6 — Run a small live test charge and refund
 
-Using a real card, make a small NGN payment (₦100) on the production site. Then verify:
+Perform a real live transaction to confirm end-to-end payment flow in production:
 
-1. The transaction appears in the Paystack **live** dashboard (not the test dashboard).
-2. The corresponding booking record in the production database shows `paymentStatus = PAID`.
+1. Using a real payment card, initiate a ₦100 (minimum) booking checkout on the production app.
+2. Confirm the transaction appears in the Paystack **live** dashboard under **Transactions**.
+3. Confirm the corresponding CC booking record in the production database shows `paystackReference` populated and `paymentStatus = PAID`.
+4. Immediately refund the transaction from the Paystack dashboard: **Transactions → [transaction] → Refund**.
+5. Confirm the `refund.processed` webhook is received by the production app (check Vercel function logs for `[webhook/paystack] refund.processed handled`).
+6. Confirm the booking record transitions to `paymentStatus = REFUNDED`.
 
----
-
-## Step 6 — Verify live webhook delivery
-
-Trigger a refund for the smoke transaction from the Paystack dashboard. Then verify:
-
-1. The `refund.processed` webhook is received by the production endpoint.
-2. The booking record in the production database shows `paymentStatus = REFUNDED`.
+If any step fails, do not proceed. Execute the rollback in Step 7.
 
 ---
 
-## Step 7 — Confirm and document
+## Step 7 — Rollback path
 
-Record the date of live activation in `INTEGRATION_STATE.md` under the Paystack section. Set the informational flag `PAYSTACK_LIVE_CREDENTIALS_ACTIVE=true` in Vercel environment variables.
+If anything is wrong after Step 6 (payment not captured, webhook not received, booking state not updated, startup log shows wrong mode):
 
----
+1. In the Vercel dashboard, change `PAYSTACK_MODE` back to `test` for the Production environment.
+2. Trigger a redeploy.
+3. Confirm the startup log shows `[PaystackAdapter] Paystack adapter initialised in test mode`.
+4. Investigate the failure before attempting live activation again.
 
-## Rollback procedure
-
-To revert to test mode at any time, set `PAYSTACK_MODE=test` in Vercel and redeploy. The adapter will immediately switch to test credentials on the next cold start. No code changes are required.
+The rollback does not require removing live credentials from the environment variables — only changing `PAYSTACK_MODE` back to `test` is sufficient to revert to safe test mode operation. No code changes are required.
