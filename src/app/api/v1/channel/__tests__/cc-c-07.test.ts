@@ -96,6 +96,7 @@ function makeDb(overrides: Record<string, unknown> = {}) {
   return {
     idempotencyCache: {
       findUnique: vi.fn().mockResolvedValue(null),
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
     },
     stayProperty: {
@@ -409,10 +410,10 @@ describe('POST /api/v1/channel/stays/reservations', () => {
     const cachedBody = { id: 'res_id_cached', status: 'PENDING', payment_status: 'PENDING' };
     guardOk('idem_dup_key');
     const db = makeDb();
-    (db.idempotencyCache.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
-      key: 'idem_dup_key',
-      responseBody: JSON.stringify(cachedBody),
-      statusCode: 201,
+    (db.idempotencyCache.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
+      idempotencyKey: 'idem_dup_key',
+      responseBody: Buffer.from(JSON.stringify(cachedBody), 'utf8'),
+      responseStatus: 201,
     });
     vi.mocked(getPrismaClient).mockReturnValue(db as ReturnType<typeof getPrismaClient>);
     const req = makeReq('http://localhost/api/v1/channel/stays/reservations', VALID_STAYS_BODY);
@@ -605,10 +606,10 @@ describe('POST /api/v1/channel/experiences/bookings', () => {
     const cachedBody = { id: 'booking_id_cached', status: 'PENDING', payment_status: 'PENDING' };
     guardOk('idem_dup_key_exp');
     const db = makeDb();
-    (db.idempotencyCache.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
-      key: 'idem_dup_key_exp',
-      responseBody: JSON.stringify(cachedBody),
-      statusCode: 201,
+    (db.idempotencyCache.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
+      idempotencyKey: 'idem_dup_key_exp',
+      responseBody: Buffer.from(JSON.stringify(cachedBody), 'utf8'),
+      responseStatus: 201,
     });
     vi.mocked(getPrismaClient).mockReturnValue(db as ReturnType<typeof getPrismaClient>);
     const req = makeReq('http://localhost/api/v1/channel/experiences/bookings', VALID_EXPERIENCES_BODY);

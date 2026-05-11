@@ -25,7 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyChannelRequest } from '@/lib/channel-auth';
 import { getCommissionCalculator } from '@/lib/commission';
 import { getPrismaClient } from '@/lib/db-safe';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -40,14 +40,20 @@ export async function POST(req: NextRequest) {
 
   // ── Idempotency ───────────────────────────────────────────────────────────
   const idempotencyKey = guard.idempotencyKey || '';
+  const rawBody = guard.rawBody || '{}';
+  const bodyHash = createHash('sha256').update(rawBody).digest('hex');
+  const endpointPath = '/api/v1/channel/stays/reservations';
   if (idempotencyKey) {
-    const cached = await db.idempotencyCache.findUnique({
-      where: { key: idempotencyKey },
+    const cached = await db.idempotencyCache.findFirst({
+      where: { idempotencyKey },
     });
     if (cached) {
+      const bodyStr = Buffer.isBuffer(cached.responseBody)
+        ? cached.responseBody.toString('utf8')
+        : String(cached.responseBody);
       return NextResponse.json(
-        { ...JSON.parse(cached.responseBody), duplicate: true },
-        { status: cached.statusCode }
+        { ...JSON.parse(bodyStr), duplicate: true },
+        { status: cached.responseStatus }
       );
     }
   }
@@ -55,7 +61,7 @@ export async function POST(req: NextRequest) {
   // ── Parse body ────────────────────────────────────────────────────────────
   let body: Record<string, unknown>;
   try {
-    body = JSON.parse(guard.rawBody || '{}');
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
@@ -231,19 +237,25 @@ export async function POST(req: NextRequest) {
   };
 
   if (idempotencyKey) {
+    const cacheId = createHash('sha256')
+      .update(`${idempotencyKey}:${endpointPath}:${bodyHash}`)
+      .digest('hex');
     await db.idempotencyCache.create({
       data: {
-        key: idempotencyKey,
-        responseBody: JSON.stringify(responseBody),
-        statusCode: 201,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        id: cacheId,
+        idempotencyKey,
+        endpointPath,
+        bodyHash,
+        responseStatus: 201,
+        responseBody: Buffer.from(JSON.stringify(responseBody), 'utf8'),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
     });
   }
 
   console.log(
     `[channel/stays/reservations] reservation created: id=${reservation.id} ` +
-    `commission=${commissionResult.breakdown}`
+    `commission=${JSON.stringify(commissionResult.breakdown)}`
   );
 
   return NextResponse.json(responseBody, { status: 201 });
