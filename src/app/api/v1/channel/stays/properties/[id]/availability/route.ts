@@ -65,7 +65,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   const owambePropertyId = params.id;
-  const endpointPath = `/api/v1/channel/stays/properties/${owambePropertyId}/availability`;
+  const endpointPath = `/api/v1/channel/coastal-corridor/properties/${owambePropertyId}/availability`;
 
   // 1. HMAC
   const guard = await verifyChannelRequest(req);

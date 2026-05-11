@@ -23,7 +23,7 @@ import { checkIdempotencyCache, storeIdempotencyResponse } from '@/lib/idempoten
 import { hashBody } from '@/lib/hmac';
 import { getPrisma } from '@/lib/db-safe';
 
-const ENDPOINT_PATH = '/api/v1/channel/stays/properties';
+const ENDPOINT_PATH = '/api/v1/channel/coastal-corridor/properties';
 
 // ─── Payload types ────────────────────────────────────────────────────────────
 interface RoomPayload {

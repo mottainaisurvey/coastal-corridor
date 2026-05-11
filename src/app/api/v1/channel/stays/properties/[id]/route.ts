@@ -28,7 +28,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   const owambePropertyId = params.id;
-  const endpointPath = `/api/v1/channel/stays/properties/${owambePropertyId}`;
+  const endpointPath = `/api/v1/channel/coastal-corridor/properties/${owambePropertyId}`;
 
   const guard = await verifyChannelRequest(req);
   if (guard.error) return guard.error;
@@ -109,7 +109,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   const owambePropertyId = params.id;
-  const endpointPath = `/api/v1/channel/stays/properties/${owambePropertyId}`;
+  const endpointPath = `/api/v1/channel/coastal-corridor/properties/${owambePropertyId}`;
 
   // DELETE requests may have no body — use empty string for HMAC + idempotency
   const guard = await verifyChannelRequest(req);

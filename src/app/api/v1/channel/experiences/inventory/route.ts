@@ -20,7 +20,7 @@ import { checkIdempotencyCache, storeIdempotencyResponse } from '@/lib/idempoten
 import { hashBody } from '@/lib/hmac';
 import { getPrisma } from '@/lib/db-safe';
 
-const ENDPOINT_PATH = '/api/v1/channel/experiences/inventory';
+const ENDPOINT_PATH = '/api/v1/channel/coastal-corridor/experiences/inventory';
 
 interface ExperiencePayload {
   owambe_experience_id: string;
