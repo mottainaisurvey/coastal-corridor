@@ -5,16 +5,17 @@
  *
  * Handles:
  *   payment_intent.succeeded  → updates Reservation.paymentStatus = PAID
+ *   payment_intent.payment_failed → updates Reservation.paymentStatus = FAILED
  *   charge.refunded           → updates Reservation.paymentStatus = REFUNDED
  *
  * Idempotency: events are deduplicated via IdempotencyCache keyed on
  * Stripe event ID.
  */
 export const dynamic = 'force-dynamic';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripeAdapter } from '@/lib/stripe-adapter';
 import { getPrismaClient } from '@/lib/db-safe';
+import { assertPaymentStatusTransition, PaymentStatusTransitionError } from '@/lib/payment-status-guard';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const rawBody = await req.text();
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const cached = await db.idempotencyCache.findUnique({
     where: { key: `stripe_cc_event_${event.id}` },
   });
+
   if (cached) {
     console.log(`[webhook/stripe-cc] duplicate event ${event.id} — skipping`);
     return NextResponse.json({ received: true, duplicate: true });
@@ -63,17 +65,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       case 'payment_intent.succeeded': {
         const pi = event.data.object as { id: string; amount: number; currency: string; metadata?: Record<string, string> };
         const reservationId = pi.metadata?.cc_reservation_id;
+        
         if (!reservationId) {
           console.warn('[webhook/stripe-cc] payment_intent.succeeded: no cc_reservation_id in metadata');
           break;
         }
-        await db.reservation.update({
-          where: { id: reservationId },
-          data: {
-            paymentStatus: 'PAID',
-            stripePaymentIntentId: pi.id,
-          },
-        });
+
+        const paymentType = pi.metadata?.payment_type;
+        let targetStatus: any = 'PAID';
+        if (paymentType === 'DEPOSIT_PAID') targetStatus = 'DEPOSIT_PAID';
+        else if (paymentType === 'PARTIALLY_PAID') targetStatus = 'PARTIALLY_PAID';
+
+        const reservation = await db.reservation.findUnique({ where: { id: reservationId } });
+        if (reservation) {
+          assertPaymentStatusTransition(reservation.paymentStatus, targetStatus);
+          await db.reservation.update({
+            where: { id: reservationId },
+            data: {
+              paymentStatus: targetStatus,
+              stripePaymentIntentId: pi.id,
+            },
+          });
+        }
+
         await db.auditEntry.create({
           data: {
             userId: reservationId, // placeholder — no guestUserId in scope here
@@ -86,13 +100,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               paymentIntentId: pi.id,
               amountSmallestUnit: pi.amount,
               currency: pi.currency,
+              targetStatus,
             }),
           },
         });
+
         console.log(
-          `[webhook/stripe-cc] payment_intent.succeeded: reservation ${reservationId} → PAID ` +
+          `[webhook/stripe-cc] payment_intent.succeeded: reservation ${reservationId} → ${targetStatus} ` +
           `(pi=${pi.id} amount=${pi.amount} currency=${pi.currency})`
         );
+        break;
+      }
+      
+      case 'payment_intent.payment_failed': {
+        const pi = event.data.object as { id: string; metadata?: Record<string, string> };
+        const reservationId = pi.metadata?.cc_reservation_id;
+        
+        if (!reservationId) {
+          console.warn('[webhook/stripe-cc] payment_intent.payment_failed: no cc_reservation_id in metadata');
+          break;
+        }
+
+        const reservation = await db.reservation.findUnique({ where: { id: reservationId } });
+        if (reservation) {
+          assertPaymentStatusTransition(reservation.paymentStatus, 'FAILED');
+          await db.reservation.update({
+            where: { id: reservationId },
+            data: {
+              paymentStatus: 'FAILED',
+            },
+          });
+        }
+
+        console.log(`[webhook/stripe-cc] payment_intent.payment_failed: reservation ${reservationId} → FAILED`);
         break;
       }
 
@@ -102,29 +142,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           amount_refunded: number;
           currency: string;
           refunds?: { data: Array<{ id: string; status: string }> };
+          metadata?: Record<string, string>;
         };
         const piId = charge.payment_intent;
+        
         if (!piId) {
           console.warn('[webhook/stripe-cc] charge.refunded: no payment_intent on charge');
           break;
         }
+
         // Find reservation by stripePaymentIntentId
         const reservation = await db.reservation.findFirst({
           where: { stripePaymentIntentId: piId },
         });
+
         if (!reservation) {
           console.warn(`[webhook/stripe-cc] charge.refunded: no reservation for pi=${piId}`);
           break;
         }
+
+        const refundType = charge.metadata?.refund_type;
+        let targetStatus: any = 'REFUNDED';
+        if (refundType === 'PARTIALLY_REFUNDED') targetStatus = 'PARTIALLY_REFUNDED';
+
+        assertPaymentStatusTransition(reservation.paymentStatus, targetStatus);
+
         const refundAmountDecimal = (charge.amount_refunded / 100).toFixed(2);
         await db.reservation.update({
           where: { id: reservation.id },
           data: {
-            paymentStatus: 'REFUNDED',
-            status: 'REFUNDED',
+            paymentStatus: targetStatus,
+            status: targetStatus === 'REFUNDED' ? 'REFUNDED' : reservation.status,
             refundAmount: refundAmountDecimal,
           },
         });
+
         await db.auditEntry.create({
           data: {
             userId: reservation.guestUserId,
@@ -138,21 +190,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               amountRefundedSmallestUnit: charge.amount_refunded,
               currency: charge.currency,
               refundId: charge.refunds?.data?.[0]?.id,
+              targetStatus,
             }),
           },
         });
+
         console.log(
-          `[webhook/stripe-cc] charge.refunded: reservation ${reservation.id} → REFUNDED ` +
+          `[webhook/stripe-cc] charge.refunded: reservation ${reservation.id} → ${targetStatus} ` +
           `(pi=${piId} amount_refunded=${charge.amount_refunded} currency=${charge.currency})`
         );
         break;
       }
-
       default:
         console.log(`[webhook/stripe-cc] unhandled event type: ${event.type}`);
     }
   } catch (err) {
     console.error('[webhook/stripe-cc] handler error:', err);
+    if (err instanceof PaymentStatusTransitionError) {
+      return NextResponse.json({ error: err.message }, { status: 422 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 
@@ -160,7 +216,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   await db.idempotencyCache.create({
     data: {
       key: `stripe_cc_event_${event.id}`,
-      responseBody: JSON.stringify({ received: true }),
+      responseBody: Buffer.from(JSON.stringify({ received: true })),
       statusCode: 200,
       expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000), // 72 hours
     },
