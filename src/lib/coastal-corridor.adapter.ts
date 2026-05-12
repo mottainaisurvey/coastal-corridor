@@ -36,13 +36,13 @@ export function toCanonicalPaymentStatus(status: string): CanonicalPaymentStatus
 }
 
 export interface OwambePatchPayload {
-  paymentStatus: CanonicalPaymentStatus;
+  payment_status: CanonicalPaymentStatus;
   [key: string]: any;
 }
 
 export function createOwambePatchPayload(status: string, additionalData: Record<string, any> = {}): OwambePatchPayload {
   return {
-    paymentStatus: toCanonicalPaymentStatus(status),
+    payment_status: toCanonicalPaymentStatus(status),
     ...additionalData
   };
 }

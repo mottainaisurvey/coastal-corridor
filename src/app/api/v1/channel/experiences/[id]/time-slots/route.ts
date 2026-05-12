@@ -15,11 +15,11 @@
  *
  * Payload shape:
  *   {
- *     "time_slots": [
+ *     "timeSlots": [
  *       {
- *         "owambe_time_slot_id": "ts_abc",
- *         "start_date_time": "2026-07-01T09:00:00Z",
- *         "end_date_time": "2026-07-01T12:00:00Z",
+ *         "owambeTimeSlotId": "ts_abc",
+ *         "startDateTime": "2026-07-01T09:00:00Z",
+ *         "endDateTime": "2026-07-01T12:00:00Z",
  *         "capacity": 12,
  *         "rate": 15000,
  *         "currency": "NGN",
@@ -39,9 +39,9 @@ import { hashBody } from '@/lib/hmac';
 import { getPrisma } from '@/lib/db-safe';
 
 interface TimeSlotPayload {
-  owambe_time_slot_id: string;
-  start_date_time: string;
-  end_date_time: string;
+  owambeTimeSlotId: string;
+  startDateTime: string;
+  endDateTime: string;
   capacity: number;
   rate?: number | null;
   currency?: string;
@@ -50,7 +50,7 @@ interface TimeSlotPayload {
 }
 
 interface TimeSlotsBody {
-  time_slots: TimeSlotPayload[];
+  timeSlots: TimeSlotPayload[];
 }
 
 export async function PUT(
@@ -76,8 +76,8 @@ export async function PUT(
   const { data: body, parseError } = parseBody<Record<string, unknown>>(rawBody);
   if (parseError) return parseError;
 
-  if (!Array.isArray(body.time_slots) || body.time_slots.length === 0) {
-    const errResponse = { error: 'time_slots array is required and must not be empty' };
+  if (!Array.isArray(body.timeSlots) || body.timeSlots.length === 0) {
+    const errResponse = { error: 'timeSlots array is required and must not be empty' };
     await storeIdempotencyResponse(idempotencyKey, endpointPath, bodyHash, 422, errResponse);
     return NextResponse.json(errResponse, { status: 422 });
   }
@@ -85,24 +85,24 @@ export async function PUT(
   const payload = body as unknown as TimeSlotsBody;
 
   // Validate each slot
-  for (const slot of payload.time_slots) {
-    if (!slot.owambe_time_slot_id) {
-      const errResponse = { error: 'Each time_slot must have owambe_time_slot_id' };
+  for (const slot of payload.timeSlots) {
+    if (!slot.owambeTimeSlotId) {
+      const errResponse = { error: 'Each time_slot must have owambeTimeSlotId' };
       await storeIdempotencyResponse(idempotencyKey, endpointPath, bodyHash, 422, errResponse);
       return NextResponse.json(errResponse, { status: 422 });
     }
-    const start = new Date(slot.start_date_time);
-    const end = new Date(slot.end_date_time);
+    const start = new Date(slot.startDateTime);
+    const end = new Date(slot.endDateTime);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       const errResponse = {
-        error: `Invalid date in time slot ${slot.owambe_time_slot_id}: start_date_time and end_date_time must be ISO 8601`,
+        error: `Invalid date in time slot ${slot.owambeTimeSlotId}: startDateTime and endDateTime must be ISO 8601`,
       };
       await storeIdempotencyResponse(idempotencyKey, endpointPath, bodyHash, 422, errResponse);
       return NextResponse.json(errResponse, { status: 422 });
     }
     if (end <= start) {
       const errResponse = {
-        error: `end_date_time must be after start_date_time in slot ${slot.owambe_time_slot_id}`,
+        error: `endDateTime must be after startDateTime in slot ${slot.owambeTimeSlotId}`,
       };
       await storeIdempotencyResponse(idempotencyKey, endpointPath, bodyHash, 422, errResponse);
       return NextResponse.json(errResponse, { status: 422 });
@@ -129,14 +129,14 @@ export async function PUT(
   let upsertedCount = 0;
   try {
     await prisma.$transaction(async (tx) => {
-      for (const slot of payload.time_slots) {
+      for (const slot of payload.timeSlots) {
         await tx.timeSlot.upsert({
-          where: { owambeTimeSlotId: slot.owambe_time_slot_id },
+          where: { owambeTimeSlotId: slot.owambeTimeSlotId },
           create: {
-            owambeTimeSlotId: slot.owambe_time_slot_id,
+            owambeTimeSlotId: slot.owambeTimeSlotId,
             experienceId: experience.id,
-            startDateTime: new Date(slot.start_date_time),
-            endDateTime: new Date(slot.end_date_time),
+            startDateTime: new Date(slot.startDateTime),
+            endDateTime: new Date(slot.endDateTime),
             capacity: slot.capacity,
             rate: slot.rate ?? null,
             currency: (slot.currency ?? 'NGN') as any,
@@ -144,8 +144,8 @@ export async function PUT(
             status: (slot.status ?? 'OPEN') as any,
           },
           update: {
-            startDateTime: new Date(slot.start_date_time),
-            endDateTime: new Date(slot.end_date_time),
+            startDateTime: new Date(slot.startDateTime),
+            endDateTime: new Date(slot.endDateTime),
             capacity: slot.capacity,
             rate: slot.rate ?? null,
             currency: (slot.currency ?? 'NGN') as any,
@@ -164,8 +164,8 @@ export async function PUT(
 
   // 6. Cache + return
   const responseBody = {
-    owambe_experience_id: owambeExperienceId,
-    time_slots_upserted: upsertedCount,
+    owambeExperienceId: owambeExperienceId,
+    timeSlots_upserted: upsertedCount,
   };
   await storeIdempotencyResponse(idempotencyKey, endpointPath, bodyHash, 200, responseBody);
   return NextResponse.json(responseBody);

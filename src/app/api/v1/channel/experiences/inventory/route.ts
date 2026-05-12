@@ -23,19 +23,19 @@ import { getPrisma } from '@/lib/db-safe';
 const ENDPOINT_PATH = '/api/v1/channel/coastal-corridor/experiences/inventory';
 
 interface ExperiencePayload {
-  owambe_experience_id: string;
-  operator_user_id: string;
+  owambeExperienceId: string;
+  operatorUserId: string;
   name: string;
   description: string;
-  experience_type: string;
-  duration_minutes: number;
+  experienceType: string;
+  durationMinutes: number;
   capacity: number;
-  meeting_point_description: string;
-  meeting_point_latitude: number;
-  meeting_point_longitude: number;
+  meetingPointDescription: string;
+  meetingPointLatitude: number;
+  meetingPointLongitude: number;
   pricing_model: string;
-  base_price: number;
-  base_currency?: string;
+  basePrice: number;
+  baseCurrency?: string;
   age_restriction?: string | null;
   fitness_requirement?: string | null;
   weather_dependent?: boolean;
@@ -44,18 +44,18 @@ interface ExperiencePayload {
 }
 
 const REQUIRED_FIELDS: (keyof ExperiencePayload)[] = [
-  'owambe_experience_id',
-  'operator_user_id',
+  'owambeExperienceId',
+  'operatorUserId',
   'name',
   'description',
-  'experience_type',
-  'duration_minutes',
+  'experienceType',
+  'durationMinutes',
   'capacity',
-  'meeting_point_description',
-  'meeting_point_latitude',
-  'meeting_point_longitude',
+  'meetingPointDescription',
+  'meetingPointLatitude',
+  'meetingPointLongitude',
   'pricing_model',
-  'base_price',
+  'basePrice',
 ];
 
 function validatePayload(
@@ -67,22 +67,22 @@ function validatePayload(
     }
   }
   if (
-    typeof body.meeting_point_latitude !== 'number' ||
-    typeof body.meeting_point_longitude !== 'number'
+    typeof body.meetingPointLatitude !== 'number' ||
+    typeof body.meetingPointLongitude !== 'number'
   ) {
     return {
       valid: false,
-      error: 'meeting_point_latitude and meeting_point_longitude must be numbers',
+      error: 'meetingPointLatitude and meetingPointLongitude must be numbers',
     };
   }
-  if (typeof body.duration_minutes !== 'number' || body.duration_minutes <= 0) {
-    return { valid: false, error: 'duration_minutes must be a positive number' };
+  if (typeof body.durationMinutes !== 'number' || body.durationMinutes <= 0) {
+    return { valid: false, error: 'durationMinutes must be a positive number' };
   }
   if (typeof body.capacity !== 'number' || body.capacity <= 0) {
     return { valid: false, error: 'capacity must be a positive number' };
   }
-  if (typeof body.base_price !== 'number' || body.base_price < 0) {
-    return { valid: false, error: 'base_price must be a non-negative number' };
+  if (typeof body.basePrice !== 'number' || body.basePrice < 0) {
+    return { valid: false, error: 'basePrice must be a non-negative number' };
   }
   return { valid: true, data: body as unknown as ExperiencePayload };
 }
@@ -119,11 +119,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const operatorUser = await prisma.user.findUnique({
-    where: { id: payload.operator_user_id },
+    where: { id: payload.operatorUserId },
     select: { id: true },
   });
   if (!operatorUser) {
-    const errResponse = { error: `Operator user not found: ${payload.operator_user_id}` };
+    const errResponse = { error: `Operator user not found: ${payload.operatorUserId}` };
     await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 422, errResponse);
     return NextResponse.json(errResponse, { status: 422 });
   }
@@ -133,21 +133,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     experience = await prisma.$transaction(async (tx) => {
       return tx.experience.upsert({
-        where: { owambeExperienceId: payload.owambe_experience_id },
+        where: { owambeExperienceId: payload.owambeExperienceId },
         create: {
-          owambeExperienceId: payload.owambe_experience_id,
-          operatorUserId: payload.operator_user_id,
+          owambeExperienceId: payload.owambeExperienceId,
+          operatorUserId: payload.operatorUserId,
           name: payload.name,
           description: payload.description,
-          experienceType: payload.experience_type as any,
-          durationMinutes: payload.duration_minutes,
+          experienceType: payload.experienceType as any,
+          durationMinutes: payload.durationMinutes,
           capacity: payload.capacity,
-          meetingPointDescription: payload.meeting_point_description,
-          meetingPointLatitude: payload.meeting_point_latitude,
-          meetingPointLongitude: payload.meeting_point_longitude,
+          meetingPointDescription: payload.meetingPointDescription,
+          meetingPointLatitude: payload.meetingPointLatitude,
+          meetingPointLongitude: payload.meetingPointLongitude,
           pricingModel: payload.pricing_model as any,
-          basePrice: payload.base_price,
-          baseCurrency: (payload.base_currency ?? 'NGN') as any,
+          basePrice: payload.basePrice,
+          baseCurrency: (payload.baseCurrency ?? 'NGN') as any,
           ageRestriction: payload.age_restriction ?? null,
           fitnessRequirement: payload.fitness_requirement ?? null,
           weatherDependent: payload.weather_dependent ?? false,
@@ -158,15 +158,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         update: {
           name: payload.name,
           description: payload.description,
-          experienceType: payload.experience_type as any,
-          durationMinutes: payload.duration_minutes,
+          experienceType: payload.experienceType as any,
+          durationMinutes: payload.durationMinutes,
           capacity: payload.capacity,
-          meetingPointDescription: payload.meeting_point_description,
-          meetingPointLatitude: payload.meeting_point_latitude,
-          meetingPointLongitude: payload.meeting_point_longitude,
+          meetingPointDescription: payload.meetingPointDescription,
+          meetingPointLatitude: payload.meetingPointLatitude,
+          meetingPointLongitude: payload.meetingPointLongitude,
           pricingModel: payload.pricing_model as any,
-          basePrice: payload.base_price,
-          baseCurrency: (payload.base_currency ?? 'NGN') as any,
+          basePrice: payload.basePrice,
+          baseCurrency: (payload.baseCurrency ?? 'NGN') as any,
           ageRestriction: payload.age_restriction ?? null,
           fitnessRequirement: payload.fitness_requirement ?? null,
           weatherDependent: payload.weather_dependent ?? false,
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 6. Cache + return 201
   const responseBody = {
     id: experience.id,
-    owambe_experience_id: experience.owambeExperienceId,
+    owambeExperienceId: experience.owambeExperienceId,
     status: 'UNDER_REVIEW',
   };
   await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 201, responseBody);
