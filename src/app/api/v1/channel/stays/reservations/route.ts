@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const idempotencyKey = guard.idempotencyKey || '';
   const rawBody = guard.rawBody || '{}';
   const bodyHash = createHash('sha256').update(rawBody).digest('hex');
-  const endpointPath = '/api/v1/channel/coastal-corridor/reservations';
+  const endpointPath = '/api/v1/channel/stays/reservations';
   if (idempotencyKey) {
     const cached = await db.idempotencyCache.findFirst({
       where: { idempotencyKey },
