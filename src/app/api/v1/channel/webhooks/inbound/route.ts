@@ -73,7 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // 5. Parse payload
-  let payload: { event: string; data: Record<string, unknown> };
+  let payload: { event_type: string; event_id?: string; data: Record<string, unknown> };
   try {
     payload = JSON.parse(rawBody);
   } catch {
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { event, data } = payload;
+  const { event_type: event, data } = payload;
 
   // 6. Idempotency check — reject duplicate deliveries
   const prisma = getPrisma();
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         eventId,
         eventType: event,
         targetPlatform: 'OWAMBE',
-        payload: data as Record<string, unknown>,
+        payload: data as object,
         signature,
         status: 'PENDING',
       },
@@ -568,7 +568,7 @@ async function handleReconciliationRequested(
       mismatchesFound: 0,
       autoCorrected: 0,
       manualReviewItems: 0,
-      details: { trigger: 'owambe_webhook', eventId, raw: data },
+      details: { trigger: 'owambe_webhook', eventId, raw: data } as object,
       durationMs: 0,
     },
   });
