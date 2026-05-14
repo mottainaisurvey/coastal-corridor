@@ -75,9 +75,9 @@ export async function GET(
       // Guest contact from participant User record
       participant: {
         select: {
-          name: true,
           email: true,
           phone: true,
+          profile: { select: { firstName: true, lastName: true } },
         },
       },
     },
@@ -119,7 +119,9 @@ export async function GET(
       endDateTime: booking.timeSlot.endDateTime.toISOString(),
     },
     // Guest contact (from placeholder User created at booking time)
-    guestName: booking.participant.name ?? booking.participantNames[0] ?? 'Guest',
+    guestName: booking.participant.profile
+      ? `${booking.participant.profile.firstName} ${booking.participant.profile.lastName}`.trim()
+      : (booking.participantNames[0] ?? 'Guest'),
     guestEmail: booking.participant.email,
     guestPhone: booking.participant.phone ?? null,
   };
