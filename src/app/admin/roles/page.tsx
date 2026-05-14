@@ -51,7 +51,7 @@ export default function AdminRolesPage() {
   }, [isLoaded, userId, router]);
 
   useEffect(() => {
-    if (isLoaded && userId && role && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
+    if (isLoaded && userId && sessionClaims && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
   }, [isLoaded, userId, role, router]);
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function AdminRolesPage() {
   };
 
   if (!isLoaded || !user) return <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>;
-  if (isLoaded && userId && role && !isSuperadmin) {
+  if (isLoaded && userId && sessionClaims && !isSuperadmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

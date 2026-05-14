@@ -24,7 +24,7 @@ export default function AdminAnalyticsPage() {
   }, [isLoaded, userId, router]);
 
   useEffect(() => {
-    if (isLoaded && userId && role && !isAdmin) router.replace('/unauthorized?required=admin');
+    if (isLoaded && userId && sessionClaims && !isAdmin) router.replace('/unauthorized?required=admin');
   }, [isLoaded, userId, role, router]);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function AdminAnalyticsPage() {
   }, [userId, isAdmin, period]);
 
   if (!isLoaded || !user) return <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>;
-  if (isLoaded && userId && role && !isAdmin) {
+  if (isLoaded && userId && sessionClaims && !isAdmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

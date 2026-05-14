@@ -27,7 +27,7 @@ export default function AgentDashboard() {
 
   // Redirect users without agent role — only redirect when role is confirmed loaded
   useEffect(() => {
-    if (isLoaded && userId && role && !isAgent) {
+    if (isLoaded && userId && sessionClaims && !isAgent) {
       router.replace('/unauthorized?required=agent');
     }
   }, [isLoaded, userId, role, isAgent, router]);

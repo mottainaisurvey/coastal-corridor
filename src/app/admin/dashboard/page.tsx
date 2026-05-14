@@ -29,7 +29,7 @@ export default function AdminDashboard() {
 
   // Redirect users without admin role once user data is loaded
   useEffect(() => {
-    if (isLoaded && userId && role && !isAdmin) {
+    if (isLoaded && userId && sessionClaims && !isAdmin) {
       router.replace('/unauthorized?required=admin');
     }
   }, [metadataLoaded, isAdmin, router]);
@@ -68,7 +68,7 @@ export default function AdminDashboard() {
   }
 
   // Waiting for role check
-  if (isLoaded && userId && role && !isAdmin) {
+  if (isLoaded && userId && sessionClaims && !isAdmin) {
   return (
     <div className="container-x py-24">
       <div className="animate-pulse space-y-4">

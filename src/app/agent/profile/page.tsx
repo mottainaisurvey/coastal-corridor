@@ -38,7 +38,7 @@ export default function AgentProfilePage() {
   }, [isLoaded, userId, router]);
 
   useEffect(() => {
-    if (isLoaded && userId && role && !isAgent) router.replace('/unauthorized?required=agent');
+    if (isLoaded && userId && sessionClaims && !isAgent) router.replace('/unauthorized?required=agent');
   }, [isLoaded, userId, role, isAgent, router]);
 
   useEffect(() => {
