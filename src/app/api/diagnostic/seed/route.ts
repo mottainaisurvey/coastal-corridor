@@ -8,10 +8,14 @@
  * Protected by DIAGNOSTIC_SECRET header (default: 'cc-probe-staging-2026').
  * Only active when VERCEL_ENV !== 'production' (staging/preview deployments).
  *
+ * Body (optional):
+ *   { currency?: 'NGN' | 'USD' | 'GBP' }   — defaults to 'NGN'
+ *
  * Response: {
  *   operatorUserId, experienceId, timeSlotId,
  *   paystackSubaccountCode (null in staging),
- *   seeded: boolean (true = newly created, false = already existed)
+ *   seeded: boolean (true = newly created, false = already existed),
+ *   currency: string
  * }
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -32,8 +36,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Database not available' }, { status: 503 });
   }
 
+  // Parse optional currency from request body
+  let currency: 'NGN' | 'USD' | 'GBP' = 'NGN';
+  try {
+    const body = await req.json().catch(() => ({}));
+    if (body?.currency && ['NGN', 'USD', 'GBP'].includes(body.currency)) {
+      currency = body.currency as 'NGN' | 'USD' | 'GBP';
+    }
+  } catch {
+    // ignore parse errors — use default NGN
+  }
+
+  // Use currency-specific seed names so NGN and USD/GBP probes don't collide
   const SEED_OPERATOR_EMAIL = 'probe-operator@cc-staging.test';
-  const SEED_EXPERIENCE_NAME = 'CC-D-01-E Probe: Lagos Sunset Boat Tour';
+  const SEED_EXPERIENCE_NAME =
+    currency === 'NGN'
+      ? 'CC-D-01-E Probe: Lagos Sunset Boat Tour'
+      : `CC-D-01-E Probe: International Experience (${currency})`;
+
+  // Base price and rate by currency
+  const BASE_PRICE = currency === 'NGN' ? '25000.00' : '50.00';
+  const SLOT_RATE = currency === 'NGN' ? '25000.00' : '50.00';
 
   try {
     // ── 1. Operator User ─────────────────────────────────────────────────────
@@ -77,9 +100,9 @@ export async function POST(req: NextRequest) {
       experience = await prisma.experience.create({
         data: {
           operatorUserId,
-          owambeExperienceId: `probe-exp-${Date.now()}`,
+          owambeExperienceId: `probe-exp-${currency.toLowerCase()}-${Date.now()}`,
           name: SEED_EXPERIENCE_NAME,
-          description: 'Automated probe experience for CC-D-01-E end-to-end test.',
+          description: `Automated probe experience for CC-D-01-E end-to-end test (${currency}).`,
           experienceType: 'CHARTER',
           durationMinutes: 120,
           capacity: 10,
@@ -87,8 +110,8 @@ export async function POST(req: NextRequest) {
           meetingPointLatitude: 6.4281,
           meetingPointLongitude: 3.4219,
           pricingModel: 'PER_PERSON',
-          basePrice: '25000.00',
-          baseCurrency: 'NGN',
+          basePrice: BASE_PRICE,
+          baseCurrency: currency,
           status: 'ACTIVE',
         },
       });
@@ -97,7 +120,9 @@ export async function POST(req: NextRequest) {
     const experienceId = experience.id;
 
     // ── 3. Time Slot ──────────────────────────────────────────────────────────
-    // Always create a future time slot (48 hours from now) so it's bookable
+    // Always create a future time slot (48 hours from now) so it's bookable.
+    // For currency-specific probes, always create a fresh slot to avoid
+    // currency mismatch with existing NGN slots.
     const startDateTime = new Date(Date.now() + 48 * 60 * 60 * 1000);
     const endDateTime = new Date(startDateTime.getTime() + 120 * 60 * 1000);
 
@@ -106,6 +131,7 @@ export async function POST(req: NextRequest) {
         experienceId,
         startDateTime: { gte: new Date() },
         status: 'OPEN',
+        currency: currency as any,
       },
       orderBy: { startDateTime: 'asc' },
     });
@@ -115,11 +141,13 @@ export async function POST(req: NextRequest) {
       timeSlot = await prisma.timeSlot.create({
         data: {
           experienceId,
-          owambeTimeSlotId: `probe-slot-${Date.now()}`,
+          owambeTimeSlotId: `probe-slot-${currency.toLowerCase()}-${Date.now()}`,
           startDateTime,
           endDateTime,
           capacity: 10,
           spotsBooked: 0,
+          rate: SLOT_RATE,
+          currency: currency as any,
           status: 'OPEN',
         },
       });
@@ -131,6 +159,7 @@ export async function POST(req: NextRequest) {
       operatorUserId,
       experienceId,
       timeSlotId,
+      currency,
       paystackSubaccountCode: operatorUser.operatorProfile?.paystackSubaccountCode ?? null,
       seeded,
       experience: {
@@ -144,6 +173,7 @@ export async function POST(req: NextRequest) {
         endDateTime: timeSlot.endDateTime.toISOString(),
         capacity: timeSlot.capacity,
         spotsBooked: timeSlot.spotsBooked,
+        currency: timeSlot.currency,
       },
     });
   } catch (err) {

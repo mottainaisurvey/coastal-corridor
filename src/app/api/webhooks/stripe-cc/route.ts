@@ -156,7 +156,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                   },
                 },
                 timeSlot: { select: { startDateTime: true, endDateTime: true } },
-                participant: { select: { name: true, email: true, phone: true } },
+                participant: { select: { email: true, phone: true, profile: { select: { firstName: true, lastName: true } } } },
               },
             });
             if (bookingForEmail) {
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               const emailData: ExperienceBookingEmailData = {
                 bookingId: bookingForEmail.id,
                 bookingRef: `CC-EXP-${bookingForEmail.id.slice(0, 8).toUpperCase()}`,
-                guestName: bookingForEmail.participant.name ?? bookingForEmail.id,
+                guestName: bookingForEmail.participant.profile ? `${bookingForEmail.participant.profile.firstName ?? ''} ${bookingForEmail.participant.profile.lastName ?? ''}`.trim() || bookingForEmail.id : bookingForEmail.id,
                 guestEmail: bookingForEmail.participant.email,
                 guestPhone: bookingForEmail.participant.phone ?? null,
                 experienceName: bookingForEmail.experience.name,
