@@ -536,24 +536,27 @@ describe('PUT /api/v1/channel/stays/properties/{id}/availability', () => {
 // ─── POST /experiences/inventory ─────────────────────────────────────────────
 
 describe('POST /api/v1/channel/experiences/inventory', () => {
-  // NOTE: This payload matches the route's current flat camelCase ExperiencePayload
-  // interface (as aligned by PAY-CANONICAL-01-CC-FIX-FIELDS AC-4). The route itself
-  // does NOT match Owambe's actual outbound payload (which uses nested meetingPoint
-  // and pricing objects, and operatorOwambeUserId). That structural gap is tracked
-  // under CC-C-FIX-INVENTORY-01 for separate remediation.
+  // Payload matches Owambe's CCExperienceRegistration interface exactly
+  // (CC-C-FIX-INVENTORY-01 AC-3 realignment)
   const validPayload = {
     owambeExperienceId: 'exp_001',
-    operatorUserId: 'user_op_001',
+    operatorOwambeUserId: 'owambe_user_op_001',
     name: 'Sunset Kayak Tour',
     description: 'A beautiful sunset kayak tour along the coast',
     experienceType: 'TOUR',
     durationMinutes: 180,
     capacity: 12,
-    meetingPointDescription: 'Tarkwa Bay Beach Jetty',
-    meetingPointLatitude: 6.4281,
-    meetingPointLongitude: 3.4219,
-    pricing_model: 'PER_PERSON',
-    basePrice: 15000,
+    meetingPoint: {
+      description: 'Tarkwa Bay Beach Jetty',
+      latitude: 6.4281,
+      longitude: 3.4219,
+    },
+    pricing: {
+      model: 'PER_PERSON',
+      basePrice: 15000,
+      baseCurrency: 'NGN',
+    },
+    status: 'ACTIVE',
   };
 
   it('returns 422 when required fields are missing', async () => {
@@ -578,7 +581,7 @@ describe('POST /api/v1/channel/experiences/inventory', () => {
     expect(res.status).toBe(422);
   });
 
-  it('returns 422 when operator user does not exist', async () => {
+  it('returns 422 when operator user does not exist (looked up by owambeUserId)', async () => {
     vi.mocked(getPrisma).mockReturnValue({
       user: { findUnique: vi.fn().mockResolvedValue(null) },
     } as never);
@@ -605,9 +608,9 @@ describe('POST /api/v1/channel/experiences/inventory', () => {
     expect(res.status).toBe(503);
   });
 
-  it('returns 201 with experience id on success', async () => {
+  it('returns 201 with coastalCorridorExperienceId and listingUrl on success', async () => {
     vi.mocked(getPrisma).mockReturnValue({
-      user: { findUnique: vi.fn().mockResolvedValue({ id: 'user_op_001' }) },
+      user: { findUnique: vi.fn().mockResolvedValue({ id: 'user_op_cuid_001' }) },
       $transaction: vi.fn().mockResolvedValue({
         id: 'exp_cuid_001',
         owambeExperienceId: 'exp_001',
@@ -622,9 +625,12 @@ describe('POST /api/v1/channel/experiences/inventory', () => {
     const res = await experiencesInventoryPost(req);
     expect(res.status).toBe(201);
     const json = await res.json();
-    expect(json.id).toBe('exp_cuid_001');
+    // Response matches CCExperienceRegistrationResponse shape
+    expect(json.coastalCorridorExperienceId).toBe('exp_cuid_001');
     expect(json.owambeExperienceId).toBe('exp_001');
     expect(json.status).toBe('UNDER_REVIEW');
+    expect(json.listingUrl).toBe('/experiences/exp_cuid_001');
+    expect(json.createdAt).toBeDefined();
   });
 });
 
@@ -633,22 +639,26 @@ describe('POST /api/v1/channel/experiences/inventory', () => {
 describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
   const params = { params: { id: 'exp_001' } };
 
-  // NOTE: This payload matches the route's current camelCase TimeSlotsBody interface.
-  // CC-C-FIX-INVENTORY-01 will align this to Owambe's actual snake_case outbound payload.
+  // Payload matches Owambe's CCTimeSlotsUpdate / CCTimeSlot interfaces exactly
+  // (CC-C-FIX-INVENTORY-01 AC-3 realignment): wrapper key is "slots" (not "timeSlots"),
+  // recurrencePattern is camelCase (not recurrence_pattern)
   const validPayload = {
-    timeSlots: [
+    slots: [
       {
         owambeTimeSlotId: 'ts_001',
         startDateTime: '2026-07-01T09:00:00Z',
         endDateTime: '2026-07-01T12:00:00Z',
         capacity: 12,
+        spotsBooked: 0,
         rate: 15000,
         currency: 'NGN',
+        recurrencePattern: null,
+        status: 'OPEN',
       },
     ],
   };
 
-  it('returns 422 when time_slots array is missing', async () => {
+  it('returns 422 when slots array is missing', async () => {
     const req = makeReq(
       'http://localhost/api/v1/channel/experiences/exp_001/time-slots',
       'PUT',
@@ -656,6 +666,8 @@ describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
     );
     const res = await experiencesTimeSlotsput(req, params);
     expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toMatch(/slots array is required/i);
   });
 
   it('returns 422 when endDateTime is before startDateTime', async () => {
@@ -663,7 +675,7 @@ describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
       'http://localhost/api/v1/channel/experiences/exp_001/time-slots',
       'PUT',
       {
-        timeSlots: [
+        slots: [
           {
             owambeTimeSlotId: 'ts_001',
             startDateTime: '2026-07-01T12:00:00Z',
@@ -693,7 +705,7 @@ describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 200 with time_slots_upserted count on success', async () => {
+  it('returns 200 with updatedSlots count and effectiveAt on success', async () => {
     const mockTx = {
       timeSlot: { upsert: vi.fn().mockResolvedValue({}) },
     };
@@ -711,8 +723,10 @@ describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
     const res = await experiencesTimeSlotsput(req, params);
     expect(res.status).toBe(200);
     const json = await res.json();
+    // Response matches CCTimeSlotsUpdate response shape: { updatedSlots, effectiveAt }
     expect(json.owambeExperienceId).toBe('exp_001');
-    expect(json.timeSlots_upserted).toBe(1);
+    expect(json.updatedSlots).toBe(1);
+    expect(json.effectiveAt).toBeDefined();
   });
 });
 

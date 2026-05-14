@@ -3,15 +3,18 @@
  *
  * Registers a new experience pushed from Owambe.
  *
+ * Payload shape matches Owambe's CCExperienceRegistration interface exactly
+ * (coastal-corridor.adapter.ts lines 134-153, staging branch).
+ *
  * Flow:
  *   1. HMAC signature verification
  *   2. Idempotency check
  *   3. Payload validation
- *   4. Business validation (operator user must exist)
+ *   4. Business validation (operator user must exist via operatorOwambeUserId)
  *   5. Transactional upsert: Experience
  *   6. Cache + return 201
  *
- * Spec reference: Implementation Brief §10
+ * Spec reference: Implementation Brief §10 / CC-C-FIX-INVENTORY-01
  */
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,68 +25,101 @@ import { getPrisma } from '@/lib/db-safe';
 
 const ENDPOINT_PATH = '/api/v1/channel/coastal-corridor/experiences/inventory';
 
+// ── Nested sub-interfaces (matching Owambe's CCMeetingPoint / CCExperiencePricing) ──
+
+interface MeetingPoint {
+  description: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface Pricing {
+  model: string;
+  basePrice: number;
+  baseCurrency?: string;
+}
+
+// ── Top-level payload — verbatim match to CCExperienceRegistration ─────────────
+
 interface ExperiencePayload {
   owambeExperienceId: string;
-  operatorUserId: string;
+  operatorOwambeUserId: string;
+  cohortMember?: boolean;
+  cohortType?: string | null;
   name: string;
-  description: string;
+  description?: string;
   experienceType: string;
   durationMinutes: number;
   capacity: number;
-  meetingPointDescription: string;
-  meetingPointLatitude: number;
-  meetingPointLongitude: number;
-  pricing_model: string;
-  basePrice: number;
-  baseCurrency?: string;
-  age_restriction?: string | null;
-  fitness_requirement?: string | null;
-  weather_dependent?: boolean;
-  equipment_provided?: string[];
-  equipment_required?: string[];
+  meetingPoint: MeetingPoint;
+  pricing: Pricing;
+  ageRestriction?: string | null;
+  fitnessRequirement?: string | null;
+  weatherDependent?: boolean;
+  equipmentProvided?: string[];
+  equipmentRequired?: string[];
+  photos?: unknown[];
+  status: string;
 }
 
-const REQUIRED_FIELDS: (keyof ExperiencePayload)[] = [
+// Required fields checked at the top level (nested paths checked separately below)
+const TOP_LEVEL_REQUIRED: (keyof ExperiencePayload)[] = [
   'owambeExperienceId',
-  'operatorUserId',
+  'operatorOwambeUserId',
   'name',
-  'description',
   'experienceType',
   'durationMinutes',
   'capacity',
-  'meetingPointDescription',
-  'meetingPointLatitude',
-  'meetingPointLongitude',
-  'pricing_model',
-  'basePrice',
+  'meetingPoint',
+  'pricing',
+  'status',
 ];
 
 function validatePayload(
   body: Record<string, unknown>
 ): { valid: true; data: ExperiencePayload } | { valid: false; error: string } {
-  for (const field of REQUIRED_FIELDS) {
+  // Top-level required fields
+  for (const field of TOP_LEVEL_REQUIRED) {
     if (body[field] === undefined || body[field] === null || body[field] === '') {
       return { valid: false, error: `Missing required field: ${field}` };
     }
   }
-  if (
-    typeof body.meetingPointLatitude !== 'number' ||
-    typeof body.meetingPointLongitude !== 'number'
-  ) {
-    return {
-      valid: false,
-      error: 'meetingPointLatitude and meetingPointLongitude must be numbers',
-    };
+
+  // meetingPoint nested validation
+  const mp = body.meetingPoint as Record<string, unknown> | undefined;
+  if (!mp || typeof mp !== 'object') {
+    return { valid: false, error: 'meetingPoint must be an object' };
   }
+  if (!mp.description || typeof mp.description !== 'string') {
+    return { valid: false, error: 'meetingPoint.description is required and must be a string' };
+  }
+  if (typeof mp.latitude !== 'number') {
+    return { valid: false, error: 'meetingPoint.latitude must be a number' };
+  }
+  if (typeof mp.longitude !== 'number') {
+    return { valid: false, error: 'meetingPoint.longitude must be a number' };
+  }
+
+  // pricing nested validation
+  const pricing = body.pricing as Record<string, unknown> | undefined;
+  if (!pricing || typeof pricing !== 'object') {
+    return { valid: false, error: 'pricing must be an object' };
+  }
+  if (!pricing.model || typeof pricing.model !== 'string') {
+    return { valid: false, error: 'pricing.model is required and must be a string' };
+  }
+  if (typeof pricing.basePrice !== 'number' || pricing.basePrice < 0) {
+    return { valid: false, error: 'pricing.basePrice must be a non-negative number' };
+  }
+
+  // Scalar validations
   if (typeof body.durationMinutes !== 'number' || body.durationMinutes <= 0) {
     return { valid: false, error: 'durationMinutes must be a positive number' };
   }
   if (typeof body.capacity !== 'number' || body.capacity <= 0) {
     return { valid: false, error: 'capacity must be a positive number' };
   }
-  if (typeof body.basePrice !== 'number' || body.basePrice < 0) {
-    return { valid: false, error: 'basePrice must be a non-negative number' };
-  }
+
   return { valid: true, data: body as unknown as ExperiencePayload };
 }
 
@@ -112,23 +148,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const payload = validation.data;
 
-  // 4. Business validation — operator user must exist
+  // 4. Business validation — operator user must exist (looked up by owambeUserId field on User)
   const prisma = getPrisma();
   if (!prisma) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
   }
 
   const operatorUser = await prisma.user.findUnique({
-    where: { id: payload.operatorUserId },
+    where: { owambeUserId: payload.operatorOwambeUserId },
     select: { id: true },
   });
   if (!operatorUser) {
-    const errResponse = { error: `Operator user not found: ${payload.operatorUserId}` };
+    const errResponse = { error: `Operator user not found: ${payload.operatorOwambeUserId}` };
     await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 422, errResponse);
     return NextResponse.json(errResponse, { status: 422 });
   }
 
   // 5. Transactional upsert
+  // Schema-vs-query verification (CC-C-FIX-INVENTORY-01 AC-2d):
+  //   Experience.owambeExperienceId   ✓ @unique
+  //   Experience.operatorUserId       ✓ FK to User.id
+  //   Experience.name                 ✓ String
+  //   Experience.description          ✓ String @db.Text
+  //   Experience.experienceType       ✓ ExperienceType enum
+  //   Experience.durationMinutes      ✓ Int
+  //   Experience.capacity             ✓ Int
+  //   Experience.meetingPointDescription ✓ String
+  //   Experience.meetingPointLatitude ✓ Decimal
+  //   Experience.meetingPointLongitude ✓ Decimal
+  //   Experience.pricingModel         ✓ PricingModel enum (from pricing.model)
+  //   Experience.basePrice            ✓ Decimal (from pricing.basePrice)
+  //   Experience.baseCurrency         ✓ Currency enum (from pricing.baseCurrency)
+  //   Experience.ageRestriction       ✓ String?
+  //   Experience.fitnessRequirement   ✓ String?
+  //   Experience.weatherDependent     ✓ Boolean
+  //   Experience.equipmentProvided    ✓ String[]
+  //   Experience.equipmentRequired    ✓ String[]
+  //   Experience.status               ✓ ExperienceStatus (hardcoded UNDER_REVIEW on create)
+
   let experience: { id: string; owambeExperienceId: string };
   try {
     experience = await prisma.$transaction(async (tx) => {
@@ -136,42 +193,43 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         where: { owambeExperienceId: payload.owambeExperienceId },
         create: {
           owambeExperienceId: payload.owambeExperienceId,
-          operatorUserId: payload.operatorUserId,
+          operatorUserId: operatorUser.id,
           name: payload.name,
-          description: payload.description,
+          description: payload.description ?? '',
           experienceType: payload.experienceType as any,
           durationMinutes: payload.durationMinutes,
           capacity: payload.capacity,
-          meetingPointDescription: payload.meetingPointDescription,
-          meetingPointLatitude: payload.meetingPointLatitude,
-          meetingPointLongitude: payload.meetingPointLongitude,
-          pricingModel: payload.pricing_model as any,
-          basePrice: payload.basePrice,
-          baseCurrency: (payload.baseCurrency ?? 'NGN') as any,
-          ageRestriction: payload.age_restriction ?? null,
-          fitnessRequirement: payload.fitness_requirement ?? null,
-          weatherDependent: payload.weather_dependent ?? false,
-          equipmentProvided: payload.equipment_provided ?? [],
-          equipmentRequired: payload.equipment_required ?? [],
+          meetingPointDescription: payload.meetingPoint.description,
+          meetingPointLatitude: payload.meetingPoint.latitude,
+          meetingPointLongitude: payload.meetingPoint.longitude,
+          pricingModel: payload.pricing.model as any,
+          basePrice: payload.pricing.basePrice,
+          baseCurrency: (payload.pricing.baseCurrency ?? 'NGN') as any,
+          ageRestriction: payload.ageRestriction ?? null,
+          fitnessRequirement: payload.fitnessRequirement ?? null,
+          weatherDependent: payload.weatherDependent ?? false,
+          equipmentProvided: payload.equipmentProvided ?? [],
+          equipmentRequired: payload.equipmentRequired ?? [],
           status: 'UNDER_REVIEW',
         },
         update: {
+          operatorUserId: operatorUser.id,
           name: payload.name,
-          description: payload.description,
+          description: payload.description ?? '',
           experienceType: payload.experienceType as any,
           durationMinutes: payload.durationMinutes,
           capacity: payload.capacity,
-          meetingPointDescription: payload.meetingPointDescription,
-          meetingPointLatitude: payload.meetingPointLatitude,
-          meetingPointLongitude: payload.meetingPointLongitude,
-          pricingModel: payload.pricing_model as any,
-          basePrice: payload.basePrice,
-          baseCurrency: (payload.baseCurrency ?? 'NGN') as any,
-          ageRestriction: payload.age_restriction ?? null,
-          fitnessRequirement: payload.fitness_requirement ?? null,
-          weatherDependent: payload.weather_dependent ?? false,
-          equipmentProvided: payload.equipment_provided ?? [],
-          equipmentRequired: payload.equipment_required ?? [],
+          meetingPointDescription: payload.meetingPoint.description,
+          meetingPointLatitude: payload.meetingPoint.latitude,
+          meetingPointLongitude: payload.meetingPoint.longitude,
+          pricingModel: payload.pricing.model as any,
+          basePrice: payload.pricing.basePrice,
+          baseCurrency: (payload.pricing.baseCurrency ?? 'NGN') as any,
+          ageRestriction: payload.ageRestriction ?? null,
+          fitnessRequirement: payload.fitnessRequirement ?? null,
+          weatherDependent: payload.weatherDependent ?? false,
+          equipmentProvided: payload.equipmentProvided ?? [],
+          equipmentRequired: payload.equipmentRequired ?? [],
           updatedAt: new Date(),
         },
         select: { id: true, owambeExperienceId: true },
@@ -184,9 +242,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // 6. Cache + return 201
   const responseBody = {
-    id: experience.id,
+    coastalCorridorExperienceId: experience.id,
     owambeExperienceId: experience.owambeExperienceId,
     status: 'UNDER_REVIEW',
+    listingUrl: `/experiences/${experience.id}`,
+    createdAt: new Date().toISOString(),
   };
   await storeIdempotencyResponse(idempotencyKey, ENDPOINT_PATH, bodyHash, 201, responseBody);
   return NextResponse.json(responseBody, { status: 201 });
