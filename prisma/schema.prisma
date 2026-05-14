@@ -1052,6 +1052,7 @@ enum BookingDraftStatus {
   DRAFT
   PENDING_PAYMENT
   ABANDONED
+  COMPLETED
 }
 
 model BookingDraft {
