@@ -536,26 +536,31 @@ describe('PUT /api/v1/channel/stays/properties/{id}/availability', () => {
 // ─── POST /experiences/inventory ─────────────────────────────────────────────
 
 describe('POST /api/v1/channel/experiences/inventory', () => {
+  // NOTE: This payload matches the route's current flat camelCase ExperiencePayload
+  // interface (as aligned by PAY-CANONICAL-01-CC-FIX-FIELDS AC-4). The route itself
+  // does NOT match Owambe's actual outbound payload (which uses nested meetingPoint
+  // and pricing objects, and operatorOwambeUserId). That structural gap is tracked
+  // under CC-C-FIX-INVENTORY-01 for separate remediation.
   const validPayload = {
-    owambe_experience_id: 'exp_001',
-    operator_user_id: 'user_op_001',
+    owambeExperienceId: 'exp_001',
+    operatorUserId: 'user_op_001',
     name: 'Sunset Kayak Tour',
     description: 'A beautiful sunset kayak tour along the coast',
-    experience_type: 'TOUR',
-    duration_minutes: 180,
+    experienceType: 'TOUR',
+    durationMinutes: 180,
     capacity: 12,
-    meeting_point_description: 'Tarkwa Bay Beach Jetty',
-    meeting_point_latitude: 6.4281,
-    meeting_point_longitude: 3.4219,
+    meetingPointDescription: 'Tarkwa Bay Beach Jetty',
+    meetingPointLatitude: 6.4281,
+    meetingPointLongitude: 3.4219,
     pricing_model: 'PER_PERSON',
-    base_price: 15000,
+    basePrice: 15000,
   };
 
   it('returns 422 when required fields are missing', async () => {
     const req = makeReq(
       'http://localhost/api/v1/channel/experiences/inventory',
       'POST',
-      { owambe_experience_id: 'exp_001' }
+      { owambeExperienceId: 'exp_001' }
     );
     const res = await experiencesInventoryPost(req);
     expect(res.status).toBe(422);
@@ -618,7 +623,7 @@ describe('POST /api/v1/channel/experiences/inventory', () => {
     expect(res.status).toBe(201);
     const json = await res.json();
     expect(json.id).toBe('exp_cuid_001');
-    expect(json.owambe_experience_id).toBe('exp_001');
+    expect(json.owambeExperienceId).toBe('exp_001');
     expect(json.status).toBe('UNDER_REVIEW');
   });
 });
@@ -628,12 +633,14 @@ describe('POST /api/v1/channel/experiences/inventory', () => {
 describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
   const params = { params: { id: 'exp_001' } };
 
+  // NOTE: This payload matches the route's current camelCase TimeSlotsBody interface.
+  // CC-C-FIX-INVENTORY-01 will align this to Owambe's actual snake_case outbound payload.
   const validPayload = {
-    time_slots: [
+    timeSlots: [
       {
-        owambe_time_slot_id: 'ts_001',
-        start_date_time: '2026-07-01T09:00:00Z',
-        end_date_time: '2026-07-01T12:00:00Z',
+        owambeTimeSlotId: 'ts_001',
+        startDateTime: '2026-07-01T09:00:00Z',
+        endDateTime: '2026-07-01T12:00:00Z',
         capacity: 12,
         rate: 15000,
         currency: 'NGN',
@@ -651,16 +658,16 @@ describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
     expect(res.status).toBe(422);
   });
 
-  it('returns 422 when end_date_time is before start_date_time', async () => {
+  it('returns 422 when endDateTime is before startDateTime', async () => {
     const req = makeReq(
       'http://localhost/api/v1/channel/experiences/exp_001/time-slots',
       'PUT',
       {
-        time_slots: [
+        timeSlots: [
           {
-            owambe_time_slot_id: 'ts_001',
-            start_date_time: '2026-07-01T12:00:00Z',
-            end_date_time: '2026-07-01T09:00:00Z', // before start
+            owambeTimeSlotId: 'ts_001',
+            startDateTime: '2026-07-01T12:00:00Z',
+            endDateTime: '2026-07-01T09:00:00Z', // before start
             capacity: 12,
           },
         ],
@@ -669,7 +676,7 @@ describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
     const res = await experiencesTimeSlotsput(req, params);
     expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.error).toMatch(/end_date_time must be after/i);
+    expect(json.error).toMatch(/endDateTime must be after/i);
   });
 
   it('returns 404 when experience does not exist', async () => {
@@ -704,8 +711,8 @@ describe('PUT /api/v1/channel/experiences/{id}/time-slots', () => {
     const res = await experiencesTimeSlotsput(req, params);
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.owambe_experience_id).toBe('exp_001');
-    expect(json.time_slots_upserted).toBe(1);
+    expect(json.owambeExperienceId).toBe('exp_001');
+    expect(json.timeSlots_upserted).toBe(1);
   });
 });
 
