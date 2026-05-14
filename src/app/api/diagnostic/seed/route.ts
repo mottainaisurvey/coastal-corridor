@@ -87,6 +87,12 @@ export async function POST(req: NextRequest) {
         },
         include: { operatorProfile: true },
       });
+    } else if (!operatorUser.owambeUserId) {
+      operatorUser = await prisma.user.update({
+        where: { id: operatorUser.id },
+        data: { owambeUserId: 'probe-operator-owambe-id' },
+        include: { operatorProfile: true },
+      });
     }
 
     const operatorUserId = operatorUser.id;
