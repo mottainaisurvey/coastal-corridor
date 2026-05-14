@@ -6,7 +6,7 @@
  * and to observe email dispatch attempts (logged to console and captured in audit).
  *
  * Protected by DIAGNOSTIC_SECRET header.
- * Only active when NODE_ENV !== 'production'.
+ * Only active when VERCEL_ENV !== 'production' (staging/preview deployments).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/db-safe';
@@ -14,7 +14,7 @@ import { getPrisma } from '@/lib/db-safe';
 const DIAGNOSTIC_SECRET = process.env.DIAGNOSTIC_SECRET ?? 'cc-probe-staging-2026';
 
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.VERCEL_ENV === 'production') {
     return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
   }
 

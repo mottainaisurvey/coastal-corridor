@@ -6,7 +6,7 @@
  * returns the existing IDs without creating duplicates.
  *
  * Protected by DIAGNOSTIC_SECRET header (default: 'cc-probe-staging-2026').
- * Only active when NODE_ENV !== 'production'.
+ * Only active when VERCEL_ENV !== 'production' (staging/preview deployments).
  *
  * Response: {
  *   operatorUserId, experienceId, timeSlotId,
@@ -21,7 +21,7 @@ const DIAGNOSTIC_SECRET = process.env.DIAGNOSTIC_SECRET ?? 'cc-probe-staging-202
 
 export async function POST(req: NextRequest) {
   // Guard: never run in production
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.VERCEL_ENV === 'production') {
     return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
   }
 

@@ -5,7 +5,7 @@
  * Used by the probe to verify DB state after webhook delivery.
  *
  * Protected by DIAGNOSTIC_SECRET header.
- * Only active when NODE_ENV !== 'production'.
+ * Only active when VERCEL_ENV !== 'production' (staging/preview deployments).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/db-safe';
@@ -16,7 +16,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.VERCEL_ENV === 'production') {
     return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
   }
 
