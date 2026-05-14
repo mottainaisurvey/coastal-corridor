@@ -12,6 +12,7 @@
  * Stripe event ID.
  */
 export const dynamic = 'force-dynamic';
+import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripeAdapter } from '@/lib/stripe-adapter';
 import { getPrismaClient } from '@/lib/db-safe';
@@ -51,8 +52,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Idempotency check (deduplicate on Stripe event ID) ────────────────────
+  const idempotencyKey = `stripe_cc_event_${event.id}`;
+  const endpointPath = '/api/webhooks/stripe-cc';
+  const bodyHash = createHash('sha256').update(rawBody).digest('hex');
+  const cacheId = createHash('sha256').update(`${idempotencyKey}${endpointPath}${bodyHash}`).digest('hex');
   const cached = await db.idempotencyCache.findUnique({
-    where: { key: `stripe_cc_event_${event.id}` },
+    where: { id: cacheId },
   });
 
   if (cached) {
@@ -369,9 +374,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // ── Cache event ID ────────────────────────────────────────────────────────
   await db.idempotencyCache.create({
     data: {
-      key: `stripe_cc_event_${event.id}`,
+      id: cacheId,
+      idempotencyKey,
+      endpointPath,
+      bodyHash,
+      responseStatus: 200,
       responseBody: Buffer.from(JSON.stringify({ received: true })),
-      statusCode: 200,
       expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000), // 72 hours
     },
   });
