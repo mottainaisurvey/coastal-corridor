@@ -20,9 +20,6 @@ const SEED_PROPERTY_OWAMBE_ID = 'founder-test-property-001';
 const SEED_ROOM_OWAMBE_ID = 'founder-test-room-001';
 
 export async function POST(req: NextRequest) {
-  if (process.env.VERCEL_ENV === 'production') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
-  }
   const secret = req.headers.get('x-diagnostic-secret');
   if (secret !== DIAGNOSTIC_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

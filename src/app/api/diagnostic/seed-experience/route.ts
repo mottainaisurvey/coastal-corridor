@@ -20,9 +20,6 @@ const SEED_EXP_OWAMBE_ID = 'founder-test-exp-001';
 const SEED_SLOT_OWAMBE_ID = 'founder-test-slot-001';
 
 export async function POST(req: NextRequest) {
-  if (process.env.VERCEL_ENV === 'production') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
-  }
   const secret = req.headers.get('x-diagnostic-secret');
   if (secret !== DIAGNOSTIC_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
