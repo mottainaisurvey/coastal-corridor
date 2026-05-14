@@ -46,7 +46,7 @@ export async function GET(
       netToOperator: true,
       createdAt: true,
       updatedAt: true,
-      experience: { select: { name: true, currency: true } },
+      experience: { select: { name: true } },
       timeSlot: { select: { startDateTime: true, endDateTime: true } },
       participant: { select: { email: true } },
     },
