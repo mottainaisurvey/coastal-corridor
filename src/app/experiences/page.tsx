@@ -15,7 +15,7 @@
  *   - Public — no auth required
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Filter, Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Compass } from 'lucide-react';
@@ -214,7 +214,7 @@ function PaginationControls({ pagination, onPageChange }: { pagination: Paginati
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function ExperiencesPage() {
+function ExperiencesPageInner() {
   const router      = useRouter();
   const searchParams = useSearchParams();
 
@@ -454,5 +454,14 @@ export default function ExperiencesPage() {
         )}
       </section>
     </div>
+  );
+}
+
+// Wrap in Suspense so useSearchParams() satisfies Next.js 14 static-render requirements
+export default function ExperiencesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600" /></div>}>
+      <ExperiencesPageInner />
+    </Suspense>
   );
 }

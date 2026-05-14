@@ -26,7 +26,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers';
 
 // Basic RFC 5322 email pattern
