@@ -203,6 +203,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       signInFallbackRedirectUrl="/"
       signUpFallbackRedirectUrl="/"
       allowedRedirectOrigins={[
+        'https://coastal-corridor-staging.vercel.app',
         'https://coastalcorridor.africa',
         'https://admin.coastalcorridor.africa',
         'https://agent.coastalcorridor.africa',
