@@ -14,10 +14,8 @@ import { getPrisma } from '@/lib/db-safe';
 const DIAGNOSTIC_SECRET = process.env.DIAGNOSTIC_SECRET ?? 'cc-probe-staging-2026';
 
 export async function GET(req: NextRequest) {
-  if (process.env.VERCEL_ENV === 'production') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
-  }
-
+  // Auth check — DIAGNOSTIC_SECRET header is the sole access control.
+  // TODO: remove these diagnostic endpoints before production launch.
   const secret = req.headers.get('x-diagnostic-secret');
   if (secret !== DIAGNOSTIC_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

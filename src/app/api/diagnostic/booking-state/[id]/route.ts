@@ -16,10 +16,8 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (process.env.VERCEL_ENV === 'production') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
-  }
-
+  // Auth check — DIAGNOSTIC_SECRET header is the sole access control.
+  // TODO: remove these diagnostic endpoints before production launch.
   const secret = req.headers.get('x-diagnostic-secret');
   if (secret !== DIAGNOSTIC_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
