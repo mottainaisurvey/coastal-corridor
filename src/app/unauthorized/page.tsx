@@ -2,9 +2,10 @@
 import { Suspense } from 'react';
 
 import { useSearchParams } from 'next/navigation';
-import { useClerk, useUser } from '@clerk/nextjs';
+import { useClerk, useUser, useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import { ShieldOff } from 'lucide-react';
+import { getUserRoles } from '@/lib/user-roles';
 
 function UnauthorizedContent() {
   const params = useSearchParams();
@@ -12,7 +13,10 @@ function UnauthorizedContent() {
   const { user } = useUser();
   const { signOut } = useClerk();
 
+  const { sessionClaims } = useAuth();
   const roleLabel = required === 'admin' ? 'Administrator' : required === 'agent' ? 'Agent' : 'the required';
+  // CC-C-09-A-0.1: array-aware role display (handles string | string[])
+  const userRoles = getUserRoles(sessionClaims?.publicMetadata as any);
 
   return (
     <div className="bg-paper min-h-screen flex items-center justify-center">
@@ -56,7 +60,7 @@ function UnauthorizedContent() {
           <div className="mt-10 pt-8 border-t border-ink/10">
             <div className="eyebrow mb-2">Your current role</div>
             <div className="inline-block px-3 py-1 bg-ink/5 rounded-sm font-mono text-[12px] text-ink/60">
-              {(user.publicMetadata?.role as string) || 'BUYER (default)'}
+              {userRoles.length > 0 ? userRoles.join(', ') : 'BUYER (default)'}
             </div>
           </div>
         )}

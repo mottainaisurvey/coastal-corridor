@@ -8,7 +8,9 @@ import { ArrowLeft, ShieldCheck, UserCog, Lock, Search, ChevronLeft, ChevronRigh
 
 const SUPERADMIN_ROLES = ['superadmin', 'SUPERADMIN'];
 
-const ROLE_OPTIONS = ['BUYER', 'AGENT', 'DEVELOPER', 'ADMIN', 'VERIFIER', 'GOVERNMENT', 'TOUR_OPERATOR'];
+// CC-C-08-A AC-3b: HOST added to ROLE_OPTIONS
+// CC-C-09-A-0: OPERATOR added to ROLE_OPTIONS
+const ROLE_OPTIONS = ['BUYER', 'AGENT', 'DEVELOPER', 'ADMIN', 'VERIFIER', 'GOVERNMENT', 'TOUR_OPERATOR', 'HOST', 'OPERATOR'];
 
 const ROLE_COLOURS: Record<string, string> = {
   BUYER: 'bg-ocean/10 text-ocean border border-ocean/20',
@@ -18,6 +20,8 @@ const ROLE_COLOURS: Record<string, string> = {
   VERIFIER: 'bg-ocean/10 text-ocean border border-ocean/20',
   GOVERNMENT: 'bg-sage/10 text-sage border border-sage/20',
   TOUR_OPERATOR: 'bg-ochre/10 text-ochre border border-ochre/20',
+  HOST: 'bg-success/10 text-success border border-success/20',
+  OPERATOR: 'bg-brand/10 text-brand border border-brand/20',
 };
 
 export default function AdminRolesPage() {
@@ -34,9 +38,13 @@ export default function AdminRolesPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const PAGE_SIZE = 20;
 
-  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isSuperadmin = SUPERADMIN_ROLES.includes(role);
+  // CC-C-09-A-0: use getUserRoles for array-safe role normalization
+  // Inline normalization here (no import needed — simple check)
+  const rawMeta = (sessionClaims?.publicMetadata as any) || (user?.publicMetadata as any) || {};
+  const rawRole = rawMeta?.role;
+  const roleList: string[] = Array.isArray(rawRole) ? rawRole : (rawRole ? [rawRole] : []);
+  const role = roleList[0] || '';
+  const isSuperadmin = roleList.some((r: string) => SUPERADMIN_ROLES.includes(r));
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

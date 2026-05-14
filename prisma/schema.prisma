@@ -712,6 +712,15 @@ model OperatorApplication {
   reviewNotes          String?
   // Phase A addition — link to cohort code issued on acceptance
   cohortCodeId         String?  // FK to CohortCode.code (set when ACCEPTED)
+  // CC-C-08-D-2 additions — admin admit flow
+  cohortMember         Boolean  @default(false)
+  // Set by admin during review; true = 12% commission rate, false = 15%
+  adminNotes           String?  @db.Text
+  // Internal notes from ops team review
+  reviewedBy           String?
+  // Admin User.id who performed the admit/reject action
+  clerkInviteId        String?
+  // Clerk invitation ID returned after approve action issues the invite
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -952,6 +961,7 @@ model Experience {
   timeSlots               TimeSlot[]
   bookings                ExperienceBooking[]
   images                  ExperienceImage[]
+  bookingDrafts           BookingDraft[]
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
@@ -972,6 +982,7 @@ model TimeSlot {
   recurrencePattern String?        // RFC 5545 RRULE if recurring
   status            TimeSlotStatus @default(OPEN)
   bookings          ExperienceBooking[]
+  bookingDrafts     BookingDraft[]
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -998,7 +1009,10 @@ model ExperienceBooking {
   pickupRequested          Boolean                 @default(false)
   pickupAddress            String?
   paystackReference        String?
+  stripePaymentIntentId    String?                 // Stripe PaymentIntent ID (CC-D-01-C)
   outboundIdempotencyKey   String?                 @unique  // UUID v4 for outbound call to Owambe
+  owambeSyncAttempts       Int                     @default(0)  // CC-D-01-D: retry counter (max 3)
+  owambeSyncError          String?                 // CC-D-01-D: last sync error message
   paymentStatus            PaymentStatus           @default(PENDING)
   status                   ExperienceBookingStatus @default(PENDING)
   cancellationReason       String?
@@ -1019,6 +1033,58 @@ model ExperienceImage {
   isPrimary     Boolean    @default(false)
   sortOrder     Int        @default(0)
   createdAt     DateTime   @default(now())
+}
+
+// =========================================================
+// GUEST BOOKING DRAFT — CC-D-01-B
+// =========================================================
+// Holds anonymous guest booking state across the multi-step
+// booking flow (slot selection → group size → contact details
+// → confirmation pre-payment). Lifecycle:
+//   DRAFT            — slot selected, details being filled
+//   PENDING_PAYMENT  — all details filled, proceeding to payment
+//   ABANDONED        — expired/cleaned-up (future cron)
+// On payment success (CC-D-01-C), a real ExperienceBooking
+// record is created and this draft is no longer needed.
+// =========================================================
+
+enum BookingDraftStatus {
+  DRAFT
+  PENDING_PAYMENT
+  ABANDONED
+}
+
+model BookingDraft {
+  id              String             @id @default(cuid())
+  sessionToken    String             @unique @default(cuid()) // HttpOnly cookie value
+  experienceId    String
+  experience      Experience         @relation(fields: [experienceId], references: [id])
+  timeSlotId      String
+  timeSlot        TimeSlot           @relation(fields: [timeSlotId], references: [id])
+  status          BookingDraftStatus @default(DRAFT)
+
+  // Step 2 — group size
+  groupSize       Int?
+
+  // Step 3 — contact details
+  guestName       String?
+  guestEmail      String?
+  guestPhone      String?
+
+  // Pre-calculated total (groupSize * slot.rate or experience.basePrice)
+  totalAmount     Decimal?           @db.Decimal(10, 2)
+  currency        String?            // ISO 4217 code
+
+  // Set when proceed-to-payment creates the ExperienceBooking (CC-D-01-C)
+  experienceBookingId String?          // Reference to the created ExperienceBooking
+
+  expiresAt       DateTime           // Draft expires after 24h
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([sessionToken])
+  @@index([experienceId])
+  @@index([status])
 }
 
 // =========================================================

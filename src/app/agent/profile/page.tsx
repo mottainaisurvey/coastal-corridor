@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, User, MapPin, Phone, Globe, FileText, Save, CheckCircle, Upload, Shield } from 'lucide-react';
-
-const AGENT_ROLES = ['agent', 'admin', 'superadmin', 'AGENT', 'ADMIN', 'SUPERADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
@@ -31,8 +30,8 @@ export default function AgentProfilePage() {
     operatingStates: [] as string[], website: '', instagram: '', twitter: '',
   });
 
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isAgent = AGENT_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isAgent = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['AGENT', 'agent', 'ADMIN', 'admin', 'SUPERADMIN', 'superadmin']);
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

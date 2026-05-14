@@ -22,6 +22,9 @@ export const OWAMBE_RESERVATION_POST_PATH = '/api/v1/channel/stays/reservations'
 export const OWAMBE_RESERVATION_PATCH_PATH = (ccReservationId: string) =>
   `/api/v1/channel/stays/reservations/${ccReservationId}`;
 
+// CC-D-01-D: Experience booking outbound path
+export const OWAMBE_EXPERIENCE_BOOKING_POST_PATH = '/api/v1/channel/experiences/bookings';
+
 export type CanonicalPaymentStatus = 
   | 'PENDING'
   | 'DEPOSIT_PAID'

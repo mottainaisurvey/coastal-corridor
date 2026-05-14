@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, Settings, Save, RefreshCw, AlertTriangle } from 'lucide-react';
-
-const SUPERADMIN_ROLES = ['superadmin', 'SUPERADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 const CONFIG_GROUPS = [
   {
@@ -58,9 +57,8 @@ export default function AdminConfigPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isSuperadmin = SUPERADMIN_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isSuperadmin = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['SUPERADMIN', 'superadmin']);
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

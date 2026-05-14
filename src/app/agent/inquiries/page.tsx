@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, MessageSquare, Phone, Mail, Clock, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
-
-const AGENT_ROLES = ['agent', 'admin', 'superadmin', 'AGENT', 'ADMIN', 'SUPERADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 const STATUS_COLOURS: Record<string, string> = {
   NEW: 'bg-ocean/10 text-ocean border border-ocean/20',
@@ -30,8 +29,8 @@ export default function AgentInquiriesPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const PAGE_SIZE = 20;
 
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isAgent = AGENT_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isAgent = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['AGENT', 'agent', 'ADMIN', 'admin', 'SUPERADMIN', 'superadmin']);
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

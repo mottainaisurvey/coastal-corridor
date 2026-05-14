@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Eye, MessageSquare, Home, TrendingUp, Calendar, BadgeCheck } from 'lucide-react';
-
-const AGENT_ROLES = ['agent', 'AGENT', 'admin', 'superadmin', 'ADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 export default function AgentDashboard() {
   const { isLoaded, userId, sessionClaims } = useAuth();
@@ -16,9 +15,8 @@ export default function AgentDashboard() {
   const [recentInquiries, setRecentInquiries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Use sessionClaims first (available immediately from JWT), fall back to user.publicMetadata
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isAgent = AGENT_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isAgent = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['AGENT', 'agent', 'ADMIN', 'admin', 'SUPERADMIN', 'superadmin']);
 
   // Redirect unauthenticated users
   useEffect(() => {

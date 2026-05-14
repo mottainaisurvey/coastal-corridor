@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { hasAnyRole } from '@/lib/user-roles';
 
 // ---------------------------------------------------------------------------
 // Role arrays
@@ -87,6 +88,8 @@ const isHostRoute = createRouteMatcher(['/host/dashboard(.*)']);
 // 3. Protected routes explicitly redirect to the correct sign-in page.
 //
 // 4. Role-based access is enforced via sessionClaims.publicMetadata.role.
+//    CC-C-09-A-0: role can be a string (legacy) or array (new multi-role).
+//    hasAnyRole() from @/lib/user-roles normalizes both forms.
 // ---------------------------------------------------------------------------
 export default clerkMiddleware(async (auth, req) => {
   const url = req.nextUrl.clone();
@@ -98,7 +101,8 @@ export default clerkMiddleware(async (auth, req) => {
 
   // For protected routes, get auth state
   const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
+  // CC-C-09-A-0: publicMetadata passed to hasAnyRole — handles string and array forms
+  const publicMetadata = sessionClaims?.publicMetadata;
 
   // ---- Admin routes (/admin/*) — protect all except sign-in page --------
   if (isAdminRoute(req)) {
@@ -106,7 +110,7 @@ export default clerkMiddleware(async (auth, req) => {
       url.pathname = '/admin/sign-in';
       return NextResponse.redirect(url);
     }
-    if (role && !ADMIN_ROLES.includes(role)) {
+    if (publicMetadata && !hasAnyRole(publicMetadata, ADMIN_ROLES)) {
       url.pathname = '/unauthorized';
       url.searchParams.set('required', 'admin');
       return NextResponse.redirect(url);
@@ -120,7 +124,7 @@ export default clerkMiddleware(async (auth, req) => {
       url.pathname = '/agent/sign-in';
       return NextResponse.redirect(url);
     }
-    if (role && !AGENT_ROLES.includes(role)) {
+    if (publicMetadata && !hasAnyRole(publicMetadata, AGENT_ROLES)) {
       url.pathname = '/unauthorized';
       url.searchParams.set('required', 'agent');
       return NextResponse.redirect(url);
@@ -134,7 +138,7 @@ export default clerkMiddleware(async (auth, req) => {
       url.pathname = '/developer/sign-in';
       return NextResponse.redirect(url);
     }
-    if (role && !DEVELOPER_ROLES.includes(role)) {
+    if (publicMetadata && !hasAnyRole(publicMetadata, DEVELOPER_ROLES)) {
       url.pathname = '/unauthorized';
       url.searchParams.set('required', 'developer');
       return NextResponse.redirect(url);
@@ -148,7 +152,8 @@ export default clerkMiddleware(async (auth, req) => {
       url.pathname = '/operator/sign-in';
       return NextResponse.redirect(url);
     }
-    if (role && !OPERATOR_ROLES.includes(role)) {
+    // CC-C-09-A-0: hasAnyRole handles both string "OPERATOR" and array ["HOST","OPERATOR"]
+    if (publicMetadata && !hasAnyRole(publicMetadata, OPERATOR_ROLES)) {
       url.pathname = '/unauthorized';
       url.searchParams.set('required', 'operator');
       return NextResponse.redirect(url);
@@ -162,7 +167,8 @@ export default clerkMiddleware(async (auth, req) => {
       url.pathname = '/host/sign-in';
       return NextResponse.redirect(url);
     }
-    if (role && !HOST_ROLES.includes(role)) {
+    // CC-C-09-A-0: hasAnyRole handles both string "HOST" and array ["HOST","OPERATOR"]
+    if (publicMetadata && !hasAnyRole(publicMetadata, HOST_ROLES)) {
       url.pathname = '/unauthorized';
       url.searchParams.set('required', 'host');
       return NextResponse.redirect(url);

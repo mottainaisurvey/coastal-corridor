@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, Plug, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
-
-const SUPERADMIN_ROLES = ['superadmin', 'SUPERADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 const INTEGRATIONS = [
   {
@@ -81,9 +80,8 @@ export default function AdminIntegrationsPage() {
   const { user } = useUser();
   const router = useRouter();
 
-  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isSuperadmin = SUPERADMIN_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isSuperadmin = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['SUPERADMIN', 'superadmin']);
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

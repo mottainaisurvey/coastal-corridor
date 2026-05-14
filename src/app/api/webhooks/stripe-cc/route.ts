@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeAdapter } from '@/lib/stripe-adapter';
 import { getPrismaClient } from '@/lib/db-safe';
 import { assertPaymentStatusTransition, PaymentStatusTransitionError } from '@/lib/payment-status-guard';
+import { sendEmail, guestBookingConfirmationEmail, operatorBookingNotificationEmail, type ExperienceBookingEmailData } from '@/lib/email';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const rawBody = await req.text();
@@ -64,13 +65,166 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const pi = event.data.object as { id: string; amount: number; currency: string; metadata?: Record<string, string> };
+
+        // CC-D-01-C AC-4b: Route by metadata source
+        // Experience bookings use metadata.experienceBookingId (set by proceed-to-payment)
+        // Real-estate reservations use metadata.cc_reservation_id (legacy path)
+        const experienceBookingId = pi.metadata?.experienceBookingId;
         const reservationId = pi.metadata?.cc_reservation_id;
-        
-        if (!reservationId) {
-          console.warn('[webhook/stripe-cc] payment_intent.succeeded: no cc_reservation_id in metadata');
+
+        if (experienceBookingId) {
+          // ── Experience booking confirmation path ──────────────────────────────
+          const current = await db.experienceBooking.findUnique({
+            where: { id: experienceBookingId },
+            select: {
+              id: true,
+              paymentStatus: true,
+              status: true,
+              numberOfParticipants: true,
+              timeSlotId: true,
+            },
+          });
+          if (current) {
+            // Idempotency: if already CONFIRMED, no-op
+            if (current.status === 'CONFIRMED' && current.paymentStatus === 'PAID') {
+              console.info(
+                `[webhook/stripe-cc] payment_intent.succeeded idempotent: booking ${experienceBookingId} already CONFIRMED`
+              );
+              break;
+            }
+            assertPaymentStatusTransition(current.paymentStatus, 'PAID');
+            // Atomic transaction: confirm booking + increment spotsBooked
+            await db.$transaction(async (tx) => {
+              // 1. Update ExperienceBooking: paymentStatus=PAID, status=CONFIRMED
+              await tx.experienceBooking.update({
+                where: { id: experienceBookingId },
+                data: {
+                  paymentStatus: 'PAID',
+                  status: 'CONFIRMED',
+                  stripePaymentIntentId: pi.id,
+                  updatedAt: new Date(),
+                },
+              });
+              // 2. Increment TimeSlot.spotsBooked by numberOfParticipants
+              const updatedSlot = await tx.timeSlot.update({
+                where: { id: current.timeSlotId },
+                data: { spotsBooked: { increment: current.numberOfParticipants } },
+                select: { spotsBooked: true, capacity: true },
+              });
+              // 3. Post-increment over-booking guard
+              if (updatedSlot.spotsBooked > updatedSlot.capacity) {
+                throw new Error(
+                  `[webhook/stripe-cc] Over-booking detected: slot ${current.timeSlotId} ` +
+                  `spotsBooked=${updatedSlot.spotsBooked} capacity=${updatedSlot.capacity} ` +
+                  `— transaction rolled back`
+                );
+              }
+              // 4. Update BookingDraft to COMPLETED
+              await tx.bookingDraft.updateMany({
+                where: { experienceBookingId },
+                data: { status: 'COMPLETED' },
+              });
+            });
+
+            // CC-D-01-E AC-2/3: Fire-and-forget email notifications after transaction commit.
+            const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_BASE_URL ?? 'https://coastalcorridor.co';
+            const bookingForEmail = await db.experienceBooking.findUnique({
+              where: { id: experienceBookingId },
+              select: {
+                id: true,
+                numberOfParticipants: true,
+                totalAmount: true,
+                currency: true,
+                channelCommissionAmount: true,
+                channelCommissionPercent: true,
+                netToOperator: true,
+                specialRequirements: true,
+                pickupRequested: true,
+                pickupAddress: true,
+                experience: {
+                  select: {
+                    name: true,
+                    meetingPointDescription: true,
+                    meetingPointLatitude: true,
+                    meetingPointLongitude: true,
+                    operator: {
+                      select: {
+                        email: true,
+                        operatorProfile: { select: { displayName: true, businessName: true } },
+                      },
+                    },
+                  },
+                },
+                timeSlot: { select: { startDateTime: true, endDateTime: true } },
+                participant: { select: { name: true, email: true, phone: true } },
+              },
+            });
+            if (bookingForEmail) {
+              const operatorDisplayName =
+                bookingForEmail.experience.operator.operatorProfile?.displayName ??
+                bookingForEmail.experience.operator.operatorProfile?.businessName ??
+                'Your Operator';
+              const emailData: ExperienceBookingEmailData = {
+                bookingId: bookingForEmail.id,
+                bookingRef: `CC-EXP-${bookingForEmail.id.slice(0, 8).toUpperCase()}`,
+                guestName: bookingForEmail.participant.name ?? bookingForEmail.id,
+                guestEmail: bookingForEmail.participant.email,
+                guestPhone: bookingForEmail.participant.phone ?? null,
+                experienceName: bookingForEmail.experience.name,
+                startDateTime: bookingForEmail.timeSlot.startDateTime.toISOString(),
+                endDateTime: bookingForEmail.timeSlot.endDateTime.toISOString(),
+                numberOfParticipants: bookingForEmail.numberOfParticipants,
+                totalAmount: bookingForEmail.totalAmount.toString(),
+                currency: bookingForEmail.currency,
+                channelCommissionAmount: bookingForEmail.channelCommissionAmount.toString(),
+                channelCommissionPercent: bookingForEmail.channelCommissionPercent.toString(),
+                netToOperator: bookingForEmail.netToOperator.toString(),
+                meetingPointDescription: bookingForEmail.experience.meetingPointDescription,
+                meetingPointLatitude: bookingForEmail.experience.meetingPointLatitude.toString(),
+                meetingPointLongitude: bookingForEmail.experience.meetingPointLongitude.toString(),
+                specialRequirements: bookingForEmail.specialRequirements,
+                pickupRequested: bookingForEmail.pickupRequested,
+                pickupAddress: bookingForEmail.pickupAddress,
+                operatorDisplayName,
+                operatorEmail: bookingForEmail.experience.operator.email,
+                confirmationPageUrl: `${APP_BASE_URL}/booking-complete/${bookingForEmail.id}`,
+                operatorBookingsUrl: `${APP_BASE_URL}/operator/bookings`,
+              };
+              const guestEmail = guestBookingConfirmationEmail(emailData);
+              sendEmail({ to: emailData.guestEmail, subject: guestEmail.subject, htmlBody: guestEmail.htmlBody, textBody: guestEmail.textBody })
+                .catch(err => console.error('[webhook/stripe-cc] Guest email send failed:', err));
+              const opEmail = operatorBookingNotificationEmail(emailData);
+              sendEmail({ to: emailData.operatorEmail, subject: opEmail.subject, htmlBody: opEmail.htmlBody, textBody: opEmail.textBody })
+                .catch(err => console.error('[webhook/stripe-cc] Operator email send failed:', err));
+            }
+          }
+          await db.auditEntry.create({
+            data: {
+              entityType: 'ExperienceBooking',
+              entityId: experienceBookingId,
+              action: 'stripe_payment_succeeded',
+              metadata: JSON.stringify({
+                event: 'payment_intent.succeeded',
+                stripeEventId: event.id,
+                paymentIntentId: pi.id,
+                amountSmallestUnit: pi.amount,
+                currency: pi.currency,
+              }),
+            },
+          });
+          console.log(
+            `[webhook/stripe-cc] payment_intent.succeeded: experienceBooking ${experienceBookingId} → CONFIRMED ` +
+            `(pi=${pi.id} amount=${pi.amount} currency=${pi.currency})`
+          );
           break;
         }
 
+        if (!reservationId) {
+          console.warn('[webhook/stripe-cc] payment_intent.succeeded: no cc_reservation_id or experienceBookingId in metadata');
+          break;
+        }
+
+        // ── Real-estate reservation path (legacy, unchanged) ─────────────────
         const paymentType = pi.metadata?.payment_type;
         let targetStatus: any = 'PAID';
         if (paymentType === 'DEPOSIT_PAID') targetStatus = 'DEPOSIT_PAID';

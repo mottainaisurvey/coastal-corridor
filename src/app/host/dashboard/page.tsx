@@ -1,25 +1,106 @@
 'use client';
 
+/**
+ * /host/dashboard — CC-C-08-B
+ *
+ * Replaces the placeholder stats with real data fetched from GET /api/host/stats.
+ * Changes from the CC-C-08-A placeholder:
+ *   - Stats (properties, bookings, revenue) are fetched server-side via /api/host/stats
+ *   - Occupancy is deferred to v2 (requires calendar data from Owambe Stays via callOwambe)
+ *   - Loading state: spinner while stats are loading (not stale hardcoded zeros)
+ *   - Error state: graceful "Unable to load stats — please refresh" if the fetch fails
+ *   - Zero state: real zeros from the API (visually identical to placeholder zeros)
+ *   - "Coming soon" notice removed once real stats render
+ *   - HostProfile provisioning (CC-C-08-A AC-2) retained
+ */
+
 import { useAuth, useUser } from '@clerk/nextjs';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Home, BarChart3, MapPin, Calendar, FileText, Settings, LogOut } from 'lucide-react';
+import { Home, BarChart3, MapPin, Calendar, FileText, Settings, LogOut, RefreshCw } from 'lucide-react';
+import { hasAnyRole } from '@/lib/user-roles';
+
+interface HostStats {
+  propertiesActive: number;
+  propertiesReview: number;
+  bookings: number;
+  revenueThisMonth: number;
+  revenueCurrency: string;
+  revenueMixed: boolean;
+  occupancy: null; // deferred to v2
+  meta: {
+    hostUserId: string;
+    monthStart: string;
+    monthEnd: string;
+  };
+}
+
+type StatsState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ok'; data: HostStats };
+
+function formatRevenue(amount: number, currency: string, mixed: boolean): string {
+  const symbol = currency === 'NGN' ? '₦' : currency + ' ';
+  const formatted = symbol + amount.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return mixed ? `${formatted}*` : formatted;
+}
+
+function currentMonthLabel(monthStart?: string): string {
+  if (!monthStart) return 'This month';
+  const d = new Date(monthStart);
+  return d.toLocaleString('en-NG', { month: 'long', year: 'numeric' });
+}
 
 export default function HostDashboardPage() {
   const { isLoaded, sessionClaims } = useAuth();
   const { user } = useUser();
   const router = useRouter();
+  const [statsState, setStatsState] = useState<StatsState>({ status: 'loading' });
 
-  const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-  const isHost = isLoaded && (role === 'host' || role === 'admin' || role === 'superadmin');
+  // CC-C-09-A-0.1: array-aware role check (supports legacy string and new array form)
+  const isHost = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['HOST', 'host', 'ADMIN', 'admin', 'SUPERADMIN', 'superadmin']);
 
+  // Auth redirect
   useEffect(() => {
     if (isLoaded && !isHost) {
       router.replace('/host/sign-in');
     }
   }, [isLoaded, isHost, router]);
 
+  // CC-C-08-A AC-2: Idempotent HostProfile provisioning on dashboard load.
+  useEffect(() => {
+    if (!isLoaded || !isHost) return;
+    fetch('/api/host/provision', { method: 'POST' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.provisioned) {
+          console.log('[host/dashboard] HostProfile provisioned:', data.profileId, 'wasNew:', data.wasNew);
+        }
+      })
+      .catch((err) => console.error('[host/dashboard] provision error:', err));
+  }, [isLoaded, isHost]);
+
+  // CC-C-08-B: Fetch real dashboard stats
+  useEffect(() => {
+    if (!isLoaded || !isHost) return;
+    setStatsState({ status: 'loading' });
+    fetch('/api/host/stats')
+      .then((res) => {
+        if (!res.ok) throw new Error(`Stats fetch failed: ${res.status}`);
+        return res.json();
+      })
+      .then((data: HostStats) => {
+        setStatsState({ status: 'ok', data });
+      })
+      .catch((err) => {
+        console.error('[host/dashboard] stats fetch error:', err);
+        setStatsState({ status: 'error', message: 'Unable to load stats — please refresh.' });
+      });
+  }, [isLoaded, isHost]);
+
+  // Auth loading skeleton
   if (!isLoaded || !isHost) {
     return (
       <div className="min-h-screen bg-ink flex items-center justify-center">
@@ -30,6 +111,47 @@ export default function HostDashboardPage() {
       </div>
     );
   }
+
+  // Derive stat display values
+  const stats = statsState.status === 'ok' ? statsState.data : null;
+  const isStatsLoading = statsState.status === 'loading';
+  const isStatsError = statsState.status === 'error';
+
+  const propertiesValue = isStatsLoading ? '…' : isStatsError ? '—' : String(stats!.propertiesActive);
+  const propertiesSubline = isStatsLoading
+    ? 'Loading…'
+    : isStatsError
+    ? 'Unavailable'
+    : stats!.propertiesReview > 0
+    ? `${stats!.propertiesReview} under review`
+    : stats!.propertiesActive === 0
+    ? 'Add your first'
+    : 'Active';
+
+  const bookingsValue = isStatsLoading ? '…' : isStatsError ? '—' : String(stats!.bookings);
+  const bookingsSubline = isStatsLoading
+    ? 'Loading…'
+    : isStatsError
+    ? 'Unavailable'
+    : stats!.bookings === 0
+    ? 'No bookings yet'
+    : 'CC-channel bookings';
+
+  const revenueValue = isStatsLoading
+    ? '…'
+    : isStatsError
+    ? '—'
+    : formatRevenue(stats!.revenueThisMonth, stats!.revenueCurrency, stats!.revenueMixed);
+  const revenueSubline = isStatsLoading
+    ? 'Loading…'
+    : isStatsError
+    ? 'Unavailable'
+    : currentMonthLabel(stats?.meta.monthStart);
+
+  // Occupancy: deferred to v2
+  // Requires calendar data from Owambe Stays; implementation pending callOwambe wiring.
+  const occupancyValue = '—';
+  const occupancySubline = 'Coming soon';
 
   return (
     <div className="min-h-screen bg-[#0f1117] text-paper flex">
@@ -92,31 +214,50 @@ export default function HostDashboardPage() {
             <p className="text-paper/50 text-[14px] mt-1">Manage your coastal properties and bookings.</p>
           </div>
 
-          {/* Stats grid */}
+          {/* Error banner (AC-6a) */}
+          {isStatsError && (
+            <div className="mb-6 flex items-center gap-3 bg-laterite/10 border border-laterite/30 rounded-lg px-4 py-3 text-[13px] text-laterite">
+              <RefreshCw className="w-4 h-4 shrink-0" />
+              <span>{(statsState as { status: 'error'; message: string }).message}</span>
+              <button
+                onClick={() => {
+                  setStatsState({ status: 'loading' });
+                  fetch('/api/host/stats')
+                    .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+                    .then((d) => setStatsState({ status: 'ok', data: d }))
+                    .catch(() => setStatsState({ status: 'error', message: 'Unable to load stats — please refresh.' }));
+                }}
+                className="ml-auto text-[12px] underline underline-offset-2 hover:no-underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Stats grid (AC-1/2/3/4) */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {[
-              { label: 'Properties', value: '0', change: 'Add your first' },
-              { label: 'Active Bookings', value: '0', change: 'No bookings yet' },
-              { label: 'Revenue (NGN)', value: '₦0', change: 'This month' },
-              { label: 'Occupancy Rate', value: '0%', change: '30-day average' },
-            ].map(({ label, value, change }) => (
+              { label: 'Properties', value: propertiesValue, subline: propertiesSubline },
+              { label: 'Active Bookings', value: bookingsValue, subline: bookingsSubline },
+              { label: `Revenue (${stats?.revenueCurrency ?? 'NGN'})`, value: revenueValue, subline: revenueSubline },
+              { label: 'Occupancy Rate', value: occupancyValue, subline: occupancySubline },
+            ].map(({ label, value, subline }) => (
               <div key={label} className="bg-ink border border-paper/10 rounded-lg p-5">
                 <div className="text-[11px] font-mono uppercase tracking-widest text-paper/40 mb-2">{label}</div>
-                <div className="text-2xl font-serif font-light text-paper">{value}</div>
-                <div className="text-[11px] text-paper/40 mt-1">{change}</div>
+                <div className={`text-2xl font-serif font-light ${isStatsLoading ? 'text-paper/30 animate-pulse' : 'text-paper'}`}>
+                  {value}
+                </div>
+                <div className="text-[11px] text-paper/40 mt-1">{subline}</div>
               </div>
             ))}
           </div>
 
-          {/* Coming soon notice */}
-          <div className="bg-ink border border-ocean/20 rounded-lg p-8 text-center">
-            <Home className="w-10 h-10 text-ocean-2/40 mx-auto mb-4" />
-            <div className="font-mono text-[11px] uppercase tracking-widest text-ocean-2 mb-2">Host Tools</div>
-            <h2 className="font-serif text-xl font-light mb-2">Full host dashboard coming soon</h2>
-            <p className="text-paper/40 text-[13px] max-w-md mx-auto">
-              Property management, booking calendar, revenue tracking, and guest communication tools are being built out.
+          {/* Mixed-currency footnote (AC-3c) */}
+          {stats?.revenueMixed && (
+            <p className="text-[11px] text-paper/30 mb-6">
+              * Revenue shown in NGN only. This host has reservations in multiple currencies. Full multi-currency aggregation is pending.
             </p>
-          </div>
+          )}
         </div>
       </main>
     </div>

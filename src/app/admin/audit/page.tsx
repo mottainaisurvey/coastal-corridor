@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, Activity, Search, ChevronLeft, ChevronRight, Eye, Edit, Trash2, Plus } from 'lucide-react';
-
-const SUPERADMIN_ROLES = ['superadmin', 'SUPERADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 const ACTION_COLOURS: Record<string, string> = {
   create: 'bg-sage/10 text-sage border border-sage/20',
@@ -36,9 +35,8 @@ export default function AdminAuditPage() {
   const [total, setTotal] = useState(0);
   const PAGE_SIZE = 30;
 
-  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isSuperadmin = SUPERADMIN_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isSuperadmin = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['SUPERADMIN', 'superadmin']);
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

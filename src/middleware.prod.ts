@@ -1,6 +1,7 @@
 import { authMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { hasAnyRole } from '@/lib/user-roles';
 
 // ---------------------------------------------------------------------------
 // Subdomain routing
@@ -97,10 +98,12 @@ export default authMiddleware({
     const { userId, sessionClaims } = auth;
     const url = req.nextUrl.clone();
 
+    // CC-C-09-A-0: use publicMetadata with hasAnyRole (handles string + array forms)
+    const publicMetadata = sessionClaims?.publicMetadata;
+
     // ---- Authenticated agent on the marketing landing page → dashboard ----
     if (url.pathname === '/agent' && userId) {
-      const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-      if (role && AGENT_ROLES.includes(role)) {
+      if (hasAnyRole(publicMetadata, AGENT_ROLES)) {
         url.pathname = '/agent/dashboard';
         return NextResponse.redirect(url);
       }
@@ -108,8 +111,7 @@ export default authMiddleware({
 
     // ---- Authenticated admin on the sign-in page → dashboard ----
     if (url.pathname === '/admin/sign-in' && userId) {
-      const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-      if (role && ADMIN_ROLES.includes(role)) {
+      if (hasAnyRole(publicMetadata, ADMIN_ROLES)) {
         url.pathname = '/admin/dashboard';
         return NextResponse.redirect(url);
       }
@@ -118,8 +120,7 @@ export default authMiddleware({
     // ---- Admin routes (/admin/*) — protect all except sign-in page --------
     if (url.pathname.startsWith('/admin') && !url.pathname.startsWith('/admin/sign-in')) {
       if (userId) {
-        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-        if (!role || !ADMIN_ROLES.includes(role)) {
+        if (!hasAnyRole(publicMetadata, ADMIN_ROLES)) {
           url.pathname = '/unauthorized';
           url.searchParams.set('required', 'admin');
           return NextResponse.redirect(url);
@@ -134,8 +135,7 @@ export default authMiddleware({
       url.pathname.startsWith('/agent/listings')
     ) {
       if (userId) {
-        const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-        if (!role || !AGENT_ROLES.includes(role)) {
+        if (!hasAnyRole(publicMetadata, AGENT_ROLES)) {
           url.pathname = '/unauthorized';
           url.searchParams.set('required', 'agent');
           return NextResponse.redirect(url);

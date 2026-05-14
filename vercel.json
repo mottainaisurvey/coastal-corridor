@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/reconcile-owambe",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-owambe-bookings",
+      "schedule": "*/5 * * * *"
     }
   ],
   "headers": [

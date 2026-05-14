@@ -20,6 +20,7 @@ import { getPaystackAdapter } from '@/lib/paystack-adapter';
 import { getPrisma } from '@/lib/db-safe';
 import { assertPaymentStatusTransition, PaymentStatusTransitionError } from '@/lib/payment-status-guard';
 import { PaymentStatus } from '@prisma/client';
+import { sendEmail, guestBookingConfirmationEmail, operatorBookingNotificationEmail, type ExperienceBookingEmailData } from '@/lib/email';
 
 // ─── POST /api/webhooks/paystack ──────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -193,17 +194,135 @@ async function handleChargeSuccess(data: Record<string, unknown>): Promise<void>
       });
     }
   } else if (reservationType === 'EXPERIENCE' && entityId) {
-    const current = await prisma.experienceBooking.findUnique({ where: { id: entityId } });
+    // CC-D-01-C AC-4a: Full ExperienceBooking confirmation with capacity reservation
+    const current = await prisma.experienceBooking.findUnique({
+      where: { id: entityId },
+      select: {
+        id: true,
+        paymentStatus: true,
+        status: true,
+        numberOfParticipants: true,
+        timeSlotId: true,
+      },
+    });
     if (current) {
+      // Idempotency: if already CONFIRMED, no-op (AC-4a idempotent re-delivery)
+      if (current.status === 'CONFIRMED' && current.paymentStatus === 'PAID') {
+        console.info(
+          `[webhook/paystack] charge.success idempotent: booking ${entityId} already CONFIRMED`
+        );
+        return;
+      }
       assertPaymentStatusTransition(current.paymentStatus, targetStatus);
-      await prisma.experienceBooking.update({
+      // Atomic transaction: confirm booking + increment spotsBooked (AC-4a)
+      await prisma.$transaction(async (tx) => {
+        // 1. Update ExperienceBooking: paymentStatus=PAID, status=CONFIRMED
+        await tx.experienceBooking.update({
+          where: { id: entityId },
+          data: {
+            paymentStatus: targetStatus,
+            status: 'CONFIRMED',
+            paystackReference: reference,
+            updatedAt: new Date(),
+          },
+        });
+        // 2. Increment TimeSlot.spotsBooked by numberOfParticipants
+        const updatedSlot = await tx.timeSlot.update({
+          where: { id: current.timeSlotId },
+          data: { spotsBooked: { increment: current.numberOfParticipants } },
+          select: { spotsBooked: true, capacity: true },
+        });
+        // 3. Post-increment over-booking guard (AC-4d defensive check)
+        if (updatedSlot.spotsBooked > updatedSlot.capacity) {
+          // Rollback the transaction by throwing — Prisma will revert all writes
+          // Phase E: trigger refund via Paystack API on race-condition loss
+          throw new Error(
+            `[webhook/paystack] Over-booking detected: slot ${current.timeSlotId} ` +
+            `spotsBooked=${updatedSlot.spotsBooked} capacity=${updatedSlot.capacity} ` +
+            `— transaction rolled back`
+          );
+        }
+        // 4. Update BookingDraft to COMPLETED (terminal state)
+        await tx.bookingDraft.updateMany({
+          where: { experienceBookingId: entityId },
+          data: { status: 'COMPLETED' },
+        });
+      });
+
+      // CC-D-01-E AC-2/3: Fire-and-forget email notifications after transaction commit.
+      // Non-blocking: email send failures are logged but do not affect the webhook 200 response.
+      // Idempotency: gated behind the same CONFIRMED transition check above — re-delivery
+      // short-circuits before reaching this point, so no duplicate emails.
+      const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_BASE_URL ?? 'https://coastalcorridor.co';
+      const bookingForEmail = await prisma.experienceBooking.findUnique({
         where: { id: entityId },
-        data: {
-          paymentStatus: targetStatus,
-          paystackReference: reference,
-          updatedAt: new Date(),
+        select: {
+          id: true,
+          numberOfParticipants: true,
+          totalAmount: true,
+          currency: true,
+          channelCommissionAmount: true,
+          channelCommissionPercent: true,
+          netToOperator: true,
+          specialRequirements: true,
+          pickupRequested: true,
+          pickupAddress: true,
+          experience: {
+            select: {
+              name: true,
+              meetingPointDescription: true,
+              meetingPointLatitude: true,
+              meetingPointLongitude: true,
+              operator: {
+                select: {
+                  email: true,
+                  operatorProfile: { select: { displayName: true, businessName: true } },
+                },
+              },
+            },
+          },
+          timeSlot: { select: { startDateTime: true, endDateTime: true } },
+          participant: { select: { name: true, email: true, phone: true } },
         },
       });
+      if (bookingForEmail) {
+        const operatorDisplayName =
+          bookingForEmail.experience.operator.operatorProfile?.displayName ??
+          bookingForEmail.experience.operator.operatorProfile?.businessName ??
+          'Your Operator';
+        const emailData: ExperienceBookingEmailData = {
+          bookingId: bookingForEmail.id,
+          bookingRef: `CC-EXP-${bookingForEmail.id.slice(0, 8).toUpperCase()}`,
+          guestName: bookingForEmail.participant.name ?? bookingForEmail.id,
+          guestEmail: bookingForEmail.participant.email,
+          guestPhone: bookingForEmail.participant.phone ?? null,
+          experienceName: bookingForEmail.experience.name,
+          startDateTime: bookingForEmail.timeSlot.startDateTime.toISOString(),
+          endDateTime: bookingForEmail.timeSlot.endDateTime.toISOString(),
+          numberOfParticipants: bookingForEmail.numberOfParticipants,
+          totalAmount: bookingForEmail.totalAmount.toString(),
+          currency: bookingForEmail.currency,
+          channelCommissionAmount: bookingForEmail.channelCommissionAmount.toString(),
+          channelCommissionPercent: bookingForEmail.channelCommissionPercent.toString(),
+          netToOperator: bookingForEmail.netToOperator.toString(),
+          meetingPointDescription: bookingForEmail.experience.meetingPointDescription,
+          meetingPointLatitude: bookingForEmail.experience.meetingPointLatitude.toString(),
+          meetingPointLongitude: bookingForEmail.experience.meetingPointLongitude.toString(),
+          specialRequirements: bookingForEmail.specialRequirements,
+          pickupRequested: bookingForEmail.pickupRequested,
+          pickupAddress: bookingForEmail.pickupAddress,
+          operatorDisplayName,
+          operatorEmail: bookingForEmail.experience.operator.email,
+          confirmationPageUrl: `${APP_BASE_URL}/booking-complete/${bookingForEmail.id}`,
+          operatorBookingsUrl: `${APP_BASE_URL}/operator/bookings`,
+        };
+        const guestEmail = guestBookingConfirmationEmail(emailData);
+        sendEmail({ to: emailData.guestEmail, subject: guestEmail.subject, htmlBody: guestEmail.htmlBody, textBody: guestEmail.textBody })
+          .catch(err => console.error('[webhook/paystack] Guest email send failed:', err));
+        const opEmail = operatorBookingNotificationEmail(emailData);
+        sendEmail({ to: emailData.operatorEmail, subject: opEmail.subject, htmlBody: opEmail.htmlBody, textBody: opEmail.textBody })
+          .catch(err => console.error('[webhook/paystack] Operator email send failed:', err));
+      }
     }
   }
 

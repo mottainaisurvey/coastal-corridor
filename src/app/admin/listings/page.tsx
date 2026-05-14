@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Search, CheckCircle, XCircle, Eye, Home, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
-
-const ADMIN_ROLES = ['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 const STATUS_COLOURS: Record<string, string> = {
   ACTIVE: 'bg-sage/10 text-sage border border-sage/20',
@@ -29,9 +28,8 @@ export default function AdminListingsPage() {
   const [total, setTotal] = useState(0);
   const PAGE_SIZE = 20;
 
-  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isAdmin = ADMIN_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isAdmin = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['ADMIN', 'admin', 'SUPERADMIN', 'superadmin']);
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

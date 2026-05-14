@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, XCircle, Clock, MapPin, User, FileText } from 'lucide-react';
-
-const ADMIN_ROLES = ['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 type Tab = 'agents' | 'plots';
 
@@ -20,9 +19,8 @@ export default function AdminVerificationPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ pendingAgents: 0, pendingPlots: 0, verifiedToday: 0 });
 
-  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isAdmin = ADMIN_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isAdmin = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['ADMIN', 'admin', 'SUPERADMIN', 'superadmin']);
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

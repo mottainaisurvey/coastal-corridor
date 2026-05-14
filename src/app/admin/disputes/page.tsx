@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle, CheckCircle, Clock, MessageSquare, Scale } from 'lucide-react';
-
-const ADMIN_ROLES = ['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'];
+import { hasAnyRole } from '@/lib/user-roles';
 
 const PRIORITY_COLOURS: Record<string, string> = {
   HIGH: 'bg-laterite/10 text-laterite border border-laterite/20',
@@ -24,9 +23,8 @@ export default function AdminDisputesPage() {
   const [filter, setFilter] = useState('ALL');
   const [stats, setStats] = useState({ open: 0, resolved: 0, avgDays: 0 });
 
-  // Use sessionClaims (JWT, available immediately) with fallback to publicMetadata
-  const role = ((sessionClaims?.publicMetadata as any)?.role as string) || (user?.publicMetadata?.role as string) || '';
-  const isAdmin = ADMIN_ROLES.includes(role);
+  // CC-C-09-A-0.1: array-aware role check
+  const isAdmin = isLoaded && hasAnyRole(sessionClaims?.publicMetadata as any, ['ADMIN', 'admin', 'SUPERADMIN', 'superadmin']);
 
   useEffect(() => {
     if (isLoaded && !userId) router.replace('/');

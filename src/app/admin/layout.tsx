@@ -17,6 +17,7 @@ import {
   Plug,
   Shield,
   ChevronRight,
+  ClipboardList,
 } from 'lucide-react';
 
 const ADMIN_NAV = [
@@ -25,6 +26,7 @@ const ADMIN_NAV = [
     items: [
       { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/admin/users', label: 'Users', icon: Users },
+      { href: '/admin/host-applications', label: 'Host Applications', icon: ClipboardList },
       { href: '/admin/listings', label: 'Listings', icon: Home },
       { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
       { href: '/admin/transactions', label: 'Transactions', icon: CreditCard },
