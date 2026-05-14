@@ -52,7 +52,7 @@ export default function AdminRolesPage() {
 
   useEffect(() => {
     if (isLoaded && userId && sessionClaims && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
-  }, [isLoaded, userId, role, router]);
+  }, [isLoaded, userId, router]);
 
   useEffect(() => {
     if (!userId || !isSuperadmin) return;

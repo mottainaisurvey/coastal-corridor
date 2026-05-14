@@ -30,7 +30,7 @@ export default function AgentDashboard() {
     if (isLoaded && userId && sessionClaims && !isAgent) {
       router.replace('/unauthorized?required=agent');
     }
-  }, [isLoaded, userId, role, isAgent, router]);
+  }, [isLoaded, userId, isAgent, router]);
 
   useEffect(() => {
     if (!userId || !isAgent) return;

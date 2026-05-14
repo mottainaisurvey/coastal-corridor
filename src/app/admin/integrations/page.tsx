@@ -89,7 +89,7 @@ export default function AdminIntegrationsPage() {
 
   useEffect(() => {
     if (isLoaded && userId && sessionClaims && !isSuperadmin) router.replace('/unauthorized?required=superadmin');
-  }, [isLoaded, userId, role, router]);
+  }, [isLoaded, userId, router]);
 
   if (!isLoaded || !user) return <div className="container-x py-24"><div className="animate-pulse h-10 bg-ink/10 rounded w-1/3" /></div>;
   if (isLoaded && userId && sessionClaims && !isSuperadmin) {

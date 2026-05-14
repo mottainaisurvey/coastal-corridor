@@ -47,7 +47,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (isLoaded && userId && sessionClaims && !isAdmin) router.replace('/unauthorized?required=admin');
-  }, [isLoaded, userId, role, router]);
+  }, [isLoaded, userId, router]);
 
   useEffect(() => {
     if (!userId || !isAdmin) return;
