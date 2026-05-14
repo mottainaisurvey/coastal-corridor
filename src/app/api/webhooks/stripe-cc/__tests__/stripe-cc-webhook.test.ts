@@ -76,6 +76,7 @@ function makeDb(overrides?: {
   idempotencyFindUnique?: ReturnType<typeof vi.fn>;
   reservationUpdate?: ReturnType<typeof vi.fn>;
   reservationFindFirst?: ReturnType<typeof vi.fn>;
+  reservationFindUnique?: ReturnType<typeof vi.fn>;
 }) {
   return {
     idempotencyCache: {
@@ -84,9 +85,16 @@ function makeDb(overrides?: {
     },
     reservation: {
       update: overrides?.reservationUpdate ?? vi.fn().mockResolvedValue({ id: 'res_test_001' }),
+      // findUnique: used by legacy Reservation path in payment_intent.succeeded
+      findUnique: overrides?.reservationFindUnique ?? vi.fn().mockResolvedValue({
+        id: 'res_test_001',
+        paymentStatus: 'PENDING',
+      }),
+      // findFirst: used by charge.refunded path (lookup by stripePaymentIntentId)
       findFirst: overrides?.reservationFindFirst ?? vi.fn().mockResolvedValue({
         id: 'res_test_001',
         guestUserId: 'user_test_001',
+        paymentStatus: 'PAID',
         stripePaymentIntentId: 'pi_test_abc123',
       }),
     },
