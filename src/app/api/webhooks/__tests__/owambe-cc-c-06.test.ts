@@ -96,7 +96,7 @@ describe('CC-C-06 — property.deactivated (AC-1, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'property.deactivated',
+      event_type: 'property.deactivated',
       data: { property_id: 'owambe-prop-001', reason: 'Host suspended' },
     });
     const res = await POST(req);
@@ -120,7 +120,7 @@ describe('CC-C-06 — property.deactivated (AC-1, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'property.deactivated',
+      event_type: 'property.deactivated',
       data: { property_id: 'owambe-prop-002' },
     });
     await POST(req);
@@ -136,7 +136,7 @@ describe('CC-C-06 — property.deactivated (AC-1, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'property.deactivated',
+      event_type: 'property.deactivated',
       data: { property_id: 'owambe-prop-003' },
     });
     await POST(req);
@@ -160,7 +160,7 @@ describe('CC-C-06 — property.deactivated (AC-1, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'property.deactivated',
+      event_type: 'property.deactivated',
       data: {}, // missing property_id
     });
     const res = await POST(req);
@@ -192,7 +192,7 @@ describe('CC-C-06 — experience.deactivated (AC-2, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'experience.deactivated',
+      event_type: 'experience.deactivated',
       data: { experience_id: 'owambe-exp-001', reason: 'Operator suspended' },
     });
     const res = await POST(req);
@@ -214,7 +214,7 @@ describe('CC-C-06 — experience.deactivated (AC-2, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'experience.deactivated',
+      event_type: 'experience.deactivated',
       data: { experience_id: 'owambe-exp-002' },
     });
     await POST(req);
@@ -230,7 +230,7 @@ describe('CC-C-06 — experience.deactivated (AC-2, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'experience.deactivated',
+      event_type: 'experience.deactivated',
       data: { experience_id: 'owambe-exp-003' },
     });
     await POST(req);
@@ -270,7 +270,7 @@ describe('CC-C-06 — reservation.cancelled (AC-3, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.cancelled',
+      event_type: 'reservation.cancelled',
       data: {
         reservation_id: 'owambe-res-001',
         reason: 'Host unavailable for dates',
@@ -299,7 +299,7 @@ describe('CC-C-06 — reservation.cancelled (AC-3, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.cancelled',
+      event_type: 'reservation.cancelled',
       data: { reservation_id: 'owambe-res-002' },
     });
     await POST(req);
@@ -330,7 +330,7 @@ describe('CC-C-06 — reservation.cancelled (AC-3, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.cancelled',
+      event_type: 'reservation.cancelled',
       data: {
         reservation_id: 'owambe-res-003',
         reason: 'Host cancelled',
@@ -351,7 +351,7 @@ describe('CC-C-06 — reservation.cancelled (AC-3, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.cancelled',
+      event_type: 'reservation.cancelled',
       data: { reservation_id: 'owambe-res-004', reason: 'Host cancelled' },
     });
     await POST(req);
@@ -373,7 +373,7 @@ describe('CC-C-06 — reservation.cancelled (AC-3, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.cancelled',
+      event_type: 'reservation.cancelled',
       data: { reservation_id: 'owambe-res-005', reason: 'Host cancelled' },
     });
     await POST(req);
@@ -397,7 +397,7 @@ describe('CC-C-06 — reservation.cancelled (AC-3, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.cancelled',
+      event_type: 'reservation.cancelled',
       data: { reservation_id: 'owambe-res-006', reason: 'Test cancellation' },
     });
     await POST(req);
@@ -426,7 +426,7 @@ describe('CC-C-06 — reservation.cancelled (AC-3, AC-6, AC-7)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.cancelled',
+      event_type: 'reservation.cancelled',
       data: {
         reservation_id: 'owambe-res-007',
         paystack_reference: 'ref_stay_007',
@@ -467,7 +467,7 @@ describe('CC-C-06 — HMAC validation (AC-4)', () => {
   it('AC-4: rejects property.deactivated with invalid signature (401)', async () => {
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'property.deactivated',
+      event_type: 'property.deactivated',
       data: { property_id: 'owambe-prop-sig-test' },
     });
     const res = await POST(req);
@@ -479,7 +479,7 @@ describe('CC-C-06 — HMAC validation (AC-4)', () => {
   it('AC-4: rejects experience.deactivated with invalid signature (401)', async () => {
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'experience.deactivated',
+      event_type: 'experience.deactivated',
       data: { experience_id: 'owambe-exp-sig-test' },
     });
     const res = await POST(req);
@@ -489,7 +489,7 @@ describe('CC-C-06 — HMAC validation (AC-4)', () => {
   it('AC-4: rejects reservation.cancelled with invalid signature (401)', async () => {
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest({
-      event: 'reservation.cancelled',
+      event_type: 'reservation.cancelled',
       data: { reservation_id: 'owambe-res-sig-test' },
     });
     const res = await POST(req);
@@ -523,7 +523,7 @@ describe('CC-C-06 — Idempotency (AC-5)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest(
-      { event: 'property.deactivated', data: { property_id: 'owambe-prop-dup' } },
+      { event_type: 'property.deactivated', data: { property_id: 'owambe-prop-dup' } },
       { 'x-owambe-event-id': 'evt_dup_prop' }
     );
     const res = await POST(req);
@@ -551,7 +551,7 @@ describe('CC-C-06 — Idempotency (AC-5)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest(
-      { event: 'experience.deactivated', data: { experience_id: 'owambe-exp-dup' } },
+      { event_type: 'experience.deactivated', data: { experience_id: 'owambe-exp-dup' } },
       { 'x-owambe-event-id': 'evt_dup_exp' }
     );
     const res = await POST(req);
@@ -578,7 +578,7 @@ describe('CC-C-06 — Idempotency (AC-5)', () => {
 
     const { POST } = await import('@/app/api/v1/channel/webhooks/inbound/route');
     const req = makeRequest(
-      { event: 'reservation.cancelled', data: { reservation_id: 'owambe-res-dup' } },
+      { event_type: 'reservation.cancelled', data: { reservation_id: 'owambe-res-dup' } },
       { 'x-owambe-event-id': 'evt_dup_res' }
     );
     const res = await POST(req);
