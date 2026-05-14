@@ -137,8 +137,9 @@ describe('AC-3: Startup validation', () => {
 describe('AC-4: STRIPE_MODE isolation', () => {
   it('grep confirms zero references to STRIPE_MODE outside stripe-adapter.ts', async () => {
     const { execSync } = await import('child_process');
+    const srcPath = `${process.cwd()}/src`;
     const result = execSync(
-      'grep -r "STRIPE_MODE" /tmp/coastal-corridor-c/src --include="*.ts" --include="*.tsx" -l',
+      `grep -r "STRIPE_MODE" ${srcPath} --include="*.ts" --include="*.tsx" -l`,
       { encoding: 'utf-8' }
     ).trim();
     const files = result.split('\n').filter(Boolean);

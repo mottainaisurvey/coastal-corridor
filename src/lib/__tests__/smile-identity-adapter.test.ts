@@ -151,8 +151,9 @@ describe('AC-3: Startup validation', () => {
 describe('AC-4: SMILE_IDENTITY_MODE isolation', () => {
   it('grep confirms SMILE_IDENTITY_MODE is only referenced in smile-identity-adapter.ts', async () => {
     const { execSync } = await import('child_process');
+    const srcPath = `${process.cwd()}/src`;
     const result = execSync(
-      'grep -r "SMILE_IDENTITY_MODE" /tmp/coastal-corridor-c/src --include="*.ts" --include="*.tsx" -l',
+      `grep -r "SMILE_IDENTITY_MODE" ${srcPath} --include="*.ts" --include="*.tsx" -l`,
       { encoding: 'utf-8' }
     ).trim();
     const files = result.split('\n').filter(Boolean);
