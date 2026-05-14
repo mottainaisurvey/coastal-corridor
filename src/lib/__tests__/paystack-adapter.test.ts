@@ -513,8 +513,8 @@ describe('POST /api/webhooks/paystack — adapter integration (AC-4)', () => {
   });
 
   it('AC-4: returns 200 and processes refund.processed with valid signature', async () => {
-    const mockReservationUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
-    const mockExperienceUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+    // Route calls findMany then update per record (not updateMany) for refund.processed
+    const mockReservationUpdate = vi.fn().mockResolvedValue({});
     const mockAuditCreate = vi.fn().mockResolvedValue({});
     mockGetPrisma.mockReturnValue({
       webhookDelivery: {
@@ -522,8 +522,16 @@ describe('POST /api/webhooks/paystack — adapter integration (AC-4)', () => {
         create: vi.fn().mockResolvedValue({}),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
-      reservation: { updateMany: mockReservationUpdateMany },
-      experienceBooking: { updateMany: mockExperienceUpdateMany },
+      reservation: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'res_001', paystackReference: 'ref_stay_001', paymentStatus: 'PAID', status: 'CONFIRMED' },
+        ]),
+        update: mockReservationUpdate,
+      },
+      experienceBooking: {
+        findMany: vi.fn().mockResolvedValue([]),
+        update: vi.fn().mockResolvedValue({}),
+      },
       auditEntry: { create: mockAuditCreate },
     });
 
@@ -541,10 +549,10 @@ describe('POST /api/webhooks/paystack — adapter integration (AC-4)', () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.received).toBe(true);
-    // AC-7: reservation updated to REFUNDED
-    expect(mockReservationUpdateMany).toHaveBeenCalledWith(
+    // Route calls update per record (not updateMany) for refund.processed
+    expect(mockReservationUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { paystackReference: 'ref_stay_001' },
+        where: { id: 'res_001' },
         data: expect.objectContaining({ paymentStatus: 'REFUNDED', status: 'REFUNDED' }),
       })
     );
