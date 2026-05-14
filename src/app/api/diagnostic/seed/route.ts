@@ -161,8 +161,7 @@ export async function POST(req: NextRequest) {
       operatorOwambeUserId: operatorUser.owambeUserId,
       experienceId,
       timeSlotId,
-      seeded,
-    }); paystackSubaccountCode: operatorUser.operatorProfile?.paystackSubaccountCode ?? null,
+      paystackSubaccountCode: operatorUser.operatorProfile?.paystackSubaccountCode ?? null,
       seeded,
       experience: {
         name: experience.name,
