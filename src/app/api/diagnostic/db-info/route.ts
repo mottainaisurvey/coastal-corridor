@@ -88,28 +88,71 @@ export async function GET(req: NextRequest) {
     stripePaymentIntentIdExists = false;
   }
 
-  // Probe for Wave 3 PaymentStatus enum expansion (PENDING_REFUND value)
-  let pendingRefundEnumExists = false;
+  // Probe for migration 20260512000000_expand_payment_status (PAY-CANONICAL-01)
+  // Marker: DEPOSIT_PAID value added to PaymentStatus enum
+  let depositPaidEnumExists = false;
   try {
     const result = await prisma.$queryRaw<{ exists: boolean }[]>`
       SELECT EXISTS (
         SELECT 1 FROM pg_enum pe
         JOIN pg_type pt ON pe.enumtypid = pt.oid
-        WHERE pt.typname = 'PaymentStatus' AND pe.enumlabel = 'PENDING_REFUND'
+        WHERE pt.typname = 'PaymentStatus' AND pe.enumlabel = 'DEPOSIT_PAID'
       ) AS exists
     `;
-    pendingRefundEnumExists = result[0]?.exists ?? false;
+    depositPaidEnumExists = (result[0] as { exists: boolean })?.exists ?? false;
   } catch {
-    pendingRefundEnumExists = false;
+    depositPaidEnumExists = false;
+  }
+
+  // Probe for BookingDraftStatus enum (Wave 4 partial marker — created BEFORE BookingDraft table)
+  let bookingDraftStatusEnumExists = false;
+  try {
+    const result = await prisma.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_type WHERE typname = 'BookingDraftStatus'
+      ) AS exists
+    `;
+    bookingDraftStatusEnumExists = (result[0] as { exists: boolean })?.exists ?? false;
+  } catch {
+    bookingDraftStatusEnumExists = false;
+  }
+
+  // Probe for OperatorApplication.adminNotes column (Wave 4 ALTER TABLE — before BookingDraft)
+  let operatorApplicationAdminNotesExists = false;
+  try {
+    const result = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT COUNT(*) as count FROM information_schema.columns
+      WHERE table_name = 'OperatorApplication' AND column_name = 'adminNotes'
+    `;
+    operatorApplicationAdminNotesExists = Number((result[0] as { count: number })?.count ?? 0) > 0;
+  } catch {
+    operatorApplicationAdminNotesExists = false;
+  }
+
+  // Probe for ExperienceBooking.owambeSyncAttempts column (Wave 4 ALTER TABLE — before BookingDraft)
+  let owambeSyncAttemptsExists = false;
+  try {
+    const result = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT COUNT(*) as count FROM information_schema.columns
+      WHERE table_name = 'ExperienceBooking' AND column_name = 'owambeSyncAttempts'
+    `;
+    owambeSyncAttemptsExists = Number((result[0] as { count: number })?.count ?? 0) > 0;
+  } catch {
+    owambeSyncAttemptsExists = false;
   }
 
   return NextResponse.json({
     connectionInfo,
     appliedMigrations,
     tableProbes: {
-      bookingDraftExists,           // Wave 4 marker
-      stripePaymentIntentIdExists,  // Wave 2 marker
-      pendingRefundEnumExists,      // Wave 3 marker
+      // Wave 4 markers (migration 20260514120000)
+      bookingDraftExists,                    // CREATE TABLE BookingDraft — last step
+      bookingDraftStatusEnumExists,          // CREATE TYPE BookingDraftStatus — first step
+      operatorApplicationAdminNotesExists,   // ALTER TABLE OperatorApplication — middle step
+      owambeSyncAttemptsExists,              // ALTER TABLE ExperienceBooking — first ALTER
+      stripePaymentIntentIdExists,           // ALTER TABLE Reservation — middle step
+      // PAY-CANONICAL-01 markers (migration 20260512000000)
+      depositPaidEnumExists,                 // ALTER TYPE PaymentStatus ADD VALUE DEPOSIT_PAID
     },
   });
 }
