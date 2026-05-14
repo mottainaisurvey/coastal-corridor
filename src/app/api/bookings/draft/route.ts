@@ -30,6 +30,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
 export async function POST(request: Request) {
+  try {
   let body: unknown;
   try {
     body = await request.json();
@@ -132,4 +133,9 @@ export async function POST(request: Request) {
   });
 
   return response;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[draft] Unhandled error:', message);
+    return NextResponse.json({ error: 'Internal server error', detail: message }, { status: 500 });
+  }
 }
