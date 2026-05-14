@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
         data: {
           email: SEED_OPERATOR_EMAIL,
           clerkId: null,
+          owambeUserId: 'probe-operator-owambe-id',
           role: 'OPERATOR',
           status: 'ACTIVE',
           operatorProfile: {
@@ -157,10 +158,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       operatorUserId,
+      operatorOwambeUserId: operatorUser.owambeUserId,
       experienceId,
       timeSlotId,
-      currency,
-      paystackSubaccountCode: operatorUser.operatorProfile?.paystackSubaccountCode ?? null,
+      seeded,
+    }); paystackSubaccountCode: operatorUser.operatorProfile?.paystackSubaccountCode ?? null,
       seeded,
       experience: {
         name: experience.name,
