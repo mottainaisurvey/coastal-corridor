@@ -18,6 +18,7 @@ const HOST_ROLES = ['host', 'HOST', 'admin', 'superadmin', 'ADMIN'];
 // ---------------------------------------------------------------------------
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
+  '/sign-in-complete',
   '/sign-up(.*)',
   '/admin/sign-in(.*)',
   '/agent/sign-in(.*)',
