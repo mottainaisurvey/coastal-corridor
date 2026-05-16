@@ -25,7 +25,7 @@
  * Spec reference: Implementation Brief Phase E #37
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 
 const STALE_THRESHOLD_DAYS = 7;
 
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // Bulk update — no spotsBooked decrement needed (see design decisions above).
     const result = await prisma.experienceBooking.updateMany({
       where: {
-        id: { in: staleBookings.map((b) => b.id) },
+        id: { in: staleBookings.map((b: { id: string }) => b.id) },
         // Re-check status in the update to guard against concurrent webhook arrival
         status: 'PENDING',
       },
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     console.info(
       `[cron/cleanup-stale-bookings] Transitioned ${result.count} stale PENDING → ABANDONED ` +
-      `(cutoff: ${cutoff.toISOString()}, ids: [${staleBookings.map((b) => b.id).join(', ')}])`
+      `(cutoff: ${cutoff.toISOString()}, ids: [${staleBookings.map((b: { id: string }) => b.id).join(', ')}])`
     );
 
     return NextResponse.json({
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       transitioned: result.count,
       cutoff: cutoff.toISOString(),
       timestamp: startedAt,
-      ids: staleBookings.map((b) => b.id),
+      ids: staleBookings.map((b: { id: string }) => b.id),
     });
   } catch (err) {
     console.error('[cron/cleanup-stale-bookings] Error:', err);

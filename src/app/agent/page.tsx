@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
 import { CORRIDOR_KM_DISPLAY } from '@/lib/constants/platform';
+import {
   ArrowRight,
   CheckCircle,
   MapPin,
@@ -139,7 +139,7 @@ export default function AgentLandingPage() {
               <span className="block">to the world.</span>
             </h1>
             <p className="text-[17px] md:text-[20px] text-paper/75 max-w-2xl leading-relaxed mb-10 font-light">
-              Join Nigeria&apos;s most rigorous property platform. List verified plots along the ${CORRIDOR_KM_DISPLAY} Lagos–Calabar corridor and connect with diaspora buyers, institutional investors, and local developers — all through one trusted marketplace.
+              Join Nigeria&apos;s most rigorous property platform. List verified plots along the {CORRIDOR_KM_DISPLAY} Lagos–Calabar corridor and connect with diaspora buyers, institutional investors, and local developers — all through one trusted marketplace.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/agent/sign-up" className="btn-primary !py-3.5 !px-8 !text-[14px]">

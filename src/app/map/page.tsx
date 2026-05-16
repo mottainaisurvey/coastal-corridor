@@ -790,7 +790,7 @@ export default function MapPage() {
             <div class="lp-stats-grid">
               <div class="lp-stat"><div class="lp-stat-val">${listings.length}</div><div class="lp-stat-label">Active Listings</div></div>
               <div class="lp-stat"><div class="lp-stat-val">${d.corridorKm} km</div><div class="lp-stat-label">From Lagos</div></div>
-              <div class="lp-stat"><div class="lp-stat-val">${(${CORRIDOR_KM} - d.corridorKm).toFixed(1)} km</div><div class="lp-stat-label">To Calabar</div></div>
+              <div class="lp-stat"><div class="lp-stat-val">${(CORRIDOR_KM - d.corridorKm).toFixed(1)} km</div><div class="lp-stat-label">To Calabar</div></div>
               <div class="lp-stat"><div class="lp-stat-val">${d.state}</div><div class="lp-stat-label">State</div></div>
             </div>
             <div style="font-size:10px;letter-spacing:0.1em;color:var(--text-muted);text-transform:uppercase;margin:14px 0 8px">Listings at this destination</div>
@@ -1145,7 +1145,7 @@ export default function MapPage() {
 
             // Corridor KM: interpolate from longitude (3.4° Lagos → 8.33° Calabar)
             const lng = Cesium.Math.toDegrees(cartographic.longitude);
-            const corridorKm = Math.max(0, Math.min(${CORRIDOR_KM}, ((lng - 3.4) / (8.33 - 3.4)) * ${CORRIDOR_KM}));
+            const corridorKm = Math.max(0, Math.min(CORRIDOR_KM, ((lng - 3.4) / (8.33 - 3.4)) * CORRIDOR_KM));
 
             // Elapsed time
             const elapsed = Math.floor((now - hudStartTime) / 1000);
@@ -1459,7 +1459,7 @@ export default function MapPage() {
           <div class="km-bar-track">
             <div class="km-bar-fill" id="kmBarFill" style="width:0%"></div>
             ${DESTINATIONS.map(d => {
-              const pct = (d.corridorKm / ${CORRIDOR_KM}) * 100;
+              const pct = (d.corridorKm / CORRIDOR_KM) * 100;
               return `<div class="km-bar-tick" data-km="${d.corridorKm}" style="left:${pct}%" title="${d.name} · KM ${d.corridorKm}" onclick="sidebarClickDest('${d.id}')"></div>`;
             }).join('')}
           </div>
@@ -1481,7 +1481,7 @@ export default function MapPage() {
           fill.style.width = '0%';
           label.textContent = '';
         } else {
-          const pct = Math.min(100, (km / ${CORRIDOR_KM}) * 100);
+          const pct = Math.min(100, (km / CORRIDOR_KM) * 100);
           fill.style.width = `${pct}%`;
           const dest = DESTINATIONS.find(d => d.corridorKm === km);
           label.textContent = dest ? `${dest.name} · KM ${km}` : `KM ${km}`;
