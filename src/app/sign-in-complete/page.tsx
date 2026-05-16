@@ -53,6 +53,31 @@ import { getUserRoles } from '@/lib/user-roles';
 // -----------------------------------------------------------------------------
 // Role → destination map
 // -----------------------------------------------------------------------------
+//
+// INTENTIONAL ASYMMETRY — BUYER vs. operational roles
+// ----------------------------------------------------
+// BUYER maps to /account (the consumer profile surface), NOT /buyer/dashboard.
+// This is deliberate product intent: Buyers are consumer-facing users who
+// manage saved properties, inquiries, and transactions through the same
+// "My account" surface exposed in the logged-in nav (walkthrough §06).
+// They do not have an operational dashboard. Do NOT add /buyer/dashboard
+// unless the Wave 5 Buyer Portal spec explicitly calls for a separate route.
+//
+// WAVE 5 STUBS — TRAVELLER and INVESTOR
+// --------------------------------------
+// TRAVELLER and INVESTOR are not yet in this map because their dashboards
+// have not been built. Both currently fall through to DEFAULT_DESTINATION
+// (/account), which is correct v1 behaviour. When Wave 5 ships the
+// Traveller and Investor dashboards, uncomment the two stub lines below
+// and update the paths to match the new routes.
+//
+// MULTI-ROLE GRACEFUL DEGRADATION
+// ---------------------------------
+// If publicMetadata.role is an array (e.g. ["HOST","OPERATOR"]), getUserRoles()
+// returns roles[0] and this map routes to the first role's destination.
+// A /sign-in-complete/choose role-chooser is planned for Wave 5 to replace
+// this fallback for multi-role users.
+//
 const ROUTE_BY_ROLE: Record<string, string> = {
   HOST:       '/host/dashboard',
   OPERATOR:   '/operator/dashboard',
@@ -60,7 +85,12 @@ const ROUTE_BY_ROLE: Record<string, string> = {
   DEVELOPER:  '/developer/dashboard',
   ADMIN:      '/admin/dashboard',
   SUPERADMIN: '/admin/dashboard',
+  // Intentional: Buyers use the consumer account surface, not a dashboard.
+  // See note above before changing this.
   BUYER:      '/account',
+  // Wave 5 stubs — uncomment when dashboards are built:
+  // TRAVELLER: '/traveller/dashboard',
+  // INVESTOR:  '/investor/dashboard',
 };
 
 const DEFAULT_DESTINATION = '/account';
