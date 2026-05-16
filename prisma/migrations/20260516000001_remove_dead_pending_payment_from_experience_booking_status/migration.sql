@@ -21,7 +21,10 @@ BEGIN
 END $$;
 
 -- Step 2: Remove the dead enum value
--- PostgreSQL requires creating a new enum, updating the column, then dropping the old one
+-- PostgreSQL requires creating a new enum, updating the column, then dropping the old one.
+-- The column default must be dropped before ALTER COLUMN TYPE and restored after,
+-- because PostgreSQL cannot automatically cast a default expression to the new enum type.
+ALTER TABLE "ExperienceBooking" ALTER COLUMN "status" DROP DEFAULT;
 ALTER TYPE "ExperienceBookingStatus" RENAME TO "ExperienceBookingStatus_old";
 CREATE TYPE "ExperienceBookingStatus" AS ENUM (
   'PENDING',
@@ -35,4 +38,5 @@ CREATE TYPE "ExperienceBookingStatus" AS ENUM (
 ALTER TABLE "ExperienceBooking" 
   ALTER COLUMN "status" TYPE "ExperienceBookingStatus" 
   USING "status"::text::"ExperienceBookingStatus";
+ALTER TABLE "ExperienceBooking" ALTER COLUMN "status" SET DEFAULT 'PENDING'::"ExperienceBookingStatus";
 DROP TYPE "ExperienceBookingStatus_old";
