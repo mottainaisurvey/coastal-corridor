@@ -3,11 +3,12 @@ import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 import { Nav } from '@/components/nav';
 import { Footer } from '@/components/footer';
+import { CORRIDOR_KM_ROUNDED, CORRIDOR_DESTINATIONS } from '@/lib/constants/platform';
 
 export const metadata: Metadata = {
   title: 'Coastal Corridor — Lagos to Calabar',
   description:
-    'The verified real estate, tourism and investment platform for the Lagos-Calabar Coastal Highway corridor. 700km of coastline, 12 destinations, one platform.',
+    `The verified real estate, tourism and investment platform for the Lagos-Calabar Coastal Highway corridor. ${CORRIDOR_KM_ROUNDED} of coastline, ${CORRIDOR_DESTINATIONS} destinations, one platform.`,
   keywords: ['Nigeria real estate', 'Lagos Calabar highway', 'diaspora property', 'coastal Nigeria'],
   icons: {
     icon: [
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'Coastal Corridor — Lagos to Calabar',
-    description: 'Verified real estate and tourism across the 700km Coastal Highway.',
+    description: `Verified real estate and tourism across the ${CORRIDOR_KM_ROUNDED} Coastal Highway.`,
     type: 'website',
     images: [{ url: '/icon-512.png', width: 512, height: 512 }],
   },

@@ -1,4 +1,5 @@
 import type { Destination } from './types';
+import { CORRIDOR_KM } from '@/lib/constants/platform';
 
 export const destinations: Destination[] = [
   {
@@ -304,7 +305,7 @@ export const destinations: Destination[] = [
       { label: 'Historic District', value: '412', unit: 'acres' },
       { label: 'Tourism POIs', value: '62', unit: 'sites' },
       { label: 'Plot Inventory', value: '540', unit: 'listed' },
-      { label: 'Corridor KM', value: '700.3', unit: 'km' }
+      { label: 'Corridor KM', value: String(CORRIDOR_KM), unit: 'km' }
     ],
     features: [
       'Obudu Mountain Resort VR side-quest module',

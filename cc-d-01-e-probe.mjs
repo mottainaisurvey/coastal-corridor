@@ -151,7 +151,7 @@ async function run() {
     {
       groupSize: 2,
       guestName: 'Probe Guest',
-      guestEmail: 'probe-guest@cc-staging.test',
+      guestEmail: 'probe-guest@cc-staging-probe.com',
       guestPhone: '+2348012345678',
     },
     patchHeaders
@@ -161,7 +161,7 @@ async function run() {
     printSummary();
     return;
   }
-  pass('S3', `Draft updated — groupSize=2, guestEmail=probe-guest@cc-staging.test`);
+  pass('S3', `Draft updated — groupSize=2, guestEmail=probe-guest@cc-staging-probe.com`);
 
   // ── Step 4: Proceed to payment ────────────────────────────────────────────
   log('');
@@ -210,7 +210,7 @@ async function run() {
         payment_type: 'PAID',
       },
       customer: {
-        email: 'probe-guest@cc-staging.test',
+        email: 'probe-guest@cc-staging-probe.com',
         first_name: 'Probe',
         last_name: 'Guest',
       },
@@ -352,8 +352,8 @@ async function run() {
   // webhook invocation in Step 5.
   info('Email dispatch evidence: check Vercel function log for Step 5 webhook invocation.');
   info('Expected log lines:');
-  info('  "✅ Email sent to probe-guest@cc-staging.test: <MessageID>"  (guest confirmation)');
-  info('  "✅ Email sent to probe-operator@cc-staging.test: <MessageID>"  (operator notification)');
+  info('  "✅ Email sent to probe-guest@cc-staging-probe.com: <MessageID>"  (guest confirmation)');
+  info('  "✅ Email sent to probe-operator@cc-staging-probe.com: <MessageID>"  (operator notification)');
   info('  OR: "⚠️ Postmark not configured. Email would be sent to ..." if POSTMARK_API_TOKEN unset');
 
   // ── Step 9: Idempotency re-delivery ───────────────────────────────────────

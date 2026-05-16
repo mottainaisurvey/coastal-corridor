@@ -927,11 +927,13 @@ enum TimeSlotStatus {
 
 enum ExperienceBookingStatus {
   PENDING
+  PENDING_PAYMENT // booking created, payment URL generated, awaiting webhook
   CONFIRMED
   COMPLETED
   CANCELLED
   NO_SHOW
   REFUNDED
+  ABANDONED       // stale PENDING bookings transitioned by cleanup-stale-bookings cron (Phase E #37)
 }
 
 model Experience {

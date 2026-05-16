@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { destinations } from '@/lib/mock/destinations';
 import { DestinationCard } from '@/components/destination-card';
 import { destinationTypeColors, destinationTypeLabels, formatCorridorKm } from '@/lib/utils';
+import { CORRIDOR_KM_DISPLAY } from '@/lib/constants/platform';
 
 export const metadata = {
   title: 'Destinations · Coastal Corridor',
@@ -21,7 +22,7 @@ export default function DestinationsPage() {
     <>
       {/* ===== HERO ===== */}
       <section className="container-x pt-14 pb-14">
-        <div className="eyebrow mb-4">Destinations · 700.3 km · 9 states</div>
+        <div className="eyebrow mb-4">Destinations · {CORRIDOR_KM_DISPLAY} · 9 states</div>
         <h1 className="font-serif text-[44px] md:text-[72px] leading-[1.02] tracking-tightest font-light max-w-4xl mb-6">
           Twelve destinations along one corridor —
           <span className="italic text-ocean"> each with its own story.</span>

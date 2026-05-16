@@ -1,4 +1,18 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+/**
+ * middleware.ts — Coastal Corridor auth + routing middleware
+ *
+ * SINGLE SOURCE OF TRUTH for all middleware behaviour.
+ *
+ * History: a dev/prod split existed (middleware.prod.ts) during early Wave 4
+ * development to allow local visual testing without Clerk. That split was
+ * intentionally consolidated in Phase E (#22). middleware.prod.ts has been
+ * deleted. middleware.test.ts (the Clerk-bypass stub) remains for local dev
+ * use only — it is never deployed.
+ *
+ * Do NOT recreate a middleware.prod.ts or similar split. If environment-
+ * specific behaviour is needed, use environment variables inside this file.
+ */
 import { NextResponse } from 'next/server';
 import { hasAnyRole } from '@/lib/user-roles';
 

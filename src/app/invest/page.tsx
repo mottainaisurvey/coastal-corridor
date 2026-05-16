@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight, TrendingUp, Shield, Globe, PieChart } from 'lucide-react';
 import { properties } from '@/lib/mock/properties';
 import { PropertyCard } from '@/components/property-card';
+import { CORRIDOR_KM_ROUNDED } from '@/lib/constants/platform';
 
 export const metadata = {
   title: 'Invest · Coastal Corridor',
@@ -17,7 +18,7 @@ export default function InvestPage() {
         <div className="eyebrow mb-4">Invest · Corridor opportunities</div>
         <h1 className="font-serif text-[44px] md:text-[64px] leading-[1.02] tracking-tightest font-light max-w-4xl mb-6">
           Infrastructure lifts land value.
-          <span className="italic text-laterite block">Be early on 700km of it.</span>
+          <span className="italic text-laterite block">Be early on {CORRIDOR_KM_ROUNDED} of it.</span>
         </h1>
         <p className="text-[18px] text-ink/70 leading-relaxed max-w-2xl font-light mb-10">
           The Lagos-Calabar Coastal Highway is the largest infrastructure project in Nigeria&apos;s history.

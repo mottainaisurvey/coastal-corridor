@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { CORRIDOR_KM_DISPLAY, CORRIDOR_DESTINATIONS } from '@/lib/constants/platform';
 
 /* -----------------------------------------------------------------------
    CesiumGlobeHero
@@ -263,7 +264,7 @@ export function CesiumGlobeHero() {
           § Live · Discovery Globe
         </div>
         <div className="text-[13px] font-mono text-white/40 mt-0.5">
-          700.3 km · 12 destinations · 12 active listings
+          {`${CORRIDOR_KM_DISPLAY} · ${CORRIDOR_DESTINATIONS} destinations · 12 active listings`}
         </div>
       </div>
 

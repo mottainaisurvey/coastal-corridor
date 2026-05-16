@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { CORRIDOR_KM, CORRIDOR_KM_DISPLAY } from '@/lib/constants/platform';
 
 // All 12 active properties from the platform inventory
 const LISTINGS = [
@@ -162,7 +163,7 @@ const DESTINATIONS = [
   { id: 'uyo', name: 'Uyo Corridor Spur', state: 'Akwa Ibom', lat: 5.0378, lng: 7.9128, type: 'mixed', tag: 'MIXED USE', color: '#d4a24c', corridorKm: 520 },
   { id: 'ibeno', name: 'Ibeno Beach Zone', state: 'Akwa Ibom', lat: 4.56, lng: 7.99, type: 'tourism', tag: 'TOURISM', color: '#8aa876', corridorKm: 560 },
   { id: 'tinapa', name: 'Tinapa & Marina Resort', state: 'Cross River', lat: 5.0, lng: 8.29, type: 'tourism', tag: 'TOURISM', color: '#8aa876', corridorKm: 640 },
-  { id: 'calabar', name: 'Calabar Terminus', state: 'Cross River', lat: 4.9589, lng: 8.3269, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3', corridorKm: 700.3 }
+  { id: 'calabar', name: 'Calabar Terminus', state: 'Cross River', lat: 4.9589, lng: 8.3269, type: 'infra', tag: 'INFRASTRUCTURE', color: '#4db3b3', corridorKm: CORRIDOR_KM }
 ];
 
 // Tier 1: Destination hero images (curated Unsplash aerial/coastal photography per destination)
@@ -789,7 +790,7 @@ export default function MapPage() {
             <div class="lp-stats-grid">
               <div class="lp-stat"><div class="lp-stat-val">${listings.length}</div><div class="lp-stat-label">Active Listings</div></div>
               <div class="lp-stat"><div class="lp-stat-val">${d.corridorKm} km</div><div class="lp-stat-label">From Lagos</div></div>
-              <div class="lp-stat"><div class="lp-stat-val">${(700.3 - d.corridorKm).toFixed(1)} km</div><div class="lp-stat-label">To Calabar</div></div>
+              <div class="lp-stat"><div class="lp-stat-val">${(${CORRIDOR_KM} - d.corridorKm).toFixed(1)} km</div><div class="lp-stat-label">To Calabar</div></div>
               <div class="lp-stat"><div class="lp-stat-val">${d.state}</div><div class="lp-stat-label">State</div></div>
             </div>
             <div style="font-size:10px;letter-spacing:0.1em;color:var(--text-muted);text-transform:uppercase;margin:14px 0 8px">Listings at this destination</div>
@@ -1144,7 +1145,7 @@ export default function MapPage() {
 
             // Corridor KM: interpolate from longitude (3.4° Lagos → 8.33° Calabar)
             const lng = Cesium.Math.toDegrees(cartographic.longitude);
-            const corridorKm = Math.max(0, Math.min(700.3, ((lng - 3.4) / (8.33 - 3.4)) * 700.3));
+            const corridorKm = Math.max(0, Math.min(${CORRIDOR_KM}, ((lng - 3.4) / (8.33 - 3.4)) * ${CORRIDOR_KM}));
 
             // Elapsed time
             const elapsed = Math.floor((now - hudStartTime) / 1000);
@@ -1458,14 +1459,14 @@ export default function MapPage() {
           <div class="km-bar-track">
             <div class="km-bar-fill" id="kmBarFill" style="width:0%"></div>
             ${DESTINATIONS.map(d => {
-              const pct = (d.corridorKm / 700.3) * 100;
+              const pct = (d.corridorKm / ${CORRIDOR_KM}) * 100;
               return `<div class="km-bar-tick" data-km="${d.corridorKm}" style="left:${pct}%" title="${d.name} · KM ${d.corridorKm}" onclick="sidebarClickDest('${d.id}')"></div>`;
             }).join('')}
           </div>
           <div class="km-bar-labels">
             <span class="km-bar-label-start">Lagos · KM 0</span>
             <span class="km-bar-label-active" id="kmBarLabel"></span>
-            <span class="km-bar-label-end">Calabar · KM 700.3</span>
+            <span class="km-bar-label-end">Calabar · KM ${CORRIDOR_KM}</span>
           </div>
         `;
       }
@@ -1480,7 +1481,7 @@ export default function MapPage() {
           fill.style.width = '0%';
           label.textContent = '';
         } else {
-          const pct = Math.min(100, (km / 700.3) * 100);
+          const pct = Math.min(100, (km / ${CORRIDOR_KM}) * 100);
           fill.style.width = `${pct}%`;
           const dest = DESTINATIONS.find(d => d.corridorKm === km);
           label.textContent = dest ? `${dest.name} · KM ${km}` : `KM ${km}`;
@@ -2255,7 +2256,7 @@ export default function MapPage() {
             <div className="cc-meta-value" id="cesium-clock">--:--:-- WAT</div>
           </div>
           <div className="cc-meta-item">
-            <div className="cc-meta-value">700.3 km</div>
+            <div className="cc-meta-value">{CORRIDOR_KM_DISPLAY}</div>
             <div className="cc-meta-label">Corridor Length</div>
           </div>
           <div className="cc-meta-item">

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowRight, Download, Mail, FileText, Image as ImageIcon, Video } from 'lucide-react';
+import { CORRIDOR_KM_ROUNDED, CORRIDOR_DESTINATIONS } from '@/lib/constants/platform';
 
 export const metadata = {
   title: 'Press · Coastal Corridor',
@@ -10,7 +11,7 @@ const pressReleases = [
   {
     date: '2026-04-15',
     type: 'Product',
-    title: 'Coastal Corridor launches verified real estate marketplace for 700km Lagos-Calabar highway',
+    title: `Coastal Corridor launches verified real estate marketplace for ${CORRIDOR_KM_ROUNDED} Lagos-Calabar highway`,
     excerpt: 'Platform opens to diaspora buyers with five-layer title verification, VR property tours, and multi-currency escrow across 12 corridor destinations.'
   },
   {

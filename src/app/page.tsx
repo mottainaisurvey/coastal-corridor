@@ -6,6 +6,7 @@ import { properties } from '@/lib/mock/properties';
 import { PropertyCard } from '@/components/property-card';
 import { DestinationCard } from '@/components/destination-card';
 import { formatKobo } from '@/lib/utils';
+import { CORRIDOR_KM_DISPLAY, CORRIDOR_DESTINATIONS } from '@/lib/constants/platform';
 
 const destinationTypeColors: Record<string, { bg: string; text: string }> = {
   'INFRASTRUCTURE': { bg: 'bg-ocean/10', text: 'text-ocean-2' },
@@ -42,7 +43,7 @@ export default function HomePage() {
           <div className="max-w-4xl">
             <div className="eyebrow-on-dark mb-6 flex items-center gap-3">
               <span className="inline-block h-2 w-2 rounded-full bg-success animate-pulse" />
-              Live · 700.3 km of verified coastline · 12 destinations
+              {`Live · ${CORRIDOR_KM_DISPLAY} of verified coastline · ${CORRIDOR_DESTINATIONS} destinations`}
             </div>
 
             <h1 className="font-serif text-[48px] md:text-[84px] leading-[0.95] tracking-tightest mb-8 font-light">

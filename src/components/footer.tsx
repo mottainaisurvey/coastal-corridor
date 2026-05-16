@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CORRIDOR_KM_ROUNDED } from '@/lib/constants/platform';
 
 export function Footer() {
   return (
@@ -20,7 +21,7 @@ export function Footer() {
               </div>
             </div>
             <p className="text-sm text-paper/60 leading-relaxed">
-              The verified real estate, tourism and investment platform for Nigeria&apos;s 700km Coastal Highway corridor.
+              The verified real estate, tourism and investment platform for Nigeria&apos;s {CORRIDOR_KM_ROUNDED} Coastal Highway corridor.
             </p>
           </div>
 

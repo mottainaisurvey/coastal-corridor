@@ -2,6 +2,7 @@
 
 import { SignIn } from '@clerk/nextjs';
 import Link from 'next/link';
+import { CORRIDOR_KM_DISPLAY, CORRIDOR_DESTINATIONS } from '@/lib/constants/platform';
 
 export default function SignInPage() {
   return (
@@ -44,7 +45,7 @@ export default function SignInPage() {
             <div className="font-mono text-[10px] uppercase tracking-micro text-paper/40 mb-2">Platform Status</div>
             <div className="flex items-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-success animate-pulse" />
-              <span className="text-[13px] text-paper/60">788 km · 12 destinations · All systems operational</span>
+              <span className="text-[13px] text-paper/60">{CORRIDOR_KM_DISPLAY} · {CORRIDOR_DESTINATIONS} destinations · All systems operational</span>
             </div>
           </div>
         </div>

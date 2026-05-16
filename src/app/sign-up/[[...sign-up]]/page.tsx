@@ -3,6 +3,7 @@
 import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
 import { Shield, MapPin, Users, TrendingUp } from 'lucide-react';
+import { CORRIDOR_KM_DISPLAY } from '@/lib/constants/platform';
 
 const VALUE_PROPS = [
   {
@@ -12,7 +13,7 @@ const VALUE_PROPS = [
   },
   {
     icon: MapPin,
-    title: '788 km of Coastline',
+    title: `${CORRIDOR_KM_DISPLAY} of Coastline`,
     body: 'Browse verified properties across 12 destinations from Lagos to Calabar.',
   },
   {

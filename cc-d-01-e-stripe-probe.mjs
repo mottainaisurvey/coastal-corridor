@@ -84,12 +84,9 @@ function signStripeWebhook(rawBody, webhookSecret) {
   if (!webhookSecret) return null;
   const timestamp = Math.floor(Date.now() / 1000);
   const signedPayload = `${timestamp}.${rawBody}`;
-  // The Stripe SDK expects the secret as-is (it handles the whsec_ prefix internally)
-  // For manual signing we need the raw secret bytes after stripping the whsec_ prefix
-  const secretBytes = webhookSecret.startsWith('whsec_')
-    ? Buffer.from(webhookSecret.slice(6), 'base64')
-    : Buffer.from(webhookSecret);
-  const hmac = createHmac('sha256', secretBytes)
+  // The Stripe SDK uses the full whsec_... string directly as the HMAC key
+  // (NodeCryptoProvider.computeHMACSignature does NOT base64-decode it)
+  const hmac = createHmac('sha256', webhookSecret)
     .update(signedPayload, 'utf8')
     .digest('hex');
   return { header: `t=${timestamp},v1=${hmac}`, timestamp };
