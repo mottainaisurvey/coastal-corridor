@@ -927,7 +927,6 @@ enum TimeSlotStatus {
 
 enum ExperienceBookingStatus {
   PENDING
-  PENDING_PAYMENT // booking created, payment URL generated, awaiting webhook
   CONFIRMED
   COMPLETED
   CANCELLED
@@ -1052,7 +1051,6 @@ model ExperienceImage {
 
 enum BookingDraftStatus {
   DRAFT
-  PENDING_PAYMENT
   ABANDONED
   COMPLETED
 }
