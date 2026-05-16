@@ -63,13 +63,11 @@ import { getUserRoles } from '@/lib/user-roles';
 // They do not have an operational dashboard. Do NOT add /buyer/dashboard
 // unless the Wave 5 Buyer Portal spec explicitly calls for a separate route.
 //
-// WAVE 5 STUBS — TRAVELLER and INVESTOR
-// --------------------------------------
-// TRAVELLER and INVESTOR are not yet in this map because their dashboards
-// have not been built. Both currently fall through to DEFAULT_DESTINATION
-// (/account), which is correct v1 behaviour. When Wave 5 ships the
-// Traveller and Investor dashboards, uncomment the two stub lines below
-// and update the paths to match the new routes.
+// TRAVELLER and INVESTOR — activated in CC-WAVE5-INVESTOR-TRAVELLER-01
+// -------------------------------------------------------------------
+// Both dashboards are now live at /traveller/dashboard and /investor/dashboard.
+// Sub-routes (My Bookings, My Trips, My Investments, Portfolio) are deferred
+// until backing data models are designed (Wave 5+).
 //
 // MULTI-ROLE GRACEFUL DEGRADATION
 // ---------------------------------
@@ -88,9 +86,9 @@ const ROUTE_BY_ROLE: Record<string, string> = {
   // Intentional: Buyers use the consumer account surface, not a dashboard.
   // See note above before changing this.
   BUYER:      '/account',
-  // Wave 5 stubs — uncomment when dashboards are built:
-  // TRAVELLER: '/traveller/dashboard',
-  // INVESTOR:  '/investor/dashboard',
+  // Activated in CC-WAVE5-INVESTOR-TRAVELLER-01:
+  TRAVELLER: '/traveller/dashboard',
+  INVESTOR:  '/investor/dashboard',
 };
 
 const DEFAULT_DESTINATION = '/account';
