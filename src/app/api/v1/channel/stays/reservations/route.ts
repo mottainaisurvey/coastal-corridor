@@ -227,6 +227,7 @@ export async function POST(req: NextRequest) {
   const responseBody = {
     id: reservation.id,
     owambe_reservation_id: reservation.owambeReservationId,
+    cc_property_id: property.id,
     status: reservation.status,
     payment_status: reservation.paymentStatus,
     channel_commission_amount: channelCommissionAmount,
