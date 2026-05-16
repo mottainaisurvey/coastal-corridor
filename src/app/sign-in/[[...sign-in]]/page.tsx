@@ -36,7 +36,7 @@ export default function SignInPage() {
               Continue where you left off.
             </h1>
             <p className="text-[16px] text-paper/60 leading-relaxed max-w-sm">
-              Your saved properties, agent conversations, and transaction history are waiting.
+              Whether you&apos;re tracking a plot, managing bookings, or planning a trip down the corridor — your work is here.
             </p>
           </div>
 

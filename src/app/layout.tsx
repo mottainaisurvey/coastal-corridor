@@ -200,7 +200,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       appearance={clerkAppearance}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
-      signInFallbackRedirectUrl="/"
+      signInFallbackRedirectUrl="/sign-in-complete"
       signUpFallbackRedirectUrl="/"
       allowedRedirectOrigins={[
         'https://coastal-corridor-staging.vercel.app',
