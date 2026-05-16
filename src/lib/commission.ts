@@ -9,16 +9,28 @@
  *   EXPERIENCES — COHORT OP   15%  (operator receives 85% net)
  *   EXPERIENCES — STANDARD OP 18%  (operator receives 82% net)
  *
- * Rate resolution order:
- *   1. HostProfile.commissionRate / OperatorProfile.commissionRate (negotiated)
- *   2. Cohort default (cohort_member = true)
- *   3. Standard default
+ * Rate resolution order (updated CC-WAVE5-COHORT-FLAG-ENFORCEMENT-01):
+ *   1. Cohort flag (isCohortMember = true) — cohortMember is the authoritative
+ *      source of truth for cohort enrolment. Takes precedence over stored
+ *      commissionRate so that onboarding gaps (new cohort hosts whose
+ *      commissionRate was not updated by the CC-C-08-D-1 backfill) never
+ *      produce the wrong rate.
+ *   2. Negotiated rate (HostProfile.commissionRate / OperatorProfile.commissionRate)
+ *      — applies only to non-cohort hosts/operators with a stored rate.
+ *   3. Standard default — fallback for non-cohort hosts/operators with no
+ *      stored rate.
+ *
+ * Note: HostProfile.commissionRate has @default(0.15) and is non-nullable,
+ * so negotiatedRate is always populated at the call site in the reservations
+ * route. The cohort flag check MUST come first to prevent the negotiated-rate
+ * branch from masking cohort hosts (CC-WAVE5-COMMISSION-PROBE-01 finding).
  *
  * All monetary values are in the smallest currency unit (kobo for NGN,
  * cents for USD/GBP). Decimal arithmetic uses integer rounding to avoid
  * floating-point drift.
  *
  * CC-C-07 Acceptance criteria: AC-1 through AC-7.
+ * CC-WAVE5-COHORT-FLAG-ENFORCEMENT-01: priority order updated (Phase E #17).
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -84,19 +96,32 @@ export class CommissionCalculator {
     }
 
     // Resolve rate
+    // Priority order (CC-WAVE5-COHORT-FLAG-ENFORCEMENT-01):
+    //   1. cohortMember flag — authoritative for cohort enrolment.
+    //      cohortMember=true → cohort rate (12% for STAYS, 15% for EXPERIENCES)
+    //      regardless of stored HostProfile.commissionRate value.
+    //   2. negotiatedRate — stored commissionRate for non-cohort hosts.
+    //      (Always populated for STAYS because HostProfile.commissionRate
+    //      has @default(0.15); see probe transcript CC-WAVE5-COMMISSION-PROBE-01.)
+    //   3. Standard default — fallback when neither cohort flag nor negotiated
+    //      rate is available.
     let rateApplied: number;
     let rateSource: string;
 
-    if (negotiatedRate !== undefined && negotiatedRate !== null) {
+    if (isCohortMember) {
+      // Priority 1: cohort flag is authoritative.
+      // cohortMember=true → use cohort rate regardless of stored commissionRate.
+      rateApplied = COMMISSION_RATES[vertical].COHORT;
+      rateSource = 'cohort_default';
+    } else if (negotiatedRate !== undefined && negotiatedRate !== null) {
+      // Priority 2: stored negotiated rate for non-cohort hosts/operators.
       if (negotiatedRate < 0 || negotiatedRate > 1) {
         throw new Error(`[CommissionCalculator] negotiatedRate must be between 0 and 1, got ${negotiatedRate}`);
       }
       rateApplied = negotiatedRate;
       rateSource = 'negotiated';
-    } else if (isCohortMember) {
-      rateApplied = COMMISSION_RATES[vertical].COHORT;
-      rateSource = 'cohort_default';
     } else {
+      // Priority 3: standard default.
       rateApplied = COMMISSION_RATES[vertical].STANDARD;
       rateSource = 'standard_default';
     }
@@ -123,10 +148,15 @@ export class CommissionCalculator {
 
   /**
    * Resolves the commission rate for a host/operator from their profile.
-   * Returns the negotiated rate if set, otherwise the cohort/standard default.
+   *
+   * Priority order (CC-WAVE5-COHORT-FLAG-ENFORCEMENT-01 — mirrors calculate()):
+   *   1. cohortMember flag — authoritative for cohort enrolment.
+   *      cohortMember=true → cohort rate regardless of stored commissionRate.
+   *   2. profileCommissionRate — stored negotiated rate for non-cohort hosts.
+   *   3. Standard default — fallback.
    *
    * @param profileCommissionRate - Decimal from HostProfile.commissionRate or OperatorProfile.commissionRate
-   * @param isCohortMember - From User.cohort_member
+   * @param isCohortMember - From User.cohortMember
    * @param vertical - STAYS or EXPERIENCES
    */
   static resolveRate(
@@ -134,12 +164,15 @@ export class CommissionCalculator {
     isCohortMember: boolean,
     vertical: BookingVertical
   ): { rate: number; source: 'negotiated' | 'cohort_default' | 'standard_default' } {
-    if (profileCommissionRate !== null && profileCommissionRate !== undefined) {
-      return { rate: profileCommissionRate, source: 'negotiated' };
-    }
+    // Priority 1: cohort flag is authoritative.
     if (isCohortMember) {
       return { rate: COMMISSION_RATES[vertical].COHORT, source: 'cohort_default' };
     }
+    // Priority 2: stored negotiated rate.
+    if (profileCommissionRate !== null && profileCommissionRate !== undefined) {
+      return { rate: profileCommissionRate, source: 'negotiated' };
+    }
+    // Priority 3: standard default.
     return { rate: COMMISSION_RATES[vertical].STANDARD, source: 'standard_default' };
   }
 }
