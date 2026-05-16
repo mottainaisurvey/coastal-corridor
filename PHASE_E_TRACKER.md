@@ -9,7 +9,7 @@ The CC-only Phase E GRADUATE list has reached functional completion.
 - **#37 — Cleanup Stale Bookings Cron:** CLOSED. Both migrations applied to staging DB (commit `c59308e`). ExperienceBookingStatus final state: 7 values — PENDING, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW, REFUNDED, ABANDONED. PENDING_PAYMENT removed. Cleanup cron fully operational on staging.
 
 ## Pending / Held Items
-- **#48 — Clerk Production Deploy Gate:** HELD for founder discussion.
+- **#48 — Clerk Production Deploy Gate:** CLOSED. Nav/auth items 01-02 merged to main and deployed to production. Post-deploy smoke test passed.
 - **Refund Cap Design Decision:** HELD for founder direction (path a: accept pass-through, or path b: implement cap).
 - **Cross-thread items (#2, #5b, #7):** HELD for parallel thread when Owambe-side scoping happens.
 - **Wave 5 Nav/Auth items (03-09):** HELD pending Framing B vendor decision.
