@@ -16,10 +16,31 @@ The CC-only Phase E GRADUATE backlog is fully closed. The arc that included #22,
 
 ## Standing By — Wave 5 Phase 2
 - **Refund Cap Design Decision (#49):** DEFERRED — revisit if operational evidence surfaces.
-- **Cross-thread items (#5b, #7):** HELD for Owambe Wave 4 opening (bundled in parallel-thread coordinator).
+- **Cross-thread item (#7):** HELD for Owambe Wave 4 opening (bundled in parallel-thread coordinator).
+- **#5b — Owambe Reconciliation CC-Side Coordination:** RESOLVED-NO-CC-WORK (2026-05-17). See Phase E #5b entry below.
 - **Wave 5 Nav/Auth items (03-09):** HELD pending Framing B vendor marketplace decision.
 - **CC-OPS-02:** HELD pending founder direction.
 - **Next CC briefs land when:** cross-thread coordination from Framing B work surfaces CC-side requirements; strategy v1.1 vendor marketplace decision unblocks nav/auth 03-09; or founder opens CC-OPS-02.
+
+## Phase E #5b — RESOLVED-NO-CC-WORK
+
+**Disposition:** RESOLVED-NO-CC-WORK (2026-05-17). OWB-WAVE-4-03 reconciliation flow surfaces no CC-side coordination requirements beyond the existing CC-E-01 stays snapshot endpoint.
+
+**Verification method:** Four-signal structural inspection of CC codebase.
+
+**Signal 1 — Reconciliation directory structure:** `/api/v1/channel/reconciliation/` contains exactly two routes: `stays/snapshot/route.ts` (CC-E-01) and `experiences/snapshot/route.ts`. Both are read-only `GET` endpoints. No `POST`, `PATCH`, `PUT`, or `DELETE` handlers exist under the reconciliation path. No stub routes, placeholder directories, or TODO-gated write surfaces are present.
+
+**Signal 2 — `reconcile-owambe` cron Phase B/C comments:** `src/app/api/cron/reconcile-owambe/route.ts` is Phase A infrastructure only. Phase B comment reads: "fetch Owambe inventory and diff against local." Phase C comment reads: "fetch Owambe reservations and reconcile status." Both describe CC-side read operations against local DB — not new CC-side endpoints for Owambe to call. No outbound `fetch`, `callOwambe`, or HTTP calls exist in the cron body.
+
+**Signal 3 — `reconciliation.requested` webhook handler:** `webhooks/inbound/route.ts:553–576` handles the `reconciliation.requested` event. The handler logs the request and writes a `ReconciliationLog` record. The Phase B comment reads: "Phase B will implement the full reconciliation response (GET /api/v1/channel/reconciliation/stays/snapshot and GET /api/v1/channel/reconciliation/experiences/snapshot)." This confirms Phase B's reconciliation surface is the existing snapshot endpoints — already shipped as CC-E-01 and its experiences counterpart.
+
+**Signal 4 — `PHASE_B_PLAN.md` §2.4:** Reconciliation scope is explicitly defined as two `GET` snapshot endpoints: `GET /api/v1/channel/reconciliation/stays/snapshot` and `GET /api/v1/channel/reconciliation/experiences/snapshot`. No write surfaces, audit log access endpoints, reconciliation-complete notifications, or drift event push endpoints appear anywhere in the Phase B scope definition.
+
+**Verdict:** OWB-WAVE-4-03's reconciliation flow (Owambe cron calls CC-E-01 snapshot, diffs against Owambe source of truth, corrects Owambe-side) is a pure read flow against CC. CC's role is snapshot provider only. No new CC-side endpoints are required. The `reconciliation.requested` webhook handler already exists and logs the event. The snapshot endpoints are already shipped and verified. No CC-side coordination requirement surfaces from OWB-WAVE-4-03's closure.
+
+**Reactivation trigger:** None. If Owambe's reconciliation design evolves to require a CC-side write-back surface (e.g., drift event acknowledgement, reconciliation-complete notification), a new brief would surface that scope at that time.
+
+---
 
 ## Phase E #2 — CLOSED-AS-SCAFFOLDING
 
