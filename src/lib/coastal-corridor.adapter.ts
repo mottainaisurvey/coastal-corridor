@@ -18,6 +18,13 @@ import { PaymentStatus } from '@prisma/client';
 // ── Outbound URL path constants ───────────────────────────────────────────────
 // These are the canonical paths CC emits to Owambe (v1.3 / Amendment 007).
 // The base URL is read from OWAMBE_API_BASE_URL at runtime.
+// NOTE (Phase E #2 / 2026-05-17): OWAMBE_RESERVATION_POST_PATH is currently orphaned —
+// no CC-initiated outbound POST to Owambe for stays reservations exists or is being built.
+// The active integration direction is Owambe → CC (Owambe originates the POST;
+// CC receives at /api/v1/channel/stays/reservations and returns 201 with cc_property_id
+// in the response body). This constant is preserved as documented intent in case a
+// CC-initiated push direction is added in a future wave. If that path is never built,
+// this constant should be removed at that point.
 export const OWAMBE_RESERVATION_POST_PATH = '/api/v1/channel/stays/reservations';
 export const OWAMBE_RESERVATION_PATCH_PATH = (ccReservationId: string) =>
   `/api/v1/channel/stays/reservations/${ccReservationId}`;
