@@ -48,8 +48,8 @@ export interface SyncRunSummary {
 interface OwambeExperienceBookingPayload {
   cc_booking_id: string;
   experience_id: string;
-  time_slot_id: string;
-  participant_count: number;
+  owambe_time_slot_id: string;
+  number_of_participants: number;
   participant_names: string[];
   guest_email: string;
   guest_phone?: string;
@@ -173,8 +173,8 @@ export async function syncBookingToOwambe(
   const payload: OwambeExperienceBookingPayload = {
     cc_booking_id: booking.id,
     experience_id: owambeExperienceId,
-    time_slot_id: owambeTimeSlotId,
-    participant_count: booking.numberOfParticipants,
+    owambe_time_slot_id: owambeTimeSlotId,
+    number_of_participants: booking.numberOfParticipants,
     participant_names: booking.participantNames,
     guest_email: booking.participant.email,
     guest_phone: booking.participant.phone ?? undefined,
