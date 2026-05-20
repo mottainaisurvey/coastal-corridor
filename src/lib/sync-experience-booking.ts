@@ -99,7 +99,6 @@ export async function getPendingSyncBookings() {
       experience: {
         select: {
           id: true,
-          title: true,
           owambeExperienceId: true,  // CC-D-01-D-FIX: Owambe-native ID for payload
         },
       },
