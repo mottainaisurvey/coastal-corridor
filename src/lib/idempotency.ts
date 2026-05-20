@@ -220,10 +220,7 @@ export async function callOwambe<T = unknown>(
   const headers = buildOwambeHeaders(
     bodyStr,
     options.idempotencyKey,
-    {
-      Authorization: `Bearer ${process.env.OWAMBE_API_KEY}`,
-      ...options.extraHeaders,
-    }
+    options.extraHeaders
   );
 
   // Enforce timeout
