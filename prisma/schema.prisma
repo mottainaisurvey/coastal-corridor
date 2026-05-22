@@ -868,6 +868,8 @@ model Reservation {
   paystackReference        String?
   stripePaymentIntentId    String?           // Stripe PaymentIntent ID (CC-C-02)
   outboundIdempotencyKey   String?           @unique  // UUID v4 for outbound call to Owambe
+  owambeSyncAttempts       Int               @default(0)  // CC-STAYS-RESERVATION-SENDER-01: retry counter (max 3)
+  owambeSyncError          String?                        // CC-STAYS-RESERVATION-SENDER-01: last sync error message
   paymentStatus            PaymentStatus     @default(PENDING)
   status                   ReservationStatus @default(PENDING)
   cancellationReason       String?
