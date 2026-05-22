@@ -169,6 +169,23 @@ async function routeWebhookEvent(
       await handleReservationRefunded(data);
       break;
 
+    // ── CC-WEBHOOK-HANDLERS-01 Scope A: supplementary event aliases ───────────
+    // These event type strings are used by Owambe's webhook publisher in some
+    // integration contexts (e.g. joint-window test payloads). They alias the
+    // OpenAPI spec event types above and are dispatched to the same handlers.
+    case 'reservation.checked_in':
+      // Alias for reservation.guest_checked_in (CC-WEBHOOK-HANDLERS-01 Scope A)
+      await handleReservationGuestCheckedIn(data);
+      break;
+    case 'reservation.checked_out':
+      // Alias for reservation.guest_checked_out (CC-WEBHOOK-HANDLERS-01 Scope A)
+      await handleReservationGuestCheckedOut(data);
+      break;
+    case 'reservation.status_changed':
+      // CC-WEBHOOK-HANDLERS-01 Scope A: handler-layer dispatch only (no full business logic)
+      await handleReservationStatusChanged(data, eventId);
+      break;
+
     // ── Contract events: Experiences (OpenAPI spec §7) ────────────────────────
     case 'booking.cancelled':
       await handleBookingCancelled(data);
@@ -572,6 +589,48 @@ async function handleReconciliationRequested(
       durationMs: 0,
     },
   });
+}
+
+// ─── CC-WEBHOOK-HANDLERS-01 Scope A: status_changed handler ─────────────────
+
+/**
+ * reservation.status_changed — CC-WEBHOOK-HANDLERS-01 Scope A
+ *
+ * Scope A: handler-layer dispatch only. Logs the status transition and writes
+ * an audit entry. Full business logic (e.g. conditional Reservation.status
+ * update based on new_status value) is deferred to Phase 5.2 semantic layer.
+ */
+async function handleReservationStatusChanged(
+  data: Record<string, unknown>,
+  eventId: string
+): Promise<void> {
+  const owambeReservationId = data.reservation_id as string | undefined;
+  const newStatus = data.new_status as string | undefined;
+  const previousStatus = data.previous_status as string | undefined;
+
+  console.info(
+    `[webhook/inbound] reservation.status_changed: reservation=${owambeReservationId ?? 'UNKNOWN'} ` +
+    `${previousStatus ?? '?'} → ${newStatus ?? '?'} (event: ${eventId}) — Scope A dispatch`
+  );
+
+  const prisma = getPrisma();
+  if (!prisma || !owambeReservationId) return;
+
+  await prisma.auditEntry.create({
+    data: {
+      entityType: 'Reservation',
+      entityId: owambeReservationId,
+      action: 'reservation_status_changed_by_owambe',
+      metadata: JSON.stringify({
+        event: 'reservation.status_changed',
+        owambeReservationId,
+        previousStatus,
+        newStatus,
+        eventId,
+        scopeNote: 'CC-WEBHOOK-HANDLERS-01 Scope A — semantic update deferred to Phase 5.2',
+      }),
+    },
+  }).catch((err) => console.error('[webhook/inbound] Audit log error (status_changed):', err));
 }
 
 // ─── Supplementary: internal-only handlers ───────────────────────────────────
