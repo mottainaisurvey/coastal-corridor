@@ -39,9 +39,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. Read raw body (must be done before any parsing)
   const rawBody = await req.text();
 
-  // 2. Extract signature headers
-  const signature = req.headers.get('x-owambe-signature') ?? '';
-  const timestamp = req.headers.get('x-owambe-timestamp') ?? '';
+  // 2. Extract signature headers — Amendment 010 dual-acceptance (canonical-checked-first per EP-CC-2)
+  // Step 1: Try canonical headers (X-Signature + X-Timestamp)
+  let signature = req.headers.get('x-signature') ?? '';
+  let timestamp = req.headers.get('x-timestamp') ?? '';
+  let receiptClassification: 'canonical' | 'legacy' | 'none' = 'none';
+  if (signature && timestamp) {
+    receiptClassification = 'canonical';
+  } else {
+    // Step 2: Fall back to legacy headers (x-owambe-signature + x-owambe-timestamp)
+    signature = req.headers.get('x-owambe-signature') ?? '';
+    timestamp = req.headers.get('x-owambe-timestamp') ?? '';
+    if (signature && timestamp) {
+      receiptClassification = 'legacy';
+    }
+  }
   const eventId = req.headers.get('x-owambe-event-id') ?? '';
 
   // 3. Validate required headers
@@ -71,6 +83,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 401 }
     );
   }
+
+  // 4a. Receipt-distinction structured logging (Amendment 010 § 4.2 + EP-CC-3 + AC-CC5)
+  if (receiptClassification === 'legacy') {
+    console.warn(
+      '[webhook/inbound] DEPRECATION: legacy signature headers received ' +
+      '(x-owambe-signature + x-owambe-timestamp); ' +
+      'canonical headers (X-Signature + X-Timestamp) expected post-Amendment-010-cutover',
+      { receipt_classification: receiptClassification, event_id: eventId }
+    );
+  }
+  console.info('[webhook/inbound] receipt-classification', {
+    receipt_classification: receiptClassification,
+    event_id: eventId,
+    timestamp_header: timestamp,
+  });
 
   // 5. Parse payload
   let payload: { event_type: string; event_id?: string; data: Record<string, unknown> };
