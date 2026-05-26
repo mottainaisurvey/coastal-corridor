@@ -175,9 +175,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         },
       });
     }
-    // Return 500 so Owambe retries — DIAG: expose error temporarily
+    // Return 500 so Owambe retries
     return NextResponse.json(
-      { error: 'Internal processing error', _diag: errMsg },
+      { error: 'Internal processing error' },
       { status: 500 }
     );
   }
