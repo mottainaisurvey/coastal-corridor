@@ -214,8 +214,12 @@ async function routeWebhookEvent(
       break;
 
     // ── Contract events: Experiences (OpenAPI spec §7) ────────────────────────
+    // Amendment 009 — booking event family (booking.created NEW; booking.cancelled + booking.refunded UPGRADED)
+    case 'booking.created':
+      await handleBookingCreated(data, eventId);
+      break;
     case 'booking.cancelled':
-      await handleBookingCancelled(data);
+      await handleBookingCancelled(data, eventId);
       break;
     case 'booking.no_show':
       await handleBookingNoShow(data);
@@ -224,7 +228,7 @@ async function routeWebhookEvent(
       await handleBookingCompleted(data);
       break;
     case 'booking.refunded':
-      await handleBookingRefunded(data);
+      await handleBookingRefunded(data, eventId);
       break;
 
     // ── Contract events: Inventory (OpenAPI spec §7) ──────────────────────────
@@ -421,23 +425,251 @@ async function handleReservationRefunded(
   });
 }
 
-// ─── Contract: Experiences handlers ──────────────────────────────────────────
+// ─── Contract: Experiences handlers (Amendment 009) ─────────────────────────
 
-async function handleBookingCancelled(
-  data: Record<string, unknown>
+/**
+ * booking.created — Amendment 009 § 3.1
+ *
+ * Business logic:
+ *   1. Validate required fields (booking_id, experience_id, time_slot_id, guest_count,
+ *      booking_date, guest_details.primary_guest_name, guest_details.primary_guest_email)
+ *   2. Idempotency: check inboundIdempotencyKey (eventId) — return early if already processed
+ *   3. Resolve Experience via owambeExperienceId → HTTP 404 if not found
+ *   4. Resolve TimeSlot via owambeTimeSlotId → HTTP 404 if not found
+ *   5. Atomic transaction:
+ *      a. Upsert ExperienceBooking on owambeBookingId (idempotent re-delivery)
+ *      b. Increment TimeSlot.spotsBooked by guest_count
+ *      c. Post-increment over-booking guard (throw → rollback)
+ *   6. Structured log
+ */
+async function handleBookingCreated(
+  data: Record<string, unknown>,
+  eventId: string
 ): Promise<void> {
   const prisma = getPrisma();
-  if (!prisma) return;
-  const owambeBookingId = data.booking_id as string;
-  if (!owambeBookingId) return;
-  await prisma.experienceBooking.updateMany({
-    where: { owambeBookingId },
-    data: {
-      status: 'CANCELLED',
-      cancellationReason: (data.reason as string) ?? 'Cancelled by Owambe',
-      cancellationInitiatedBy: 'OWAMBE',
-      updatedAt: new Date(),
-    },
+  if (!prisma) throw new Error('[booking.created] Database unavailable');
+
+  // 1. Validate required fields per Amendment 009 § 3.1
+  const booking_id = data.booking_id as string | undefined;
+  const experience_id = data.experience_id as string | undefined;
+  const time_slot_id = data.time_slot_id as string | undefined;
+  const guest_count = data.guest_count as number | undefined;
+  const booking_date = data.booking_date as string | undefined;
+  const guest_details = data.guest_details as Record<string, unknown> | undefined;
+  const primary_guest_name = guest_details?.primary_guest_name as string | undefined;
+  const primary_guest_email = guest_details?.primary_guest_email as string | undefined;
+
+  if (!booking_id || !experience_id || !time_slot_id || !guest_count || !booking_date ||
+      !primary_guest_name || !primary_guest_email) {
+    throw Object.assign(
+      new Error('[booking.created] Missing required fields: booking_id, experience_id, time_slot_id, guest_count, booking_date, guest_details.primary_guest_name, guest_details.primary_guest_email'),
+      { statusCode: 400 }
+    );
+  }
+
+  const guestCountNum = Number(guest_count);
+  if (!Number.isInteger(guestCountNum) || guestCountNum < 1) {
+    throw Object.assign(
+      new Error('[booking.created] Invalid guest_count: must be a positive integer'),
+      { statusCode: 400 }
+    );
+  }
+
+  // 2. Idempotency: check inboundIdempotencyKey (eventId) — return early if already processed
+  const existing = await prisma.experienceBooking.findUnique({
+    where: { inboundIdempotencyKey: eventId },
+  });
+  if (existing) {
+    console.info('[booking.created] Duplicate delivery — already processed', {
+      eventId,
+      owambeBookingId: booking_id,
+      existingId: existing.id,
+    });
+    return;
+  }
+
+  // 3. Resolve Experience via owambeExperienceId
+  const experience = await prisma.experience.findUnique({
+    where: { owambeExperienceId: experience_id },
+  });
+  if (!experience) {
+    throw Object.assign(
+      new Error(`[booking.created] Experience not found: owambeExperienceId=${experience_id}`),
+      { statusCode: 404 }
+    );
+  }
+
+  // 4. Resolve TimeSlot via owambeTimeSlotId
+  const timeSlot = await prisma.timeSlot.findUnique({
+    where: { owambeTimeSlotId: time_slot_id },
+  });
+  if (!timeSlot) {
+    throw Object.assign(
+      new Error(`[booking.created] TimeSlot not found: owambeTimeSlotId=${time_slot_id}`),
+      { statusCode: 404 }
+    );
+  }
+  if (timeSlot.experienceId !== experience.id) {
+    throw Object.assign(
+      new Error(`[booking.created] TimeSlot ${time_slot_id} does not belong to experience ${experience_id}`),
+      { statusCode: 422 }
+    );
+  }
+
+  // 5. Atomic transaction: upsert booking + increment capacity
+  await prisma.$transaction(async (tx) => {
+    // a. Upsert ExperienceBooking on owambeBookingId
+    await tx.experienceBooking.upsert({
+      where: { owambeBookingId: booking_id },
+      create: {
+        owambeBookingId: booking_id,
+        inboundIdempotencyKey: eventId,
+        experienceId: experience.id,
+        timeSlotId: timeSlot.id,
+        participantUserId: null,  // Owambe-originated: no CC user account at booking.created time
+        numberOfParticipants: guestCountNum,
+        participantNames: [primary_guest_name],
+        guestName: primary_guest_name,
+        guestEmail: primary_guest_email,
+        guestPhone: (guest_details?.primary_guest_phone as string | undefined) ?? null,
+        totalAmount: data.total_amount != null ? String(data.total_amount) : '0',
+        currency: (data.currency as string) ?? 'NGN',
+        channelCommissionAmount: data.channel_commission_amount != null ? String(data.channel_commission_amount) : '0',
+        channelCommissionPercent: data.channel_commission_percent != null ? String(data.channel_commission_percent) : '0',
+        netToOperator: data.net_to_operator != null ? String(data.net_to_operator) : '0',
+        specialRequirements: data.special_requests as string | undefined,
+        paystackReference: data.paystack_reference as string | undefined,
+        paymentStatus: 'PAID',
+        status: 'CONFIRMED',
+      },
+      update: {
+        // Re-delivery: update inboundIdempotencyKey if not already set (race-condition guard)
+        inboundIdempotencyKey: eventId,
+        updatedAt: new Date(),
+      },
+    });
+
+    // b. Increment TimeSlot.spotsBooked by guest_count
+    const updatedSlot = await tx.timeSlot.update({
+      where: { id: timeSlot.id },
+      data: { spotsBooked: { increment: guestCountNum } },
+      select: { spotsBooked: true, capacity: true },
+    });
+
+    // c. Post-increment over-booking guard
+    if (updatedSlot.spotsBooked > updatedSlot.capacity) {
+      throw new Error(
+        `[booking.created] Over-booking detected: slot ${timeSlot.id} ` +
+        `spotsBooked=${updatedSlot.spotsBooked} capacity=${updatedSlot.capacity} ` +
+        `— transaction rolled back`
+      );
+    }
+  });
+
+  // 6. Structured log
+  console.info('[booking.created] Booking accepted and persisted', {
+    eventId,
+    owambeBookingId: booking_id,
+    experienceId: experience.id,
+    timeSlotId: timeSlot.id,
+    guestCount: guestCountNum,
+  });
+}
+
+/**
+ * booking.cancelled — Amendment 009 § 3.2 (UPGRADED from stub)
+ *
+ * Business logic:
+ *   1. Validate required fields (booking_id, cancellation_reason, cancellation_initiated_by)
+ *   2. Enum validation: cancellation_initiated_by in [GUEST, HOST, PLATFORM, OWAMBE]
+ *   3. Resolve ExperienceBooking via owambeBookingId → HTTP 404 if not found
+ *   4. Idempotency: already CANCELLED → return early
+ *   5. Atomic transaction:
+ *      a. Update ExperienceBooking status → CANCELLED
+ *      b. Conditional TimeSlot.spotsBooked decrement if capacity_restoration_required === true
+ *   6. Structured log
+ */
+async function handleBookingCancelled(
+  data: Record<string, unknown>,
+  eventId: string
+): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) throw new Error('[booking.cancelled] Database unavailable');
+
+  // 1. Validate required fields per Amendment 009 § 3.2
+  const booking_id = data.booking_id as string | undefined;
+  const cancellation_reason = data.cancellation_reason as string | undefined;
+  const cancellation_initiated_by = data.cancellation_initiated_by as string | undefined;
+
+  if (!booking_id || !cancellation_reason || !cancellation_initiated_by) {
+    throw Object.assign(
+      new Error('[booking.cancelled] Missing required fields: booking_id, cancellation_reason, cancellation_initiated_by'),
+      { statusCode: 400 }
+    );
+  }
+
+  // 2. Enum validation: cancellation_initiated_by
+  const VALID_INITIATED_BY = ['GUEST', 'HOST', 'PLATFORM', 'OWAMBE'];
+  if (!VALID_INITIATED_BY.includes(cancellation_initiated_by)) {
+    throw Object.assign(
+      new Error(`[booking.cancelled] Invalid cancellation_initiated_by: ${cancellation_initiated_by}. Must be one of: ${VALID_INITIATED_BY.join(', ')}`),
+      { statusCode: 400 }
+    );
+  }
+
+  const capacityRestorationRequired = Boolean(data.capacity_restoration_required);
+
+  // 3. Resolve ExperienceBooking via owambeBookingId
+  const booking = await prisma.experienceBooking.findUnique({
+    where: { owambeBookingId: booking_id },
+    select: { id: true, status: true, timeSlotId: true, numberOfParticipants: true },
+  });
+  if (!booking) {
+    throw Object.assign(
+      new Error(`[booking.cancelled] ExperienceBooking not found: owambeBookingId=${booking_id}`),
+      { statusCode: 404 }
+    );
+  }
+
+  // 4. Idempotency: already CANCELLED → return early
+  if (booking.status === 'CANCELLED') {
+    console.info('[booking.cancelled] Already cancelled — idempotent re-delivery', {
+      eventId,
+      owambeBookingId: booking_id,
+      bookingId: booking.id,
+    });
+    return;
+  }
+
+  // 5. Atomic transaction: cancel booking + conditional capacity restoration
+  await prisma.$transaction(async (tx) => {
+    // a. Update ExperienceBooking status → CANCELLED
+    await tx.experienceBooking.update({
+      where: { id: booking.id },
+      data: {
+        status: 'CANCELLED',
+        cancellationReason: cancellation_reason,
+        cancellationInitiatedBy: cancellation_initiated_by,
+        updatedAt: new Date(),
+      },
+    });
+
+    // b. Conditional TimeSlot.spotsBooked decrement per EP-CC-B2 declarative operation
+    if (capacityRestorationRequired) {
+      await tx.timeSlot.update({
+        where: { id: booking.timeSlotId },
+        data: { spotsBooked: { decrement: booking.numberOfParticipants } },
+      });
+    }
+  });
+
+  // 6. Structured log
+  console.info('[booking.cancelled] Booking cancelled', {
+    eventId,
+    owambeBookingId: booking_id,
+    bookingId: booking.id,
+    capacityRestored: capacityRestorationRequired,
+    cancellationInitiatedBy: cancellation_initiated_by,
   });
 }
 
@@ -467,22 +699,88 @@ async function handleBookingCompleted(
   });
 }
 
+/**
+ * booking.refunded — Amendment 009 § 3.3 (UPGRADED from stub)
+ *
+ * Business logic:
+ *   1. Validate required fields (booking_id, refund_amount, refund_type)
+ *   2. Enum validation: refund_type in [FULL, PARTIAL]
+ *   3. Resolve ExperienceBooking via owambeBookingId → HTTP 404 if not found
+ *   4. Idempotency: already REFUNDED → return early
+ *   5. Update ExperienceBooking with refund metadata + paystack_refund_reference
+ *   6. Structured log
+ */
 async function handleBookingRefunded(
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  eventId: string
 ): Promise<void> {
   const prisma = getPrisma();
-  if (!prisma) return;
-  const owambeBookingId = data.booking_id as string;
-  if (!owambeBookingId) return;
-  await prisma.experienceBooking.updateMany({
-    where: { owambeBookingId },
+  if (!prisma) throw new Error('[booking.refunded] Database unavailable');
+
+  // 1. Validate required fields per Amendment 009 § 3.3
+  const booking_id = data.booking_id as string | undefined;
+  const refund_amount = data.refund_amount as number | undefined;
+  const refund_type = data.refund_type as string | undefined;
+
+  if (!booking_id || refund_amount == null || !refund_type) {
+    throw Object.assign(
+      new Error('[booking.refunded] Missing required fields: booking_id, refund_amount, refund_type'),
+      { statusCode: 400 }
+    );
+  }
+
+  // 2. Enum validation: refund_type
+  const VALID_REFUND_TYPES = ['FULL', 'PARTIAL'];
+  if (!VALID_REFUND_TYPES.includes(refund_type)) {
+    throw Object.assign(
+      new Error(`[booking.refunded] Invalid refund_type: ${refund_type}. Must be one of: ${VALID_REFUND_TYPES.join(', ')}`),
+      { statusCode: 400 }
+    );
+  }
+
+  // 3. Resolve ExperienceBooking via owambeBookingId
+  const booking = await prisma.experienceBooking.findUnique({
+    where: { owambeBookingId: booking_id },
+    select: { id: true, status: true },
+  });
+  if (!booking) {
+    throw Object.assign(
+      new Error(`[booking.refunded] ExperienceBooking not found: owambeBookingId=${booking_id}`),
+      { statusCode: 404 }
+    );
+  }
+
+  // 4. Idempotency: already REFUNDED → return early
+  if (booking.status === 'REFUNDED') {
+    console.info('[booking.refunded] Already refunded — idempotent re-delivery', {
+      eventId,
+      owambeBookingId: booking_id,
+      bookingId: booking.id,
+    });
+    return;
+  }
+
+  // 5. Update ExperienceBooking with refund metadata + paystack_refund_reference
+  await prisma.experienceBooking.update({
+    where: { id: booking.id },
     data: {
       status: 'REFUNDED',
-      refundAmount: data.refund_amount != null
-        ? (data.refund_amount as number)
-        : undefined,
+      refundAmount: refund_amount != null ? String(refund_amount) : undefined,
+      refundType: refund_type,
+      refundReason: data.refund_reason as string | undefined,
+      refundedAt: new Date(),
+      paystackRefundReference: data.paystack_refund_reference as string | undefined,
       updatedAt: new Date(),
     },
+  });
+
+  // 6. Structured log
+  console.info('[booking.refunded] Refund metadata persisted', {
+    eventId,
+    owambeBookingId: booking_id,
+    bookingId: booking.id,
+    refundType: refund_type,
+    paystackRefundReference: data.paystack_refund_reference ?? null,
   });
 }
 

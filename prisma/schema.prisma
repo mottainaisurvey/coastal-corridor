@@ -999,8 +999,8 @@ model ExperienceBooking {
   experience               Experience              @relation(fields: [experienceId], references: [id])
   timeSlotId               String
   timeSlot                 TimeSlot                @relation(fields: [timeSlotId], references: [id])
-  participantUserId        String
-  participant              User                    @relation("BookingParticipant", fields: [participantUserId], references: [id])
+  participantUserId        String?                 // nullable: Owambe-originated bookings have no CC user account at booking.created time (Amendment 009 item-1 option-a BILATERAL CONCURRENCE 2026-05-26)
+  participant              User?                   @relation("BookingParticipant", fields: [participantUserId], references: [id])
   numberOfParticipants     Int
   participantNames         String[]
   totalAmount              Decimal                 @db.Decimal(10, 2)
@@ -1016,6 +1016,15 @@ model ExperienceBooking {
   outboundIdempotencyKey   String?                 @unique  // UUID v4 for outbound call to Owambe
   owambeSyncAttempts       Int                     @default(0)  // CC-D-01-D: retry counter (max 3)
   owambeSyncError          String?                 // CC-D-01-D: last sync error message
+  // Amendment 009 — inbound booking event fields
+  inboundIdempotencyKey    String?                 @unique  // dispatch-event-instance idempotency per EP-CC-B3 + Amendment 009 § 4
+  guestName                String?                 // guest_details.primary_guest_name (Owambe-originated bookings)
+  guestEmail               String?                 // guest_details.primary_guest_email (Owambe-originated bookings)
+  guestPhone               String?                 // guest_details.primary_guest_phone (optional)
+  refundType               String?                 // enum: FULL | PARTIAL per Amendment 009 § 3.3
+  refundReason             String?                 // free-text refund reason per Amendment 009 § 3.3
+  refundedAt               DateTime?               // ISO 8601 timestamp per Amendment 009 § 3.3
+  paystackRefundReference  String?                 // Paystack refund reference for reconciliation per Amendment 009 § 3.3
   paymentStatus            PaymentStatus           @default(PENDING)
   status                   ExperienceBookingStatus @default(PENDING)
   cancellationReason       String?
