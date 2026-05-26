@@ -149,6 +149,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
     }
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    // Check for handler-attached statusCode (400 = validation error, 404 = resource not found).
+    // These are non-retryable — do NOT mark WebhookDelivery as FAILED and return the specific status.
+    const statusCode = (err instanceof Error && 'statusCode' in err)
+      ? (err as Error & { statusCode: number }).statusCode
+      : 500;
+    if (statusCode === 400 || statusCode === 404) {
+      console.warn(`[webhook/inbound] Non-retryable handler error (${statusCode}) for event ${event}:`, errMsg);
+      return NextResponse.json(
+        { error: errMsg },
+        { status: statusCode }
+      );
+    }
     console.error(`[webhook/inbound] Handler error for event ${event}:`, err);
     // Mark as failed — will be retried by Owambe
     if (prisma) {
@@ -156,7 +169,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         where: { eventId },
         data: {
           status: 'FAILED',
-          errorMessage: err instanceof Error ? err.message : String(err),
+          errorMessage: errMsg,
           attempts: { increment: 1 },
           lastAttemptAt: new Date(),
         },
