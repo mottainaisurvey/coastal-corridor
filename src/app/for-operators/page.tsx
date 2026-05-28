@@ -530,6 +530,14 @@ export default function ForOperatorsPage() {
             <p className="font-serif font-light text-[19px] leading-relaxed text-[#faf8f3]/70 max-w-2xl">
               Every early-access cohort member receives automatic integration with the Owambe booking channel — a curated network that routes diaspora and domestic demand directly to verified corridor operators. No separate application. No additional fee. Included from day one.
             </p>
+            <a
+              href="https://owambe-web-staging.up.railway.app/coastal-corridor-cohort"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-5 font-mono text-[12px] tracking-[0.15em] uppercase text-[#4a9595] hover:text-[#2d7d7d] transition-colors underline-offset-4 hover:underline"
+            >
+              Learn more about Owambe →
+            </a>
           </div>
 
           {/* Channel access detail grid */}
