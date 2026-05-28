@@ -1,10 +1,10 @@
 # Integration Status — Coastal Corridor Platform
 
-**Last Updated**: May 23, 2026
+**Last Updated**: May 28, 2026
 **Platform Status**: ✅ **PRODUCTION LIVE**
-**Version**: MVP v0.3 — Phase 5.1 complete
+**Version**: MVP v0.4 — Phase 5.2 complete
 **Repository**: https://github.com/mottainaisurvey/coastal-corridor (private)
-**Latest Commit**: `b28d8b4` — docs: update INTEGRATION_STATUS.md to v0.3
+**Latest Commit**: `86fadfe` — feat(marketing): CC-COHORT-OFFER-SURFACES-CC-01 cohort bundle section on /for-operators
 
 ---
 
@@ -21,7 +21,9 @@
 | **Payments — Stripe CC** | ⚠️ Ready | Test Mode | May 2026 |
 | **KYC — Smile Identity** | ⚠️ Ready | Framework | April 19, 2026 |
 | **Virtual Tours — Matterport** | ⚠️ Ready | Framework | April 19, 2026 |
-| **Owambe Channel Integration** | ✅ Phase 5.1 Complete | Bidirectional | May 23, 2026 |
+| **Owambe Channel Integration** | ✅ Phase 5.2 Complete | Bidirectional + Booking Events | May 28, 2026 |
+| **Email Domain** | ✅ Migrated | `.africa` (all refs updated) | May 28, 2026 |
+| **Cohort Offer Surfaces** | ✅ Live | `/for-operators` cohort bundle section | May 28, 2026 |
 | **Mobile App — Expo** | ⚠️ Scaffolded | EAS Build Config | April 24, 2026 |
 | **Analytics — PostHog** | ✅ Active | Instrumented | May 2026 |
 | **Error Tracking — Sentry** | ✅ Active | Instrumented | May 2026 |
