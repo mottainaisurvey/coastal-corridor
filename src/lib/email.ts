@@ -18,8 +18,8 @@ export async function sendEmail({
   subject,
   htmlBody,
   textBody,
-  from = 'noreply@coastalcorridor.ng',
-  replyTo = 'support@coastalcorridor.ng',
+  from = 'noreply@coastalcorridor.africa',
+  replyTo = 'support@coastalcorridor.africa',
 }: EmailOptions) {
   try {
     if (!postmarkClient) {
@@ -206,7 +206,7 @@ export function guestBookingConfirmationEmail(data: ExperienceBookingEmailData):
           <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 500; color: #0a0e12;">What happens next</p>
           <p style="margin: 0 0 12px 0; font-size: 13px; color: #555;">${data.operatorDisplayName} has been notified and will contact you with final details.</p>
           <a href="${data.confirmationPageUrl}" style="display: inline-block; padding: 10px 20px; background: #0a0e12; color: #f5f1ea; text-decoration: none; border-radius: 6px; font-size: 13px;">View your booking →</a>
-          <p style="margin: 16px 0 0 0; font-size: 11px; color: #999;">Coastal Corridor · support@coastalcorridor.ng · Ref: ${data.bookingRef}</p>
+          <p style="margin: 16px 0 0 0; font-size: 11px; color: #999;">Coastal Corridor · support@coastalcorridor.africa · Ref: ${data.bookingRef}</p>
         </div>
       </div>
     </div>
@@ -232,7 +232,7 @@ export function guestBookingConfirmationEmail(data: ExperienceBookingEmailData):
     '',
     `View your booking: ${data.confirmationPageUrl}`,
     '',
-    `Coastal Corridor · support@coastalcorridor.ng`,
+    `Coastal Corridor · support@coastalcorridor.africa`,
   ].join('\n');
 
   return { subject, htmlBody, textBody };
@@ -293,7 +293,7 @@ export function operatorBookingNotificationEmail(data: ExperienceBookingEmailDat
           <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 500; color: #0a0e12;">Action required</p>
           <p style="margin: 0 0 12px 0; font-size: 13px; color: #555;">Please contact ${data.guestName} at ${data.guestEmail} to confirm final details.</p>
           <a href="${data.operatorBookingsUrl}" style="display: inline-block; padding: 10px 20px; background: #0a0e12; color: #f5f1ea; text-decoration: none; border-radius: 6px; font-size: 13px;">View all bookings →</a>
-          <p style="margin: 16px 0 0 0; font-size: 11px; color: #999;">Coastal Corridor · support@coastalcorridor.ng · Ref: ${data.bookingRef}</p>
+          <p style="margin: 16px 0 0 0; font-size: 11px; color: #999;">Coastal Corridor · support@coastalcorridor.africa · Ref: ${data.bookingRef}</p>
         </div>
       </div>
     </div>
@@ -320,7 +320,7 @@ export function operatorBookingNotificationEmail(data: ExperienceBookingEmailDat
     '',
     `View bookings: ${data.operatorBookingsUrl}`,
     '',
-    `Coastal Corridor · support@coastalcorridor.ng`,
+    `Coastal Corridor · support@coastalcorridor.africa`,
   ].filter(Boolean).join('\n');
 
   return { subject, htmlBody, textBody };

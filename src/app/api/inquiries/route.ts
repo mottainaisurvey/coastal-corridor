@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
           buyerName,
           listing.property?.title || 'Your Property',
           listing.owner?.profile?.firstName || 'Agent',
-          listing.owner?.email || 'agent@coastalcorridor.ng'
+          listing.owner?.email || 'agent@coastalcorridor.africa'
         ),
       });
     } catch (emailError) {
