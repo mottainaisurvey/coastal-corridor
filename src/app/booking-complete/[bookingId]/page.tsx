@@ -261,7 +261,7 @@ function PendingState({ bookingId, elapsed }: { bookingId: string; elapsed: numb
               </button>
               <p className="text-xs text-gray-400">
                 If the issue persists,{' '}
-                <a href="mailto:support@coastalcorridor.ng" className="text-blue-600 hover:underline">
+                <a href="mailto:support@coastalcorridor.africa" className="text-blue-600 hover:underline">
                   contact support
                 </a>{' '}
                 with reference: <strong>{bookingId.slice(0, 8).toUpperCase()}</strong>
@@ -298,7 +298,7 @@ function ErrorState({ message }: { message?: string }) {
               Browse experiences
             </Link>
             <a
-              href="mailto:support@coastalcorridor.ng"
+              href="mailto:support@coastalcorridor.africa"
               className="block text-xs text-blue-600 hover:underline"
             >
               Contact support
