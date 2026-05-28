@@ -102,6 +102,7 @@ export default function ForOperatorsPage() {
   const heroRef = useRef<HTMLElement>(null)
   const whyUsRef = useRef<HTMLElement>(null)
   const pricingRef = useRef<HTMLElement>(null)
+  const cohortRef = useRef<HTMLElement>(null)
   const verificationRef = useRef<HTMLElement>(null)
   const applyRef = useRef<HTMLElement>(null)
   const formRef = useRef<HTMLDivElement>(null)
@@ -117,6 +118,7 @@ export default function ForOperatorsPage() {
     const sectionMap: { ref: React.RefObject<HTMLElement | null>; id: string }[] = [
       { ref: whyUsRef, id: 'why-us' },
       { ref: pricingRef, id: 'pricing' },
+      { ref: cohortRef, id: 'cohort' },
       { ref: verificationRef, id: 'verification' },
       { ref: applyRef, id: 'apply' },
     ]
@@ -276,6 +278,7 @@ export default function ForOperatorsPage() {
           {[
             { id: 'why-us', label: 'Why us' },
             { id: 'pricing', label: 'Pricing' },
+            { id: 'cohort', label: 'Cohort bundle' },
             { id: 'verification', label: 'Verification' },
             { id: 'apply', label: 'Apply' },
           ].map(link => (
@@ -506,6 +509,131 @@ export default function ForOperatorsPage() {
               Ready to apply? →
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* ── COHORT BUNDLE ── CC-COHORT-OFFER-SURFACES-CC-01 */}
+      <section ref={cohortRef} id="cohort" className="bg-[#0a0e12] text-[#faf8f3] px-6 md:px-12 py-24 relative border-t border-[#2a2f36]">
+        <div className="absolute top-0 left-0 right-0 h-px"
+          style={{ background: 'linear-gradient(90deg, #2d7d7d 0%, #2d7d7d 50%, #d4a24c 50%, #d4a24c 100%)' }} />
+        <div className="max-w-[1280px] mx-auto">
+
+          {/* Section header */}
+          <div className="mb-16 max-w-3xl">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="font-serif text-[#4a9595] text-base">§</span>
+              <span className="font-mono text-[11px] tracking-[0.18em] text-[#d4a24c] uppercase">Cohort member benefit · Channel access</span>
+            </div>
+            <h2 className="font-serif font-light text-[clamp(32px,4.5vw,52px)] leading-tight tracking-[-0.02em] mb-6">
+              Cohort members get <em className="italic text-[#4a9595] font-normal">Owambe channel access</em> — bundled in.
+            </h2>
+            <p className="font-serif font-light text-[19px] leading-relaxed text-[#faf8f3]/70 max-w-2xl">
+              Every early-access cohort member receives automatic integration with the Owambe booking channel — a curated network that routes diaspora and domestic demand directly to verified corridor operators. No separate application. No additional fee. Included from day one.
+            </p>
+          </div>
+
+          {/* Channel access detail grid */}
+          <div className="grid md:grid-cols-3 gap-0 border border-[#2a2f36] mb-12">
+            {[
+              {
+                icon: '⇄',
+                title: 'Bidirectional sync.',
+                body: 'Reservations and bookings flow between Coastal Corridor and the Owambe channel in real time. Inventory stays accurate across both surfaces without manual reconciliation.',
+              },
+              {
+                icon: '✓',
+                title: 'Verified demand only.',
+                body: 'Owambe routes only identity-verified, payment-cleared guests. The same trust standard that applies on Coastal Corridor applies on every booking that arrives through the channel.',
+              },
+              {
+                icon: '→',
+                title: 'No extra integration work.',
+                body: 'Channel access is provisioned automatically when your cohort onboarding completes. You manage one listing; both surfaces stay current.',
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className={`p-10 ${
+                  i < 2 ? 'border-b md:border-b-0 md:border-r border-[#2a2f36]' : ''
+                }`}
+              >
+                <span className="block font-mono text-[22px] text-[#4a9595] mb-5" aria-hidden="true">{item.icon}</span>
+                <h3 className="font-serif font-normal text-[20px] leading-snug mb-3">{item.title}</h3>
+                <p className="text-[15px] leading-[1.65] text-[#faf8f3]/60">{item.body}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Cohort rate comparison table */}
+          <div className="mb-12">
+            <p className="font-mono text-[11px] tracking-[0.18em] text-[#d4a24c] uppercase mb-6">What cohort membership includes</p>
+            <div className="grid md:grid-cols-2 gap-8">
+
+              {/* Cohort column */}
+              <div className="border border-[#2d7d7d] p-8 relative">
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#4a9595]" />
+                <p className="font-mono text-[11px] tracking-[0.18em] text-[#4a9595] uppercase mb-6">Cohort member</p>
+                <ul className="flex flex-col gap-4">
+                  {[
+                    { label: 'Stays commission rate', value: '12%', note: 'vs 15% standard' },
+                    { label: 'Experiences commission rate', value: '15%', note: 'vs 18% standard' },
+                    { label: 'Owambe channel access', value: 'Included', note: 'Automatic on onboarding' },
+                    { label: 'Rate lock period', value: '12 months', note: 'From platform launch' },
+                    { label: 'Priority placement', value: 'Yes', note: 'Event windows + diaspora campaigns' },
+                    { label: 'Free listing photography', value: 'Yes', note: 'Corridor standard, one-time' },
+                  ].map((row, j) => (
+                    <li key={j} className="flex items-start justify-between gap-4 pb-4 border-b border-[#2a2f36] last:border-0 last:pb-0">
+                      <span className="text-[14px] text-[#faf8f3]/70 leading-snug">{row.label}</span>
+                      <span className="text-right flex-shrink-0">
+                        <span className="block font-serif font-normal text-[18px] text-[#4a9595] leading-snug">{row.value}</span>
+                        <span className="block font-mono text-[10px] tracking-[0.08em] text-[#faf8f3]/40 uppercase mt-0.5">{row.note}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Standard column */}
+              <div className="border border-[#2a2f36] p-8 relative">
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#2a2f36]" />
+                <p className="font-mono text-[11px] tracking-[0.18em] text-[#6b7079] uppercase mb-6">Standard (post-cohort)</p>
+                <ul className="flex flex-col gap-4">
+                  {[
+                    { label: 'Stays commission rate', value: '15%', note: 'Applied after cohort period' },
+                    { label: 'Experiences commission rate', value: '18%', note: 'Applied after cohort period' },
+                    { label: 'Owambe channel access', value: 'On request', note: 'Subject to availability' },
+                    { label: 'Rate lock period', value: 'N/A', note: 'Market rate applies' },
+                    { label: 'Priority placement', value: 'Standard', note: 'Algorithmic ranking' },
+                    { label: 'Listing photography', value: 'Self-provided', note: 'Or paid service' },
+                  ].map((row, j) => (
+                    <li key={j} className="flex items-start justify-between gap-4 pb-4 border-b border-[#2a2f36] last:border-0 last:pb-0">
+                      <span className="text-[14px] text-[#faf8f3]/70 leading-snug">{row.label}</span>
+                      <span className="text-right flex-shrink-0">
+                        <span className="block font-serif font-normal text-[18px] text-[#6b7079] leading-snug">{row.value}</span>
+                        <span className="block font-mono text-[10px] tracking-[0.08em] text-[#faf8f3]/40 uppercase mt-0.5">{row.note}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Cohort section CTA */}
+          <div className="border-t border-[#2a2f36] pt-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <p className="font-serif font-light text-[17px] text-[#faf8f3]/70 max-w-lg leading-relaxed">
+              Cohort places are limited to approximately 80 hosts and 40 operators. Applications are reviewed on a rolling basis.
+            </p>
+            <button
+              onClick={scrollToForm}
+              className="flex-shrink-0 bg-[#4a9595] text-[#faf8f3] px-10 py-4 font-mono text-xs tracking-[0.2em] uppercase hover:bg-[#2d7d7d] transition-all hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4a9595] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0e12]"
+              aria-label="Apply for the early-access cohort"
+            >
+              Apply for the cohort →
+            </button>
+          </div>
+
         </div>
       </section>
 
