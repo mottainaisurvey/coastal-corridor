@@ -39,6 +39,13 @@ vi.mock('@/lib/paystack-adapter', () => ({
 
 const STABLE_UUID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 
+// CC-PHASE-5-3-A: Fixture IDs updated to valid UUID v4 values to pass the
+// sync queue validation gate integrated in syncReservationToOwambe.
+const FIXTURE_RESERVATION_ID = 'a1b2c3d4-e5f6-4789-8abc-def012345678';
+const FIXTURE_PROPERTY_ID    = 'b2c3d4e5-f6a7-4890-9bcd-ef0123456789';
+const FIXTURE_ROOM_ID        = 'c3d4e5f6-a7b8-4901-acde-f01234567890';
+const FIXTURE_USER_ID        = 'd4e5f6a7-b8c9-4012-bdea-012345678901';
+
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
     reservation: {
@@ -55,7 +62,7 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
 
 function makeReservation(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'res-001',
+    id: FIXTURE_RESERVATION_ID,
     outboundIdempotencyKey: null,
     checkInDate: new Date('2026-06-01'),
     checkOutDate: new Date('2026-06-05'),
@@ -68,17 +75,17 @@ function makeReservation(overrides: Record<string, unknown> = {}) {
     specialRequests: null,
     paystackReference: 'pstk_ref_001',
     property: {
-      id: 'prop-001',
-      owambePropertyId: 'owambe-prop-001',
+      id: FIXTURE_PROPERTY_ID,
+      owambePropertyId: FIXTURE_PROPERTY_ID,
     },
     room: {
-      id: 'room-001',
-      owambeRoomId: 'owambe-room-001',
+      id: FIXTURE_ROOM_ID,
+      owambeRoomId: FIXTURE_ROOM_ID,
     },
     guest: {
       email: 'guest@example.com',
       phone: '+2348012345678',
-      owambeUserId: 'owambe-user-001',
+      owambeUserId: FIXTURE_USER_ID,
     },
     ...overrides,
   };
@@ -124,7 +131,7 @@ describe('syncReservationToOwambe — missing Owambe-native IDs', () => {
     expect(result.error).toContain('owambePropertyId');
     expect(mockPrisma.reservation.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'res-001' },
+        where: { id: FIXTURE_RESERVATION_ID },
         data: expect.objectContaining({
           owambeSyncAttempts: { increment: 1 },
         }),
@@ -242,7 +249,7 @@ describe('syncReservationToOwambe — 201 Created', () => {
 
     expect(mockPrisma.reservation.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'res-001' },
+        where: { id: FIXTURE_RESERVATION_ID },
         data: expect.objectContaining({
           owambeReservationId: 'owambe-res-001',
           owambeSyncError: null,
@@ -261,10 +268,10 @@ describe('syncReservationToOwambe — 201 Created', () => {
     const callArgs = vi.mocked(callOwambe).mock.calls[0][1];
     const body = callArgs.body as Record<string, unknown>;
 
-    expect(body.cc_reservation_id).toBe('res-001');
-    expect(body.owambe_property_id).toBe('owambe-prop-001');
-    expect(body.owambe_room_id).toBe('owambe-room-001');
-    expect(body.guest_owambe_user_id).toBe('owambe-user-001');
+    expect(body.cc_reservation_id).toBe(FIXTURE_RESERVATION_ID);
+    expect(body.owambe_property_id).toBe(FIXTURE_PROPERTY_ID);
+    expect(body.owambe_room_id).toBe(FIXTURE_ROOM_ID);
+    expect(body.guest_owambe_user_id).toBe(FIXTURE_USER_ID);
     expect(body.guest_email).toBe('guest@example.com');
     expect(body.check_in_date).toBe('2026-06-01');
     expect(body.check_out_date).toBe('2026-06-05');
@@ -353,7 +360,7 @@ describe('syncReservationToOwambe — 409 Conflict', () => {
 
     expect(mockPrisma.reservation.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'res-001' },
+        where: { id: FIXTURE_RESERVATION_ID },
         data: expect.objectContaining({
           status: 'FAILED',
           owambeSyncAttempts: { increment: 1 },
@@ -372,7 +379,7 @@ describe('syncReservationToOwambe — 409 Conflict', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           entityType: 'Reservation',
-          entityId: 'res-001',
+          entityId: FIXTURE_RESERVATION_ID,
           action: 'reservation_sync_conflict',
         }),
       })

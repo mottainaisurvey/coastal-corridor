@@ -24,6 +24,7 @@
 import { getPrisma } from '@/lib/db-safe';
 import { callOwambe } from '@/lib/idempotency';
 import { OWAMBE_RESERVATION_POST_PATH } from '@/lib/coastal-corridor.adapter';
+import { validateSyncQueueEntry, type SyncQueueEntryPayload } from '@/lib/sync-queue-validation';
 import { randomUUID } from 'crypto';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -150,6 +151,38 @@ export async function getPendingSyncReservations() {
 export async function syncReservationToOwambe(
   reservation: Awaited<ReturnType<typeof getPendingSyncReservations>>[number]
 ): Promise<ReservationSyncResult> {
+  // ── CC-PHASE-5-3-A: Validation gate at sync queue entry ───────────────────
+  // Reject diagnostic-generated synthetic values before production-bound dispatch.
+  const validationPayload: SyncQueueEntryPayload = {
+    event_id: reservation.id,
+    event_type: 'stays_reservation_sync',
+    timestamp: new Date().toISOString(),
+    body: reservation,
+    cc_reservation_id: reservation.id,
+    owambe_property_id: reservation.property.owambePropertyId ?? undefined,
+    owambe_room_id: reservation.room.owambeRoomId ?? undefined,
+    guest_owambe_user_id: reservation.guest.owambeUserId ?? undefined,
+  };
+  const validationResult = validateSyncQueueEntry(validationPayload);
+  if (!validationResult.valid) {
+    console.warn('[sync-queue-validation-rejected]', {
+      event_id: validationPayload.event_id,
+      event_type: validationPayload.event_type,
+      validation_errors: validationResult.errors,
+      caller_context: {
+        dispatcher: 'sync-stays-reservation',
+        timestamp: new Date().toISOString(),
+      },
+    });
+    return {
+      reservationId: reservation.id,
+      success: false,
+      error: `Sync queue validation rejected: ${validationResult.errors.map(e => e.message).join('; ')}`,
+      fromCache: false,
+    };
+  }
+  // ── End validation gate ───────────────────────────────────────────────────
+
   const prisma = getPrisma();
   if (!prisma) {
     return {

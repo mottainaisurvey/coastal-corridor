@@ -20,6 +20,7 @@
 import { getPrisma } from '@/lib/db-safe';
 import { callOwambe } from '@/lib/idempotency';
 import { OWAMBE_EXPERIENCE_BOOKING_POST_PATH } from '@/lib/coastal-corridor.adapter';
+import { validateSyncQueueEntry, type SyncQueueEntryPayload } from '@/lib/sync-queue-validation';
 import { randomUUID } from 'crypto';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -122,6 +123,37 @@ export async function getPendingSyncBookings() {
 export async function syncBookingToOwambe(
   booking: Awaited<ReturnType<typeof getPendingSyncBookings>>[number]
 ): Promise<SyncResult> {
+  // ── CC-PHASE-5-3-A: Validation gate at sync queue entry ───────────────────
+  // Reject diagnostic-generated synthetic values before production-bound dispatch.
+  const validationPayload: SyncQueueEntryPayload = {
+    event_id: booking.id,
+    event_type: 'experience_booking_sync',
+    timestamp: new Date().toISOString(),
+    body: booking,
+    cc_booking_id: booking.id,
+    experience_id: booking.experience.id,
+    owambe_time_slot_id: booking.timeSlot.id,
+  };
+  const validationResult = validateSyncQueueEntry(validationPayload);
+  if (!validationResult.valid) {
+    console.warn('[sync-queue-validation-rejected]', {
+      event_id: validationPayload.event_id,
+      event_type: validationPayload.event_type,
+      validation_errors: validationResult.errors,
+      caller_context: {
+        dispatcher: 'sync-experience-booking',
+        timestamp: new Date().toISOString(),
+      },
+    });
+    return {
+      bookingId: booking.id,
+      success: false,
+      error: `Sync queue validation rejected: ${validationResult.errors.map(e => e.message).join('; ')}`,
+      fromCache: false,
+    };
+  }
+  // ── End validation gate ───────────────────────────────────────────────────
+
   const prisma = getPrisma();
   if (!prisma) {
     return {
