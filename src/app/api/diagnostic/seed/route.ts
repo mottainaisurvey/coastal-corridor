@@ -17,6 +17,12 @@
  *   seeded: boolean (true = newly created, false = already existed),
  *   currency: string
  * }
+ *
+ * Convention-E.1 (PHASE-5-3-B-COORDINATED-TEST-DATA-ALIGNMENT-01 Amendment 01):
+ * owambeExperienceId and owambeTimeSlotId use stable deterministic patterns
+ * (`coord-test-exp-${currency}` / `coord-test-slot-${currency}`) without
+ * timestamp suffix — enabling bilateral fixture reference resolution across
+ * deployments. See docs/integration/test-fixture-conventions.md.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/db-safe';
@@ -48,11 +54,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Use currency-specific seed names so NGN and USD/GBP probes don't collide
-  const SEED_OPERATOR_EMAIL = 'probe-operator@cc-staging.test';
+  // Convention-B: email domain @cc-staging.test is the CC-side test marker pattern
+  const SEED_OPERATOR_EMAIL = 'coord-test-operator@cc-staging.test';
   const SEED_EXPERIENCE_NAME =
     currency === 'NGN'
-      ? 'CC-D-01-E Probe: Lagos Sunset Boat Tour'
-      : `CC-D-01-E Probe: International Experience (${currency})`;
+      ? 'Coord-Test: Lagos Sunset Boat Tour (NGN)'
+      : `Coord-Test: International Experience (${currency})`;  // USD coordinated fixture
 
   // Base price and rate by currency
   const BASE_PRICE = currency === 'NGN' ? '25000.00' : '50.00';
@@ -107,7 +114,8 @@ export async function POST(req: NextRequest) {
       experience = await prisma.experience.create({
         data: {
           operatorUserId,
-          owambeExperienceId: `probe-exp-${currency.toLowerCase()}-${Date.now()}`,
+          // Convention-E.1: stable deterministic ID (no timestamp) for bilateral fixture coordination
+          owambeExperienceId: `coord-test-exp-${currency.toLowerCase()}`,  // e.g. coord-test-exp-ngn
           name: SEED_EXPERIENCE_NAME,
           description: `Automated probe experience for CC-D-01-E end-to-end test (${currency}).`,
           experienceType: 'CHARTER',
@@ -148,7 +156,8 @@ export async function POST(req: NextRequest) {
       timeSlot = await prisma.timeSlot.create({
         data: {
           experienceId,
-          owambeTimeSlotId: `probe-slot-${currency.toLowerCase()}-${Date.now()}`,
+          // Convention-E.1: stable deterministic ID (no timestamp) for bilateral fixture coordination
+          owambeTimeSlotId: `coord-test-slot-${currency.toLowerCase()}`,  // e.g. coord-test-slot-ngn
           startDateTime,
           endDateTime,
           capacity: 10,
