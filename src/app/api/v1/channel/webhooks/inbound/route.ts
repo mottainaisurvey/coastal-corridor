@@ -33,7 +33,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyInboundWebhook } from '@/lib/hmac';
 import { getPrisma } from '@/lib/db-safe';
-import { getCommissionCalculator } from '@/lib/commission';
+import * as Sentry from '@sentry/nextjs';
 
 // ─── POST /api/v1/channel/webhooks/inbound ────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -158,6 +158,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       : 500;
     if (statusCode === 400 || statusCode === 404) {
       console.warn(`[webhook/inbound] Non-retryable handler error (${statusCode}) for event ${event}:`, errMsg);
+      // AC-BA-04: capture to Sentry so non-retryable failures are visible to alerting
+      Sentry.captureException(err, { extra: { event, eventId, statusCode } });
+      // AC-BA-03: mark delivery as DEAD_LETTER (terminal non-retryable) to prevent ghost PENDING accumulation
+      if (prisma) {
+        await prisma.webhookDelivery.update({
+          where: { eventId },
+          data: { status: 'DEAD_LETTER', errorMessage: errMsg },
+        }).catch(() => { /* best-effort — do not mask the original error */ });
+      }
       return NextResponse.json(
         { error: errMsg },
         { status: statusCode }
@@ -290,19 +299,20 @@ async function routeWebhookEvent(
 // ─── Contract: Stays handlers ─────────────────────────────────────────────────
 
 /**
- * reservation.created — Amendment 012 Rev 2 (AC-CC-RC-1 through AC-CC-RC-10)
+ * reservation.created — Amendment 012 Rev 2 + Brief Amendment 01 (AC-BA-01 through AC-BA-05)
  *
- * Business logic:
- *   1. Validate 9 required fields per § 3.3 canonical
- *   2. Idempotency: check inboundIdempotencyKey (eventId) — return early if already processed
- *   3. Resolve StayProperty via owambePropertyId (layer-1 capacity allocation)
- *   4. Resolve Room via owambeRoomId; validate room belongs to property
- *   5. Resolve or create CC User via owambeUserId (layer-2 guest record creation)
- *      — mechanism-α: lookup existing User by owambeUserId
- *      — mechanism-β: create stub User if not found (owambeUserId + placeholder email)
- *   6. Calculate commission via CommissionCalculator (STAYS vertical)
- *   7. Atomic transaction: create Reservation record (layer-3 initial sync state)
- *   8. Audit log entry (reservation_created_received action scope)
+ * Semantic: This webhook is an ACKNOWLEDGEMENT from Owambe, not a creation event.
+ * CC initiates the booking via POST /api/v1/channel/stays/reservations; Owambe confirms
+ * acceptance by firing reservation.created. The Reservation + User records already exist
+ * at CC side when this webhook arrives.
+ *
+ * Handler flow (Brief Amendment 01):
+ *   1. Validate payload fields — guest_owambe_user_id nullable (AC-BA-01)
+ *   2. Idempotency: check inboundIdempotencyKey — return early if already processed
+ *   3. Lookup existing Reservation by owambeReservationId (AC-BA-02)
+ *   4. If not found → HTTP 404 + audit entry + Sentry capture
+ *   5. If found → write acknowledgement audit entry, update inboundIdempotencyKey
+ *   6. Return HTTP 200
  */
 async function handleReservationCreated(
   data: Record<string, unknown>,
@@ -311,12 +321,13 @@ async function handleReservationCreated(
   const prisma = getPrisma();
   if (!prisma) throw new Error('[reservation.created] Database unavailable');
 
-  // UUID v4 regex per RFC 4122 (reused from sync-queue-validation.ts pattern)
+  // UUID v4 regex per RFC 4122
   const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   // ISO 8601 date regex (YYYY-MM-DD)
   const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-  // 1. Validate 9 required fields per Amendment 012 Rev 2 § 3.3 canonical (AC-CC-RC-3)
+  // 1. Validate payload fields per Amendment 012 Rev 2 § 3.3 canonical + Brief Amendment 01 (AC-BA-01)
+  // guest_owambe_user_id is NULLABLE — Owambe Path B (CC-origin bookings) hardcodes guestUserId: null
   const reservation_id = data.reservation_id as string | undefined;
   const property_id = data.property_id as string | undefined;
   const room_id = data.room_id as string | undefined;
@@ -325,9 +336,10 @@ async function handleReservationCreated(
   const number_of_guests = data.number_of_guests;
   const total_amount_kobo = data.total_amount_kobo;
   const currency = data.currency as string | undefined;
-  const guest_owambe_user_id = data.guest_owambe_user_id as string | undefined;
+  // AC-BA-01: guest_owambe_user_id is nullable — null accepted, non-null still validated as UUID v4
+  const guest_owambe_user_id = data.guest_owambe_user_id as string | null | undefined;
 
-  // 1a. Required field presence check
+  // 1a. Required field presence check (guest_owambe_user_id excluded — nullable per AC-BA-01)
   const missing: string[] = [];
   if (!reservation_id) missing.push('reservation_id');
   if (!property_id) missing.push('property_id');
@@ -337,7 +349,6 @@ async function handleReservationCreated(
   if (number_of_guests == null) missing.push('number_of_guests');
   if (total_amount_kobo == null) missing.push('total_amount_kobo');
   if (!currency) missing.push('currency');
-  if (!guest_owambe_user_id) missing.push('guest_owambe_user_id');
   if (missing.length > 0) {
     throw Object.assign(
       new Error(`[reservation.created] Missing required fields: ${missing.join(', ')}`),
@@ -345,12 +356,12 @@ async function handleReservationCreated(
     );
   }
 
-  // 1b. UUID format validation at reservation_id, property_id, room_id, guest_owambe_user_id
+  // 1b. UUID format validation at reservation_id, property_id, room_id
+  //     guest_owambe_user_id: validated only when non-null (AC-BA-01 candidate-β)
   const uuidFields: [string, string][] = [
     ['reservation_id', reservation_id!],
     ['property_id', property_id!],
     ['room_id', room_id!],
-    ['guest_owambe_user_id', guest_owambe_user_id!],
   ];
   for (const [fieldName, fieldValue] of uuidFields) {
     if (!UUID_V4_RE.test(fieldValue)) {
@@ -360,8 +371,15 @@ async function handleReservationCreated(
       );
     }
   }
+  // AC-BA-01: conditional UUID validation for guest_owambe_user_id (null accepted; non-null must be UUID v4)
+  if (guest_owambe_user_id != null && !UUID_V4_RE.test(guest_owambe_user_id)) {
+    throw Object.assign(
+      new Error(`[reservation.created] Invalid UUID v4 format for guest_owambe_user_id: ${guest_owambe_user_id}`),
+      { statusCode: 400 }
+    );
+  }
 
-  // 1c. ISO 8601 date format validation at check_in_date + check_out_date
+  // 1c. ISO 8601 date format validation
   if (!ISO_DATE_RE.test(check_in_date!)) {
     throw Object.assign(
       new Error(`[reservation.created] Invalid ISO 8601 date format for check_in_date: ${check_in_date}`),
@@ -375,7 +393,7 @@ async function handleReservationCreated(
     );
   }
 
-  // 1d. Integer validation at number_of_guests + total_amount_kobo
+  // 1d. Integer validation
   const numberOfGuests = Number(number_of_guests);
   if (!Number.isInteger(numberOfGuests) || numberOfGuests < 1) {
     throw Object.assign(
@@ -400,7 +418,7 @@ async function handleReservationCreated(
     );
   }
 
-  // 2. Idempotency: check inboundIdempotencyKey (eventId) — return early if already processed (AC-CC-RC-4)
+  // 2. Idempotency: check inboundIdempotencyKey (eventId) — return early if already processed
   const existingByEvent = await prisma.reservation.findUnique({
     where: { inboundIdempotencyKey: eventId },
   });
@@ -413,144 +431,78 @@ async function handleReservationCreated(
     return;
   }
 
-  // 3. Resolve StayProperty via owambePropertyId (layer-1 capacity allocation)
-  const property = await prisma.stayProperty.findUnique({
-    where: { owambePropertyId: property_id },
-    include: {
-      host: {
-        include: { hostProfile: true },
-      },
-    },
+  // 3. Lookup existing Reservation by owambeReservationId (AC-BA-02 — acknowledgement handler)
+  // CC initiated the booking; the Reservation record already exists from the channel booking flow.
+  // The webhook is Owambe confirming acceptance — not a creation event.
+  const reservation = await prisma.reservation.findUnique({
+    where: { owambeReservationId: reservation_id },
   });
-  if (!property) {
-    throw Object.assign(
-      new Error(`[reservation.created] StayProperty not found: owambePropertyId=${property_id}`),
+
+  if (!reservation) {
+    // 4. Reservation not found — edge case (should not occur for CC-origin Path B bookings)
+    //    Capture to Sentry + audit entry for investigation; return 404 (non-retryable)
+    const notFoundErr = Object.assign(
+      new Error(`[reservation.created] Reservation not found for owambeReservationId=${reservation_id}. Expected CC-origin booking record.`),
       { statusCode: 404 }
     );
-  }
-
-  // 4. Resolve Room via owambeRoomId; validate room belongs to property
-  const room = await prisma.room.findUnique({
-    where: { owambeRoomId: room_id },
-  });
-  if (!room) {
-    throw Object.assign(
-      new Error(`[reservation.created] Room not found: owambeRoomId=${room_id}`),
-      { statusCode: 404 }
-    );
-  }
-  if (room.propertyId !== property.id) {
-    throw Object.assign(
-      new Error(`[reservation.created] Room ${room_id} does not belong to property ${property_id}`),
-      { statusCode: 422 }
-    );
-  }
-
-  // 5. Resolve or create CC User via owambeUserId (layer-2 guest record creation)
-  // mechanism-α: lookup existing User by owambeUserId
-  // mechanism-β: create stub User if not found (owambeUserId + placeholder email)
-  let guest = await prisma.user.findUnique({
-    where: { owambeUserId: guest_owambe_user_id },
-  });
-  if (!guest) {
-    // mechanism-β: create stub User record
-    // Placeholder email uses owambeUserId to ensure uniqueness; PII completion deferred to reconciliation cron
-    const stubEmail = `owambe-stub-${guest_owambe_user_id}@cc-internal.placeholder`;
-    guest = await prisma.user.create({
+    Sentry.captureException(notFoundErr, {
+      extra: { eventId, reservation_id, property_id, room_id, guest_owambe_user_id },
+    });
+    // Best-effort audit entry for investigation trail
+    await prisma.auditEntry.create({
       data: {
-        owambeUserId: guest_owambe_user_id,
-        email: stubEmail,
-        role: 'GUEST',
-        status: 'PENDING_VERIFICATION',
+        userId: null,
+        entityType: 'Reservation',
+        entityId: reservation_id ?? 'unknown',
+        action: 'reservation_created_not_found',
+        metadata: JSON.stringify({
+          event: 'reservation.created',
+          owambeReservationId: reservation_id,
+          owambePropertyId: property_id,
+          owambeRoomId: room_id,
+          owambeUserId: guest_owambe_user_id,
+          eventId,
+          error: 'Reservation not found at CC side — possible race condition or missing booking flow',
+        }),
       },
-    });
-    console.info('[reservation.created] mechanism-β: stub User created', {
-      guestId: guest.id,
-      owambeUserId: guest_owambe_user_id,
-      stubEmail,
-    });
+    }).catch((auditErr) => console.error('[webhook/inbound] Audit log error (reservation_created_not_found):', auditErr));
+    throw notFoundErr;
   }
 
-  // 6. Calculate commission via CommissionCalculator (STAYS vertical)
-  const hostProfile = property.host?.hostProfile;
-  const isCohortMember = property.host?.cohortMember ?? false;
-  const negotiatedRate =
-    hostProfile?.commissionRate !== null && hostProfile?.commissionRate !== undefined
-      ? Number(hostProfile.commissionRate)
-      : undefined;
-  const calculator = getCommissionCalculator();
-  const commissionResult = calculator.calculate({
-    totalAmountSmallestUnit: totalAmountKobo,
-    currency: currency as 'NGN' | 'USD' | 'GBP',
-    vertical: 'STAYS',
-    isCohortMember,
-    negotiatedRate,
-  });
-  // Convert kobo to decimal for Prisma Decimal fields (2 decimal places)
-  const totalAmountDecimal = (totalAmountKobo / 100).toFixed(2);
-  const channelCommissionAmount = (commissionResult.channelCommissionSmallestUnit / 100).toFixed(2);
-  const channelCommissionPercent = commissionResult.ratePercent.toFixed(2);
-  const netToHost = (commissionResult.netToHostSmallestUnit / 100).toFixed(2);
-
-  // 7. Atomic transaction: create Reservation record (layer-1 + layer-3)
-  const reservation = await prisma.reservation.create({
-    data: {
-      owambeReservationId: reservation_id,
-      inboundIdempotencyKey: eventId,
-      propertyId: property.id,
-      roomId: room.id,
-      guestUserId: guest.id,
-      checkInDate: new Date(check_in_date!),
-      checkOutDate: new Date(check_out_date!),
-      numberOfGuests,
-      totalAmount: totalAmountDecimal,
-      currency: currency as 'NGN' | 'USD' | 'GBP',
-      channelCommissionAmount,
-      channelCommissionPercent,
-      netToHost,
-      paystackReference: data.paystack_reference as string | undefined,
-      specialRequests: data.special_requests as string | undefined,
-      paymentStatus: 'PENDING',
-      status: 'PENDING',
-      owambeSyncAttempts: 0,
-    },
+  // 5. Reservation found — write acknowledgement audit entry + stamp inboundIdempotencyKey
+  //    guestUserId is already set on the Reservation from the CC booking flow (non-nullable field)
+  await prisma.reservation.update({
+    where: { id: reservation.id },
+    data: { inboundIdempotencyKey: eventId },
   });
 
-  // 8. Audit log entry (layer-3 initial sync state — reservation_created_received action scope)
   await prisma.auditEntry.create({
     data: {
-      userId: guest.id,
+      userId: reservation.guestUserId,
       entityType: 'Reservation',
       entityId: reservation.id,
-      action: 'reservation_created_received',
+      action: 'reservation_created_acknowledged',
       metadata: JSON.stringify({
         event: 'reservation.created',
         owambeReservationId: reservation_id,
         owambePropertyId: property_id,
         owambeRoomId: room_id,
         owambeUserId: guest_owambe_user_id,
-        commissionBreakdown: commissionResult.breakdown,
-        rateApplied: commissionResult.rateApplied,
-        channelCommissionAmount,
-        channelCommissionPercent,
-        netToHost,
-        totalAmountDecimal,
+        totalAmountKobo,
         currency,
+        numberOfGuests,
         eventId,
+        semantic: 'acknowledgement — CC-origin booking confirmed by Owambe',
       }),
     },
   }).catch((err) => console.error('[webhook/inbound] Audit log error (reservation.created):', err));
 
-  console.info('[reservation.created] Reservation accepted and persisted', {
+  console.info('[reservation.created] Reservation acknowledged', {
     eventId,
     owambeReservationId: reservation_id,
     reservationId: reservation.id,
-    propertyId: property.id,
-    roomId: room.id,
-    guestUserId: guest.id,
-    totalAmountDecimal,
+    guestUserId: reservation.guestUserId,
     currency,
-    commissionBreakdown: commissionResult.breakdown,
   });
 }
 
