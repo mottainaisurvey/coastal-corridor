@@ -52,6 +52,7 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
       update: vi.fn().mockResolvedValue({}),
     },
     reservation: {
+      findFirst: vi.fn().mockResolvedValue({ id: 'cc-res-mock-001', status: 'CONFIRMED' }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     experienceBooking: {

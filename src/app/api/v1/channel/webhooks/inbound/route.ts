@@ -527,6 +527,33 @@ async function handleReservationCancelled(
     return;
   }
 
+  // Guard: candidate-α lifecycle-event idempotency check
+  // Prevents duplicate downstream-action execution when the same cancellation
+  // event arrives via two webhooks (e.g. legacy + canonical dispatch paths).
+  const existingReservation = await prisma.reservation.findFirst({
+    where: { owambeReservationId },
+    select: { id: true, status: true },
+  });
+  if (existingReservation?.status === 'CANCELLED') {
+    await prisma.auditEntry.create({
+      data: {
+        entityType: 'Reservation',
+        entityId: existingReservation.id,
+        action: 'reservation_cancelled_duplicate_ignored',
+        metadata: JSON.stringify({
+          event: 'reservation.cancelled',
+          owambeReservationId,
+          reason: 'Duplicate lifecycle event — Reservation already CANCELLED',
+          detectedAt: new Date().toISOString(),
+        }),
+      },
+    }).catch((err) => console.error('[webhook/inbound] Duplicate-guard audit error:', err));
+    console.info(
+      `[webhook/inbound] reservation.cancelled: duplicate lifecycle event ignored for ${owambeReservationId} (already CANCELLED)`
+    );
+    return;
+  }
+
   // Step 1: Mark reservation CANCELLED
   const updateResult = await prisma.reservation.updateMany({
     where: { owambeReservationId },
