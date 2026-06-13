@@ -870,6 +870,8 @@ model Reservation {
   outboundIdempotencyKey   String?           @unique  // UUID v4 for outbound call to Owambe
   owambeSyncAttempts       Int               @default(0)  // CC-STAYS-RESERVATION-SENDER-01: retry counter (max 3)
   owambeSyncError          String?                        // CC-STAYS-RESERVATION-SENDER-01: last sync error message
+  // Amendment 012 Rev 2 — inbound reservation event fields
+  inboundIdempotencyKey    String?           @unique       // dispatch-event-instance idempotency per Amendment 012 § 4
   paymentStatus            PaymentStatus     @default(PENDING)
   status                   ReservationStatus @default(PENDING)
   cancellationReason       String?
